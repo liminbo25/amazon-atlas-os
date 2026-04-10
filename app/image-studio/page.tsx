@@ -776,11 +776,11 @@ export default function ClothingModelSwapPage() {
 
             {modelImages[0] ? (
               <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-                <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-100">
+                <div className="aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-100">
                   <img
                     src={modelImages[0]}
                     alt="Model reference"
-                    className="aspect-[4/5] w-full object-cover"
+                    className="h-full w-full object-cover"
                     onClick={() => setPreviewImage(modelImages[0])}
                   />
                 </div>
@@ -891,11 +891,11 @@ export default function ClothingModelSwapPage() {
                       <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
                         Garment
                       </p>
-                      <div className="overflow-hidden rounded-[1.25rem] bg-white">
+                      <div className="aspect-[4/5] overflow-hidden rounded-[1.25rem] bg-white">
                         <img
                           src={item.clothing}
                           alt={`Garment ${index + 1}`}
-                          className="aspect-[4/5] w-full object-cover"
+                          className="h-full w-full object-cover"
                         />
                       </div>
                     </button>
@@ -908,11 +908,11 @@ export default function ClothingModelSwapPage() {
                       <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
                         Try-on
                       </p>
-                      <div className="overflow-hidden rounded-[1.25rem] bg-slate-50">
+                      <div className="aspect-[4/5] overflow-hidden rounded-[1.25rem] bg-slate-50">
                         <img
                           src={item.result}
                           alt={`Try-on result ${index + 1}`}
-                          className="aspect-[4/5] w-full object-cover"
+                          className="h-full w-full object-cover"
                         />
                       </div>
                     </button>
@@ -926,11 +926,11 @@ export default function ClothingModelSwapPage() {
                         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
                           Enhanced
                         </p>
-                        <div className="overflow-hidden rounded-[1.25rem] bg-white">
+                        <div className="aspect-[4/5] overflow-hidden rounded-[1.25rem] bg-white">
                           <img
                             src={item.upscaledResult}
                             alt={`Enhanced result ${index + 1}`}
-                            className="aspect-[4/5] w-full object-cover"
+                            className="h-full w-full object-cover"
                           />
                         </div>
                         <p className="mt-3 text-sm leading-6 text-slate-500">
