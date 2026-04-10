@@ -12,11 +12,13 @@ interface MultiImageUploaderProps {
   maxImages?: number;
 }
 
-const TARGET_DATA_URL_LENGTH = 1_500_000;
+const TARGET_DATA_URL_LENGTH = 900_000;
 const IMAGE_COMPRESSION_STEPS = [
   { maxEdge: 1600, quality: 0.88 },
   { maxEdge: 1400, quality: 0.82 },
   { maxEdge: 1200, quality: 0.76 },
+  { maxEdge: 1000, quality: 0.7 },
+  { maxEdge: 900, quality: 0.64 },
 ];
 
 function renderCompressedImage(

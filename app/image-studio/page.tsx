@@ -195,26 +195,6 @@ export default function ClothingModelSwapPage() {
     }
   };
 
-  const normalizeGeneratedImageForDisplay = async (imageData: string) => {
-    if (!imageData.startsWith("http://") && !imageData.startsWith("https://")) {
-      return imageData;
-    }
-
-    const response = await fetch("/api/download", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl: imageData }),
-    });
-
-    const json = await response.json();
-
-    if (!response.ok || !json.success || !json.data) {
-      throw new Error(json.error || "The generated image URL was not usable.");
-    }
-
-    return json.data as string;
-  };
-
   const readTryOnResponse = async (response: Response) => {
     const responseText = await response.text();
     let data: TryOnApiResponse | null = null;
@@ -286,21 +266,23 @@ export default function ClothingModelSwapPage() {
           throw new Error("The response format was not a valid image.");
         }
 
-        const displayResult = await normalizeGeneratedImageForDisplay(data.result);
-
         const nextItem = {
           clothing: clothingImage,
           model: modelImages[0],
-          result: displayResult,
+          result: data.result,
         };
 
         nextResults.push(nextItem);
         setProcessedImages([...nextResults]);
       } catch (requestError) {
-        setError(
+        const message =
           requestError instanceof Error
             ? requestError.message
-            : "One of the garment runs failed."
+            : "One of the garment runs failed.";
+        setError(
+          message === "Failed to fetch"
+            ? "生成接口已经返回结果，但浏览器在读取下一步数据时中断。请刷新后重试，或换一张更小的图片。"
+            : message
         );
       } finally {
         setProcessedCount(index + 1);
