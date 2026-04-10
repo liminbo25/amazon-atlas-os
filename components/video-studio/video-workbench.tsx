@@ -553,11 +553,8 @@ export function VideoWorkbench() {
           <div className="max-w-3xl">
             <p className="section-kicker">视频 API 状态</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
-              视频模块保留真实业务能力，但前端已经统一进门户。
+              API 状态
             </h2>
-            <p className="mt-3 text-sm leading-7 text-slate-600">
-              当前页面默认对接项目内 Next.js API 路由，既能做本地视频拆解和脚本生成，也能保留后续视频模型任务编排入口。
-            </p>
           </div>
 
           <div className="min-w-[18rem] rounded-[1.6rem] border border-slate-200 bg-white/85 p-5">
@@ -574,19 +571,17 @@ export function VideoWorkbench() {
             <p className="mt-3 text-sm leading-7 text-slate-600">
               {backendMessage}
             </p>
-            <p className="mt-3 text-xs leading-6 text-slate-500">
-              {useLegacyVideoApi
-                ? `Legacy API: ${videoApiLabel}`
-                : "Default API: Next.js /api/video-studio"}
-            </p>
+            {useLegacyVideoApi ? (
+              <p className="mt-3 text-xs leading-6 text-slate-500">
+                {videoApiLabel}
+              </p>
+            ) : null}
           </div>
         </div>
 
         {useLegacyVideoApi ? (
           <div className="mt-6 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-600">
-            当前检测到 legacy 视频后端地址，页面会继续优先使用
-            `NEXT_PUBLIC_VIDEO_API_BASE_URL`。移除该变量后，将默认走项目内
-            Next.js API 路由。
+            当前使用 `NEXT_PUBLIC_VIDEO_API_BASE_URL`。
           </div>
         ) : null}
       </article>
@@ -598,7 +593,7 @@ export function VideoWorkbench() {
               <div>
                 <p className="section-kicker">视频拆解</p>
                 <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                  上传本地视频，拿到结构块、关键帧和原字幕。
+                  上传视频
                 </h3>
               </div>
               <button
@@ -768,7 +763,7 @@ export function VideoWorkbench() {
               <div>
                 <p className="section-kicker">脚本改写</p>
                 <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                  基于拆解结果生成新脚本、角度和视频 Prompt。
+                  生成脚本
                 </h3>
               </div>
               <button
@@ -869,7 +864,7 @@ export function VideoWorkbench() {
           <article className="glass-panel p-6 sm:p-7">
             <p className="section-kicker">模型选择</p>
             <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-              当前视频生成任务支持的模型能力。
+              模型
             </h3>
 
             <div className="mt-6 grid gap-4">
@@ -914,7 +909,7 @@ export function VideoWorkbench() {
               <div>
                 <p className="section-kicker">任务配置</p>
                 <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                  用统一前端直接创建视频生成任务。
+                  创建任务
                 </h3>
               </div>
               <button
@@ -1105,7 +1100,7 @@ export function VideoWorkbench() {
               <div>
                 <p className="section-kicker">任务状态</p>
                 <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                  创建后在这里查看参数快照与结果占位。
+                  状态
                 </h3>
               </div>
               {latestTask ? (
@@ -1142,7 +1137,7 @@ export function VideoWorkbench() {
                 </div>
 
                 <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-5">
-                  <p className="section-kicker">结果占位</p>
+                  <p className="section-kicker">结果</p>
                   <p className="mt-3 text-sm leading-7 text-slate-600">
                     {latestTask.result.placeholderMessage || "等待真实视频结果。"}
                   </p>
@@ -1150,7 +1145,7 @@ export function VideoWorkbench() {
               </div>
             ) : (
               <div className="mt-6 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm leading-7 text-slate-600">
-                当前还没有视频生成任务。选择模型并创建一次任务后，这里会展示状态、素材和参数快照。
+                暂无任务。
               </div>
             )}
           </article>

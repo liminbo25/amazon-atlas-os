@@ -30,12 +30,6 @@ interface UpscaleSettings {
   outputQuality: number;
 }
 
-const quickNotes = [
-  "Use clean product shots with the garment fully visible.",
-  "Upload one stable model reference for the whole batch.",
-  "Lock the look first, then enhance the winners with the quality pass.",
-];
-
 const formatOptions: UpscaleOutputFormat[] = ["jpg", "png", "webp"];
 
 async function getImageSize(
@@ -398,9 +392,8 @@ export default function ClothingModelSwapPage() {
   return (
     <div className="min-h-screen pb-10">
       <StudioHeader
-        eyebrow="图片工坊"
-        title="把服装图、模特参考图和超分增强流程，收在一个更适合生产使用的图片工坊里。"
-        description="这个模块沿用你已经可用的批量试穿与 Replicate 增强能力，只是现在被纳入统一门户，后面再加抠图、背景替换、海报生成也会更顺。"
+        eyebrow="图片"
+        title="图片工具"
       />
 
       <main className="page-shell mt-8">
@@ -408,19 +401,10 @@ export default function ClothingModelSwapPage() {
         <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(39,39,42,0.92))] p-6 text-white shadow-[0_32px_90px_rgba(15,23,42,0.24)] sm:p-8">
           <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl space-y-5">
-              <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/75">
-                <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                Batch virtual try-on
-              </div>
               <div className="space-y-4">
                 <h1 className="font-serif text-4xl tracking-[-0.04em] text-balance sm:text-5xl">
-                  Run the look, then push the best frames through a Replicate quality pass.
+                  批量试穿
                 </h1>
-                <p className="max-w-2xl text-base leading-8 text-white/70 sm:text-lg">
-                  This workspace keeps the try-on run simple: upload garments, add
-                  one model reference, generate the batch, then upscale the keepers
-                  with `prunaai/p-image-upscale` before download.
-                </p>
               </div>
               <div className="flex flex-col gap-3 sm:flex-row">
                 <button
@@ -433,13 +417,13 @@ export default function ClothingModelSwapPage() {
                       : "bg-amber-300 text-slate-950 hover:bg-amber-200"
                   }`}
                 >
-                  {isProcessing ? "Running batch..." : "Run try-on batch"}
+                  {isProcessing ? "生成中..." : "开始生成"}
                 </button>
                 <Link
                   href="/"
                   className="inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
                 >
-                  Back to dashboard
+                  返回总览
                 </Link>
               </div>
             </div>
@@ -447,25 +431,25 @@ export default function ClothingModelSwapPage() {
             <div className="grid gap-4 sm:grid-cols-4 lg:w-[38rem]">
               <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
                 <p className="text-xs uppercase tracking-[0.28em] text-white/40">
-                  Garments
+                  服装图
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{clothingImages.length}</p>
               </div>
               <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
                 <p className="text-xs uppercase tracking-[0.28em] text-white/40">
-                  Model refs
+                  模特图
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{modelImages.length}</p>
               </div>
               <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
                 <p className="text-xs uppercase tracking-[0.28em] text-white/40">
-                  Results
+                  结果
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{processedImages.length}</p>
               </div>
               <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
                 <p className="text-xs uppercase tracking-[0.28em] text-white/40">
-                  Enhanced
+                  增强图
                 </p>
                 <p className="mt-3 text-3xl font-semibold">{enhancedCount}</p>
               </div>
@@ -479,8 +463,7 @@ export default function ClothingModelSwapPage() {
               <MultiImageUploader
                 images={clothingImages}
                 onImagesChange={setClothingImages}
-                title="Garment inputs"
-                description="Upload clean garment references. The current backend will run them one by one against the same model image."
+                title="服装图"
                 maxImages={10}
               />
             </article>
@@ -489,8 +472,7 @@ export default function ClothingModelSwapPage() {
               <MultiImageUploader
                 images={modelImages}
                 onImagesChange={setModelImages}
-                title="Model reference"
-                description="Upload one stable reference with a clear pose and visible body shape. The batch reuses the first model image only."
+                title="模特参考图"
                 maxImages={1}
               />
             </article>
@@ -501,10 +483,10 @@ export default function ClothingModelSwapPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                    Batch status
+                    生成状态
                   </p>
                   <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                    {isProcessing ? "Processing" : "Ready"}
+                    {isProcessing ? "处理中" : "就绪"}
                   </h2>
                 </div>
                 <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white">
@@ -521,19 +503,19 @@ export default function ClothingModelSwapPage() {
 
               <dl className="mt-6 space-y-3 text-sm text-slate-600">
                 <div className="flex items-center justify-between">
-                  <dt>Total garments</dt>
+                  <dt>服装图</dt>
                   <dd className="font-semibold text-slate-950">{clothingImages.length}</dd>
                 </div>
                 <div className="flex items-center justify-between">
-                  <dt>Processed</dt>
+                  <dt>已处理</dt>
                   <dd className="font-semibold text-slate-950">{processedCount}</dd>
                 </div>
                 <div className="flex items-center justify-between">
-                  <dt>Successful</dt>
+                  <dt>成功</dt>
                   <dd className="font-semibold text-slate-950">{processedImages.length}</dd>
                 </div>
                 <div className="flex items-center justify-between">
-                  <dt>Enhanced</dt>
+                  <dt>已增强</dt>
                   <dd className="font-semibold text-slate-950">{enhancedCount}</dd>
                 </div>
               </dl>
@@ -550,15 +532,11 @@ export default function ClothingModelSwapPage() {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        Quality pass
+                        高清增强
                     </p>
                     <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                      Replicate upscale
+                      增强设置
                     </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      `prunaai/p-image-upscale` is wired in for one-click enhancement
-                      after the try-on run.
-                    </p>
                     </div>
                     <button
                       type="button"
@@ -570,7 +548,7 @@ export default function ClothingModelSwapPage() {
                         : "bg-slate-950 text-white hover:bg-slate-800"
                     }`}
                   >
-                    {isUpscalingAll ? "Enhancing all..." : "Enhance all results"}
+                    {isUpscalingAll ? "增强中..." : "全部增强"}
                   </button>
                 </div>
 
@@ -585,13 +563,13 @@ export default function ClothingModelSwapPage() {
                     }`}
                   >
                     {isUpscaleConfigured === null
-                      ? "Checking config"
+                      ? "检查配置"
                       : canEnhance
-                        ? "Replicate ready"
-                        : "Token required"}
+                        ? "可用"
+                        : "需要 Token"}
                   </span>
                   <p className="text-sm leading-6 text-slate-600">
-                    {upscaleConfigMessage || "Checking the Replicate connection."}
+                    {upscaleConfigMessage || "正在检查增强配置。"}
                   </p>
                 </div>
 
@@ -602,7 +580,7 @@ export default function ClothingModelSwapPage() {
                 <div className="space-y-4">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                      Upscale mode
+                      增强模式
                     </p>
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       {(["target", "factor"] as UpscaleMode[]).map((mode) => (
@@ -625,7 +603,7 @@ export default function ClothingModelSwapPage() {
                   {upscaleSettings.upscaleMode === "target" ? (
                     <label className="block">
                       <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        <span>Target resolution</span>
+                        <span>目标分辨率</span>
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
                           {upscaleSettings.target} MP
                         </span>
@@ -645,7 +623,7 @@ export default function ClothingModelSwapPage() {
                   ) : (
                     <label className="block">
                       <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        <span>Scale factor</span>
+                        <span>放大倍数</span>
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
                           {formatFactor(upscaleSettings.factor)}x
                         </span>
@@ -667,7 +645,7 @@ export default function ClothingModelSwapPage() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="block">
                       <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        Output format
+                        输出格式
                       </span>
                       <select
                         value={upscaleSettings.outputFormat}
@@ -689,7 +667,7 @@ export default function ClothingModelSwapPage() {
 
                     <label className="block">
                       <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        <span>Output quality</span>
+                        <span>输出质量</span>
                         <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
                           {upscaleSettings.outputQuality}
                         </span>
@@ -715,10 +693,7 @@ export default function ClothingModelSwapPage() {
                     <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">
-                          Enhance details
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-slate-500">
-                          Push texture and garment edge definition harder.
+                          细节增强
                         </p>
                       </div>
                       <input
@@ -737,10 +712,7 @@ export default function ClothingModelSwapPage() {
                     <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
                       <div>
                         <p className="text-sm font-semibold text-slate-900">
-                          Enhance realism
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-slate-500">
-                          Bias the upscale toward a more photographic finish.
+                          写实增强
                         </p>
                       </div>
                       <input
@@ -760,20 +732,6 @@ export default function ClothingModelSwapPage() {
               </div>
             </article>
 
-            <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Run notes
-              </p>
-              <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
-                {quickNotes.map((note) => (
-                  <li key={note} className="flex items-start gap-3">
-                    <span className="mt-2 h-2 w-2 rounded-full bg-amber-500" />
-                    <span>{note}</span>
-                  </li>
-                ))}
-              </ul>
-            </article>
-
             {modelImages[0] ? (
               <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-100">
@@ -786,10 +744,7 @@ export default function ClothingModelSwapPage() {
                 </div>
                 <div className="px-2 pb-2 pt-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                    Active model reference
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    This image is reused for every garment in the current run.
+                    当前模特图
                   </p>
                 </div>
               </article>
@@ -801,24 +756,24 @@ export default function ClothingModelSwapPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Outputs
+                输出
               </p>
               <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                Generated results
+                生成结果
               </h2>
             </div>
             <p className="text-sm text-slate-500">
               {processedImages.length === 0
-                ? "Results will appear here after your first run."
-                : `${processedImages.length} result${processedImages.length > 1 ? "s" : ""} ready. ${enhancedCount} enhanced.`}
+                ? "暂无结果"
+                : `${processedImages.length} 个结果，${enhancedCount} 个已增强。`}
             </p>
           </div>
 
           {processedImages.length === 0 ? (
             <div className="mt-6 rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50/80 px-6 py-12 text-center">
-              <p className="text-lg font-semibold text-slate-900">No results yet</p>
+              <p className="text-lg font-semibold text-slate-900">暂无结果</p>
               <p className="mt-2 text-sm leading-7 text-slate-500">
-                Add garment and model images, then run the batch to populate this review area.
+                上传服装图和模特参考图后点击开始生成。
               </p>
             </div>
           ) : (
@@ -831,10 +786,7 @@ export default function ClothingModelSwapPage() {
                   <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        Look {index + 1}
-                      </p>
-                      <p className="mt-1 text-sm text-slate-600">
-                        Review the garment, the try-on result, and the enhanced export.
+                        结果 {index + 1}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
@@ -849,10 +801,10 @@ export default function ClothingModelSwapPage() {
                         }`}
                       >
                         {item.isUpscaling
-                          ? "Enhancing..."
+                          ? "增强中..."
                           : canEnhance
-                            ? "Enhance quality"
-                            : "Token required"}
+                            ? "增强"
+                            : "需要 Token"}
                       </button>
                       <button
                         type="button"
@@ -861,7 +813,7 @@ export default function ClothingModelSwapPage() {
                         }
                         className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
                       >
-                        Download try-on
+                        下载试穿图
                       </button>
                       {item.upscaledResult ? (
                         <button
@@ -876,7 +828,7 @@ export default function ClothingModelSwapPage() {
                           }
                           className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                         >
-                          Download enhanced
+                          下载增强图
                         </button>
                       ) : null}
                     </div>
@@ -889,7 +841,7 @@ export default function ClothingModelSwapPage() {
                       className="bg-slate-50 p-4 text-left transition hover:bg-slate-100"
                     >
                       <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        Garment
+                        服装图
                       </p>
                       <div className="overflow-hidden rounded-[1.25rem] bg-white">
                         <img
@@ -906,7 +858,7 @@ export default function ClothingModelSwapPage() {
                       className="bg-white p-4 text-left transition hover:bg-slate-50"
                     >
                       <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        Try-on
+                        试穿图
                       </p>
                       <div className="overflow-hidden rounded-[1.25rem] bg-slate-50">
                         <img
@@ -924,7 +876,7 @@ export default function ClothingModelSwapPage() {
                         className="bg-slate-50 p-4 text-left transition hover:bg-white"
                       >
                         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                          Enhanced
+                          增强图
                         </p>
                         <div className="overflow-hidden rounded-[1.25rem] bg-white">
                           <img
@@ -934,25 +886,20 @@ export default function ClothingModelSwapPage() {
                           />
                         </div>
                         <p className="mt-3 text-sm leading-6 text-slate-500">
-                          {item.upscaleFormat?.toUpperCase() || upscaleSettings.outputFormat.toUpperCase()} export ready.
+                          {item.upscaleFormat?.toUpperCase() || upscaleSettings.outputFormat.toUpperCase()}
                         </p>
                       </button>
                     ) : (
                       <div className="bg-slate-50 p-4">
                         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                          Enhanced
+                          增强图
                         </p>
                         <div className="flex aspect-[4/5] items-center justify-center rounded-[1.25rem] border border-dashed border-slate-300 bg-white px-5 text-center">
                           <div>
                             <p className="text-base font-semibold text-slate-900">
                               {item.isUpscaling
-                                ? "Enhancement in progress"
-                                : "No enhanced export yet"}
-                            </p>
-                            <p className="mt-2 text-sm leading-6 text-slate-500">
-                              {item.isUpscaling
-                                ? "Replicate is generating the higher-quality version now."
-                                : "Run the quality pass to produce a sharper downloadable output."}
+                                ? "增强中"
+                                : "未增强"}
                             </p>
                           </div>
                         </div>

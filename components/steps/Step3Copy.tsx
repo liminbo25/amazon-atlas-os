@@ -282,7 +282,7 @@ export function Step3Copy() {
             <CardTitle className="text-base">差评痛点排行</CardTitle>
           </div>
           <CardDescription>
-            竞品的高频弱点，往往就是后续 Listing 里最值得承接的突破口。
+            高频负向反馈。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -352,7 +352,7 @@ export function Step3Copy() {
             <CardTitle className="text-base">好评价值点提取</CardTitle>
           </div>
           <CardDescription>
-            把用户反复认可的体验，沉淀成后续文案里的价值表达。
+            高频正向反馈。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -395,7 +395,7 @@ export function Step3Copy() {
         <CardHeader>
           <CardTitle className="text-base">竞品文案结构分析</CardTitle>
           <CardDescription>
-            学习值得保留的表达结构，同时避开竞品已经暴露出来的短板。
+            标题、五点、描述结构。
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -285,7 +285,6 @@ export function ProductImageUpload({
             <ImageIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
             <div>
               <p className="font-medium text-foreground">建议至少上传 1 张主图</p>
-              <p>图片越完整，后续 AI 越容易提取外观、材质和卖点线索。</p>
             </div>
           </div>
         </div>
@@ -355,7 +354,7 @@ export function ProductImageUpload({
 
       {images.length > 0 && (
         <p className="text-xs text-muted-foreground">
-          已上传 {images.length} / {maxImages} 张图片，可继续为不同视角分类，方便后续分析。
+          已上传 {images.length} / {maxImages} 张图片。
         </p>
       )}
     </div>

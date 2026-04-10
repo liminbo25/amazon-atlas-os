@@ -265,8 +265,7 @@ export function Step1Analysis() {
         <CardHeader>
           <CardTitle>Step 1: 需求确认</CardTitle>
           <CardDescription>
-            先确认目标站点、竞品 ASIN 和产品图片，为后续竞品采集、VOC 分析与
-            Listing 生成准备输入。
+            目标市场、竞品 ASIN、产品图片。
           </CardDescription>
         </CardHeader>
 
@@ -393,9 +392,6 @@ export function Step1Analysis() {
                   <div className="space-y-1">
                     <p className="font-medium text-foreground">
                       上传图片后即可触发 AI 视觉分析
-                    </p>
-                    <p>
-                      结果会提炼外观、材质、核心特征、卖点建议，供后续文案生成直接复用。
                     </p>
                   </div>
                 </div>
