@@ -20,8 +20,37 @@ import {
   type VideoModelParameterKey,
 } from "@/lib/video-studio";
 
-const videoApiBaseUrl =
+const legacyVideoApiBaseUrl =
   process.env.NEXT_PUBLIC_VIDEO_API_BASE_URL?.replace(/\/$/, "") ?? "";
+const useLegacyVideoApi = Boolean(legacyVideoApiBaseUrl);
+const videoApiLabel = useLegacyVideoApi
+  ? legacyVideoApiBaseUrl
+  : "Next.js /api/video-studio";
+const videoApiRoutes = useLegacyVideoApi
+  ? {
+      models: "/api/video-models",
+      tasks: "/api/video-generation/tasks",
+      upload: "/api/upload-video",
+      copy: "/api/generate-copy",
+    }
+  : {
+      models: "/api/video-studio/models",
+      tasks: "/api/video-studio/generation/tasks",
+      upload: "/api/video-studio/upload-video",
+      copy: "/api/video-studio/generate-copy",
+    };
+
+function videoApiUrl(path: string) {
+  return useLegacyVideoApi ? `${legacyVideoApiBaseUrl}${path}` : path;
+}
+
+async function readVideoApiError(response: Response) {
+  const errorPayload = (await response.json().catch(() => null)) as
+    | { detail?: string; error?: string }
+    | null;
+
+  return errorPayload?.detail ?? errorPayload?.error ?? `HTTP ${response.status}`;
+}
 
 const numericParameterKeys: VideoModelParameterKey[] = [
   "motion_strength",
@@ -166,11 +195,11 @@ function buildTaskPayload(model: VideoModelCapability, draft: VideoGenerationDra
 export function VideoWorkbench() {
   const [backendStatus, setBackendStatus] = useState<
     "checking" | "online" | "offline" | "unconfigured"
-  >(videoApiBaseUrl ? "checking" : "unconfigured");
+  >("checking");
   const [backendMessage, setBackendMessage] = useState(
-    videoApiBaseUrl
-      ? "正在读取视频后端能力..."
-      : "还没有配置 NEXT_PUBLIC_VIDEO_API_BASE_URL。",
+    useLegacyVideoApi
+      ? "Loading legacy video API..."
+      : "Loading Next.js video API.",
   );
 
   const [models, setModels] = useState<VideoModelCapability[]>([]);
@@ -212,29 +241,26 @@ export function VideoWorkbench() {
   const durationOptions = buildDurationOptions(selectedModel);
 
   useEffect(() => {
-    if (!videoApiBaseUrl) {
-      return;
-    }
-
     let cancelled = false;
 
     async function loadModels() {
       setBackendStatus("checking");
-      setBackendMessage("正在读取视频后端能力...");
+      setBackendMessage(
+        useLegacyVideoApi
+          ? "Loading legacy video API..."
+          : "Loading Next.js video API.",
+      );
 
       try {
-        const response = await fetch(`${videoApiBaseUrl}/api/video-models`);
+        const response = await fetch(videoApiUrl(videoApiRoutes.models));
         if (!response.ok) {
-          const errorPayload = (await response.json().catch(() => null)) as
-            | { detail?: string }
-            | null;
-          throw new Error(errorPayload?.detail ?? `HTTP ${response.status}`);
+          throw new Error(await readVideoApiError(response));
         }
 
         const payload = await response.json();
         const nextModels = normalizeVideoModelListPayload(payload);
         if (!nextModels.length) {
-          throw new Error("后端没有返回可用的视频模型能力。");
+          throw new Error("视频 API 没有返回可用的模型能力。");
         }
 
         if (cancelled) {
@@ -246,7 +272,7 @@ export function VideoWorkbench() {
           setSelectedModelId(nextModels[0].id);
           setDraft(createVideoGenerationDraft(nextModels[0]));
           setBackendStatus("online");
-          setBackendMessage("视频后端已联通，可以开始拆解与视频生成。");
+          setBackendMessage("视频 API 已联通，可以开始拆解与视频生成。");
         });
       } catch (error) {
         if (cancelled) {
@@ -257,7 +283,7 @@ export function VideoWorkbench() {
         setBackendMessage(
           error instanceof Error
             ? error.message
-            : "视频后端暂时无法连接。",
+            : "视频 API 暂时无法连接。",
         );
       }
     }
@@ -311,20 +337,13 @@ export function VideoWorkbench() {
   }
 
   async function handleRefreshTask(taskId: string) {
-    if (!videoApiBaseUrl) {
-      return;
-    }
-
     setIsRefreshingTask(true);
     try {
       const response = await fetch(
-        `${videoApiBaseUrl}/api/video-generation/tasks/${taskId}`,
+        videoApiUrl(`${videoApiRoutes.tasks}/${taskId}`),
       );
       if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => null)) as
-          | { detail?: string }
-          | null;
-        throw new Error(errorPayload?.detail ?? `HTTP ${response.status}`);
+        throw new Error(await readVideoApiError(response));
       }
 
       const payload = await response.json();
@@ -349,8 +368,8 @@ export function VideoWorkbench() {
   }
 
   async function handleSubmitTask() {
-    if (!videoApiBaseUrl) {
-      setTaskMessage("请先配置 NEXT_PUBLIC_VIDEO_API_BASE_URL。");
+    if (!videoApiLabel) {
+      setTaskMessage("视频 API 暂不可用。");
       return;
     }
 
@@ -392,15 +411,12 @@ export function VideoWorkbench() {
         });
       });
 
-      const response = await fetch(`${videoApiBaseUrl}/api/video-generation/tasks`, {
+      const response = await fetch(videoApiUrl(videoApiRoutes.tasks), {
         method: "POST",
         body,
       });
       if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => null)) as
-          | { detail?: string }
-          | null;
-        throw new Error(errorPayload?.detail ?? `HTTP ${response.status}`);
+        throw new Error(await readVideoApiError(response));
       }
 
       const payload = await response.json();
@@ -425,8 +441,8 @@ export function VideoWorkbench() {
   }
 
   async function handleAnalyzeVideo() {
-    if (!videoApiBaseUrl) {
-      setAnalysisMessage("请先配置 NEXT_PUBLIC_VIDEO_API_BASE_URL。");
+    if (!videoApiLabel) {
+      setAnalysisMessage("视频 API 暂不可用。");
       return;
     }
 
@@ -444,15 +460,12 @@ export function VideoWorkbench() {
       body.append("interval_seconds", String(analysisInterval));
       body.append("max_frames", String(analysisFrames));
 
-      const response = await fetch(`${videoApiBaseUrl}/api/upload-video`, {
+      const response = await fetch(videoApiUrl(videoApiRoutes.upload), {
         method: "POST",
         body,
       });
       if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => null)) as
-          | { detail?: string }
-          | null;
-        throw new Error(errorPayload?.detail ?? `HTTP ${response.status}`);
+        throw new Error(await readVideoApiError(response));
       }
 
       const payload = (await response.json()) as { manifest?: Record<string, unknown> };
@@ -484,8 +497,8 @@ export function VideoWorkbench() {
   }
 
   async function handleGenerateCopy() {
-    if (!videoApiBaseUrl) {
-      setCopyMessage("请先配置 NEXT_PUBLIC_VIDEO_API_BASE_URL。");
+    if (!videoApiLabel) {
+      setCopyMessage("视频 API 暂不可用。");
       return;
     }
 
@@ -498,7 +511,7 @@ export function VideoWorkbench() {
     setCopyMessage("正在基于视频结构生成新的脚本方案...");
 
     try {
-      const response = await fetch(`${videoApiBaseUrl}/api/generate-copy`, {
+      const response = await fetch(videoApiUrl(videoApiRoutes.copy), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -509,10 +522,7 @@ export function VideoWorkbench() {
         }),
       });
       if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => null)) as
-          | { detail?: string }
-          | null;
-        throw new Error(errorPayload?.detail ?? `HTTP ${response.status}`);
+        throw new Error(await readVideoApiError(response));
       }
 
       const payload = await response.json();
@@ -541,12 +551,12 @@ export function VideoWorkbench() {
       <article className="glass-panel p-6 sm:p-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
-            <p className="section-kicker">视频后端状态</p>
+            <p className="section-kicker">视频 API 状态</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
               视频模块保留真实业务能力，但前端已经统一进门户。
             </h2>
             <p className="mt-3 text-sm leading-7 text-slate-600">
-              当前页面直接对接你现有的 FastAPI 契约，既能做本地视频拆解和脚本生成，也能做后续视频模型任务编排。
+              当前页面默认对接项目内 Next.js API 路由，既能做本地视频拆解和脚本生成，也能保留后续视频模型任务编排入口。
             </p>
           </div>
 
@@ -565,18 +575,18 @@ export function VideoWorkbench() {
               {backendMessage}
             </p>
             <p className="mt-3 text-xs leading-6 text-slate-500">
-              {videoApiBaseUrl
-                ? `已配置地址：${videoApiBaseUrl}`
-                : "请在 Vercel 或本地 .env 中设置 NEXT_PUBLIC_VIDEO_API_BASE_URL。"}
+              {useLegacyVideoApi
+                ? `Legacy API: ${videoApiLabel}`
+                : "Default API: Next.js /api/video-studio"}
             </p>
           </div>
         </div>
 
-        {!videoApiBaseUrl ? (
+        {useLegacyVideoApi ? (
           <div className="mt-6 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-600">
-            这个统一门户已经为视频模块预留好了入口，但视频分析依赖 Python、OpenCV 和 Whisper。
-            先在 `video-backend/` 启动 FastAPI，再把公开地址写入
-            `NEXT_PUBLIC_VIDEO_API_BASE_URL`，这个页面就会自动连通。
+            当前检测到 legacy 视频后端地址，页面会继续优先使用
+            `NEXT_PUBLIC_VIDEO_API_BASE_URL`。移除该变量后，将默认走项目内
+            Next.js API 路由。
           </div>
         ) : null}
       </article>
