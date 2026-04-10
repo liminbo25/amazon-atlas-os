@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CheckCircle2,
   ChevronDown,
@@ -13,6 +13,10 @@ import {
   Settings2,
   XCircle,
 } from "lucide-react";
+import {
+  normalizeApiRequestError,
+  parseApiRequestError,
+} from "@/components/AiRequestErrorAlert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -92,13 +96,43 @@ type RuntimeTestResult =
       model?: string;
     };
 
-export function VideoRuntimeConfigPanel() {
+export interface VideoServerRuntimeStatus {
+  configured: boolean;
+  provider: AiProvider | null;
+  base_url: string;
+  model: string;
+  timeout_seconds: number;
+  has_api_key: boolean;
+  api_key_masked: string;
+  source: "file" | "env" | "none";
+  storage: "local-file" | "vercel-tmp";
+  config_error: string | null;
+}
+
+interface VideoRuntimeConfigPanelProps {
+  useLegacyApi?: boolean;
+  onServerStatusChange?: (status: VideoServerRuntimeStatus | null) => void;
+}
+
+type ServerSyncState = "idle" | "loading" | "saving";
+
+export function VideoRuntimeConfigPanel({
+  useLegacyApi = false,
+  onServerStatusChange,
+}: VideoRuntimeConfigPanelProps) {
   const { aiRuntimeSettings, updateAiRuntimeSettings, resetAiRuntimeSettings } =
     useVideoRuntimeStore();
   const [isOpen, setIsOpen] = useState(false);
   const [testResults, setTestResults] = useState<
     Partial<Record<VideoRuntimeServiceKey, RuntimeTestResult>>
   >({});
+  const [serverStatus, setServerStatus] = useState<VideoServerRuntimeStatus | null>(
+    null
+  );
+  const [serverSyncState, setServerSyncState] = useState<ServerSyncState>("idle");
+  const [serverMessage, setServerMessage] = useState("");
+  const [serverError, setServerError] = useState("");
+  const onServerStatusChangeRef = useRef(onServerStatusChange);
 
   const customizedCount = useMemo(
     () =>
@@ -106,6 +140,69 @@ export function VideoRuntimeConfigPanel() {
         .length,
     [aiRuntimeSettings]
   );
+
+  useEffect(() => {
+    onServerStatusChangeRef.current = onServerStatusChange;
+  }, [onServerStatusChange]);
+
+  useEffect(() => {
+    if (useLegacyApi) {
+      setServerStatus(null);
+      setServerMessage("");
+      setServerError("");
+      onServerStatusChangeRef.current?.(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadInitialServerStatus() {
+      setServerError("");
+
+      try {
+        const response = await fetch("/api/video-studio/runtime/config", {
+          cache: "no-store",
+        });
+        if (!response.ok) {
+          throw await parseApiRequestError(
+            response,
+            "Failed to load video server runtime."
+          );
+        }
+
+        const payload = (await response.json()) as unknown;
+        const nextStatus = readServerRuntimeStatus(payload);
+        if (cancelled) {
+          return;
+        }
+
+        setServerStatus(nextStatus);
+        setServerMessage(
+          nextStatus?.configured
+            ? `Shared default ready: ${formatServerStatusSummary(nextStatus)}`
+            : "Shared server default is not configured yet."
+        );
+        onServerStatusChangeRef.current?.(nextStatus);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        const normalizedError = normalizeApiRequestError(
+          error,
+          "Failed to load video server runtime."
+        );
+        setServerError(normalizedError.message);
+        onServerStatusChangeRef.current?.(null);
+      }
+    }
+
+    void loadInitialServerStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [useLegacyApi]);
 
   const updateServiceSettings = (
     service: VideoRuntimeServiceKey,
@@ -146,45 +243,198 @@ export function VideoRuntimeConfigPanel() {
         }),
       });
 
-      const payload = (await response.json().catch(() => null)) as
-        | {
-            provider?: string;
-            baseURL?: string;
-            model?: string;
-            outputPreview?: string;
-            error?: string;
-          }
-        | null;
-
       if (!response.ok) {
-        throw new Error(payload?.error || "Video runtime test failed.");
+        throw await parseApiRequestError(response, "Video runtime test failed.");
       }
+
+      const payload = (await response.json()) as {
+        provider?: string;
+        baseURL?: string;
+        model?: string;
+        outputPreview?: string;
+      };
 
       setTestResults((current) => ({
         ...current,
         [service]: {
           status: "success",
-          message: `Connected to ${payload?.provider || "AI"} at ${formatPreviewBaseUrl(
-            payload?.baseURL || aiRuntimeSettings[service].baseUrl
+          message: `Connected to ${payload.provider || "AI"} at ${formatPreviewBaseUrl(
+            payload.baseURL || aiRuntimeSettings[service].baseUrl
           )}`,
-          detail: payload?.outputPreview || "The model returned a valid response.",
-          provider: payload?.provider,
-          model: payload?.model,
+          detail: payload.outputPreview || "The model returned a valid response.",
+          provider: payload.provider,
+          model: payload.model,
         },
       }));
     } catch (error) {
+      const normalizedError = normalizeApiRequestError(
+        error,
+        "Video runtime test failed."
+      );
       setTestResults((current) => ({
         ...current,
         [service]: {
           status: "error",
-          message:
-            error instanceof Error ? error.message : "Video runtime test failed.",
-          detail:
-            "Check protocol, base URL, model, and credential. Frame analysis and copy generation can use different gateways.",
+          message: normalizedError.message,
+          detail: normalizedError.code
+            ? `code: ${normalizedError.code}`
+            : "Check protocol, base URL, model, and credential. Frame analysis and copy generation can use different gateways.",
         },
       }));
     }
   };
+
+  async function loadServerStatus(showSpinner = true) {
+    if (useLegacyApi) {
+      return;
+    }
+
+    if (showSpinner) {
+      setServerSyncState("loading");
+    }
+    setServerError("");
+
+    try {
+      const response = await fetch("/api/video-studio/runtime/config", {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw await parseApiRequestError(
+          response,
+          "Failed to load video server runtime."
+        );
+      }
+
+      const payload = (await response.json()) as unknown;
+      const nextStatus = readServerRuntimeStatus(payload);
+      setServerStatus(nextStatus);
+      setServerMessage(
+        nextStatus?.configured
+          ? `Shared default ready: ${formatServerStatusSummary(nextStatus)}`
+          : "Shared server default is not configured yet."
+      );
+      onServerStatusChangeRef.current?.(nextStatus);
+    } catch (error) {
+      const normalizedError = normalizeApiRequestError(
+        error,
+        "Failed to load video server runtime."
+      );
+      setServerError(normalizedError.message);
+      onServerStatusChangeRef.current?.(null);
+    } finally {
+      if (showSpinner) {
+        setServerSyncState("idle");
+      }
+    }
+  }
+
+  const handleSaveServerDefault = async (service: VideoRuntimeServiceKey) => {
+    if (useLegacyApi) {
+      return;
+    }
+
+    setServerSyncState("saving");
+    setServerError("");
+
+    try {
+      const runtime = aiRuntimeSettings[service];
+      const body: {
+        llm: {
+          provider: AiProvider | "";
+          base_url: string;
+          model: string;
+          preserve_api_key: boolean;
+          api_key?: string;
+        };
+      } = {
+        llm: {
+          provider: runtime.provider,
+          base_url: runtime.baseUrl.trim(),
+          model: runtime.model.trim(),
+          preserve_api_key: runtime.apiKey.trim().length === 0,
+        },
+      };
+
+      if (runtime.apiKey.trim()) {
+        body.llm.api_key = runtime.apiKey.trim();
+      }
+
+      const response = await fetch("/api/video-studio/runtime/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        throw await parseApiRequestError(
+          response,
+          "Failed to save video server runtime."
+        );
+      }
+
+      const payload = (await response.json()) as unknown;
+      const nextStatus = readServerRuntimeStatus(payload);
+      setServerStatus(nextStatus);
+      setServerMessage(
+        `${runtimeSections.find((item) => item.key === service)?.title || service} settings are now the shared server default.`
+      );
+      onServerStatusChangeRef.current?.(nextStatus);
+    } catch (error) {
+      const normalizedError = normalizeApiRequestError(
+        error,
+        "Failed to save video server runtime."
+      );
+      setServerError(normalizedError.message);
+    } finally {
+      setServerSyncState("idle");
+    }
+  };
+
+  const handleClearServerDefault = async () => {
+    if (useLegacyApi) {
+      return;
+    }
+
+    setServerSyncState("saving");
+    setServerError("");
+
+    try {
+      const response = await fetch("/api/video-studio/runtime/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          llm: {
+            provider: "",
+            base_url: "",
+            model: "",
+            api_key: "",
+            preserve_api_key: false,
+          },
+        }),
+      });
+      if (!response.ok) {
+        throw await parseApiRequestError(
+          response,
+          "Failed to clear video server runtime."
+        );
+      }
+
+      const payload = (await response.json()) as unknown;
+      const nextStatus = readServerRuntimeStatus(payload);
+      setServerStatus(nextStatus);
+      setServerMessage("Shared server default was cleared.");
+      onServerStatusChangeRef.current?.(nextStatus);
+    } catch (error) {
+      const normalizedError = normalizeApiRequestError(
+        error,
+        "Failed to clear video server runtime."
+      );
+      setServerError(normalizedError.message);
+    } finally {
+      setServerSyncState("idle");
+    }
+  };
+
+  const serverBusy = serverSyncState !== "idle";
 
   return (
     <Card className="border-dashed border-slate-300 bg-slate-50/70">
@@ -244,6 +494,155 @@ export function VideoRuntimeConfigPanel() {
             </Badge>
           ))}
         </div>
+
+        {useLegacyApi ? (
+          <div className="rounded-lg border border-dashed border-slate-300 bg-white/80 p-4 text-sm leading-6 text-slate-600">
+            Legacy video API mode is enabled. The fields below still work as
+            per-request overrides, but the shared server default only applies to
+            the built-in Next.js video runtime.
+          </div>
+        ) : (
+          <div className="rounded-lg border border-slate-200 bg-white/90 p-4">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">
+                  Shared Server Default
+                </p>
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  Used whenever the browser-side overrides are blank. This is the
+                  shared fallback for the built-in video runtime.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge
+                  variant={serverStatus?.configured ? "secondary" : "outline"}
+                >
+                  {serverSyncState === "loading"
+                    ? "Loading"
+                    : serverStatus?.configured
+                      ? "Configured"
+                      : "Not configured"}
+                </Badge>
+                {serverStatus?.config_error ? (
+                  <Badge variant="destructive">Config issue</Badge>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-600 sm:grid-cols-2">
+              <div>
+                <span className="font-medium text-slate-700">Protocol:</span>{" "}
+                <span className="font-mono break-all">
+                  {serverStatus?.provider
+                    ? formatProviderLabel(serverStatus.provider)
+                    : "Auto / none"}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">Model:</span>{" "}
+                <span className="font-mono break-all">
+                  {serverStatus?.model || "Not set"}
+                </span>
+              </div>
+              <div className="sm:col-span-2">
+                <span className="font-medium text-slate-700">Base URL:</span>{" "}
+                <span className="font-mono break-all">
+                  {serverStatus?.base_url || "Provider default"}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">Credential:</span>{" "}
+                <span>
+                  {serverStatus?.has_api_key
+                    ? serverStatus.api_key_masked || "Configured"
+                    : "No saved key"}
+                </span>
+              </div>
+              <div>
+                <span className="font-medium text-slate-700">Source:</span>{" "}
+                <span>
+                  {serverStatus
+                    ? formatServerSource(serverStatus)
+                    : "Not loaded yet"}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={serverBusy}
+                onClick={() => void loadServerStatus(true)}
+              >
+                {serverSyncState === "loading" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Loading
+                  </>
+                ) : (
+                  "Reload server default"
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={serverBusy}
+                onClick={() => void handleSaveServerDefault("frameAnalysis")}
+              >
+                {serverSyncState === "saving" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving
+                  </>
+                ) : (
+                  "Use Frame Analysis"
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                disabled={serverBusy}
+                onClick={() => void handleSaveServerDefault("copyGeneration")}
+              >
+                {serverSyncState === "saving" ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving
+                  </>
+                ) : (
+                  "Use Copy Generation"
+                )}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="destructive"
+                disabled={serverBusy}
+                onClick={() => void handleClearServerDefault()}
+              >
+                Clear default
+              </Button>
+            </div>
+
+            {serverMessage ? (
+              <p className="mt-3 text-xs leading-5 text-emerald-700">
+                {serverMessage}
+              </p>
+            ) : null}
+            {serverError ? (
+              <p className="mt-3 text-xs leading-5 text-rose-700">{serverError}</p>
+            ) : null}
+            {serverStatus?.config_error ? (
+              <p className="mt-3 text-xs leading-5 text-amber-700">
+                {serverStatus.config_error}
+              </p>
+            ) : null}
+          </div>
+        )}
 
         {isOpen ? (
           <div className="grid gap-4 xl:grid-cols-2">
@@ -343,7 +742,7 @@ export function VideoRuntimeConfigPanel() {
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Optional runtime override. If left blank, the server falls
-                      back to environment variables.
+                      back to the shared default and environment variables.
                     </p>
                   </div>
 
@@ -494,4 +893,71 @@ function formatTestHeading(result: RuntimeTestResult): string {
     default:
       return "Not tested yet";
   }
+}
+
+function readServerRuntimeStatus(value: unknown): VideoServerRuntimeStatus | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const llm =
+    record.llm && typeof record.llm === "object" && !Array.isArray(record.llm)
+      ? (record.llm as Record<string, unknown>)
+      : record;
+
+  const provider = llm.provider;
+  const source = llm.source;
+  const storage = llm.storage;
+
+  if (
+    provider !== null &&
+    provider !== undefined &&
+    provider !== "anthropic" &&
+    provider !== "openai"
+  ) {
+    return null;
+  }
+
+  if (source !== "file" && source !== "env" && source !== "none") {
+    return null;
+  }
+
+  if (storage !== "local-file" && storage !== "vercel-tmp") {
+    return null;
+  }
+
+  return {
+    configured: Boolean(llm.configured),
+    provider:
+      provider === "anthropic" || provider === "openai" ? provider : null,
+    base_url: typeof llm.base_url === "string" ? llm.base_url : "",
+    model: typeof llm.model === "string" ? llm.model : "",
+    timeout_seconds:
+      typeof llm.timeout_seconds === "number" ? llm.timeout_seconds : 120,
+    has_api_key: Boolean(llm.has_api_key),
+    api_key_masked:
+      typeof llm.api_key_masked === "string" ? llm.api_key_masked : "",
+    source,
+    storage,
+    config_error:
+      typeof llm.config_error === "string" ? llm.config_error : null,
+  };
+}
+
+function formatServerSource(status: VideoServerRuntimeStatus): string {
+  const sourceLabel =
+    status.source === "file"
+      ? "Saved file"
+      : status.source === "env"
+        ? "Environment"
+        : "None";
+
+  return `${sourceLabel} / ${status.storage}`;
+}
+
+function formatServerStatusSummary(status: VideoServerRuntimeStatus): string {
+  const provider = status.provider ? formatProviderLabel(status.provider) : "Auto";
+  const model = status.model || "model not set";
+  return `${provider} / ${model}`;
 }

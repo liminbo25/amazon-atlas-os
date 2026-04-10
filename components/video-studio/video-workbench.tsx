@@ -19,7 +19,10 @@ import {
   type VideoModelCapability,
   type VideoModelParameterKey,
 } from "@/lib/video-studio";
-import { VideoRuntimeConfigPanel } from "@/components/video-studio/video-runtime-config-panel";
+import {
+  VideoRuntimeConfigPanel,
+  type VideoServerRuntimeStatus,
+} from "@/components/video-studio/video-runtime-config-panel";
 import { useVideoRuntimeStore } from "@/lib/video-runtime-store";
 
 const legacyVideoApiBaseUrl =
@@ -30,12 +33,14 @@ const videoApiLabel = useLegacyVideoApi
   : "Next.js /api/video-studio";
 const videoApiRoutes = useLegacyVideoApi
   ? {
+      health: "/api/health",
       models: "/api/video-models",
       tasks: "/api/video-generation/tasks",
       upload: "/api/upload-video",
       copy: "/api/generate-copy",
     }
   : {
+      health: "/api/video-studio/health",
       models: "/api/video-studio/models",
       tasks: "/api/video-studio/generation/tasks",
       upload: "/api/video-studio/upload-video",
@@ -52,6 +57,94 @@ async function readVideoApiError(response: Response) {
     | null;
 
   return errorPayload?.detail ?? errorPayload?.error ?? `HTTP ${response.status}`;
+}
+
+function readVideoServerRuntimeStatus(value: unknown): VideoServerRuntimeStatus | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  const record = value as Record<string, unknown>;
+  const llm =
+    record.llm && typeof record.llm === "object" && !Array.isArray(record.llm)
+      ? (record.llm as Record<string, unknown>)
+      : null;
+
+  if (!llm) {
+    return null;
+  }
+
+  const provider = llm.provider;
+  const source = llm.source;
+  const storage = llm.storage;
+
+  if (
+    provider !== null &&
+    provider !== undefined &&
+    provider !== "anthropic" &&
+    provider !== "openai"
+  ) {
+    return null;
+  }
+
+  if (source !== "file" && source !== "env" && source !== "none") {
+    return null;
+  }
+
+  if (storage !== "local-file" && storage !== "vercel-tmp") {
+    return null;
+  }
+
+  return {
+    configured: Boolean(llm.configured),
+    provider:
+      provider === "anthropic" || provider === "openai" ? provider : null,
+    base_url: typeof llm.base_url === "string" ? llm.base_url : "",
+    model: typeof llm.model === "string" ? llm.model : "",
+    timeout_seconds:
+      typeof llm.timeout_seconds === "number" ? llm.timeout_seconds : 120,
+    has_api_key: Boolean(llm.has_api_key),
+    api_key_masked:
+      typeof llm.api_key_masked === "string" ? llm.api_key_masked : "",
+    source,
+    storage,
+    config_error:
+      typeof llm.config_error === "string" ? llm.config_error : null,
+  };
+}
+
+function describeBackendRuntimeStatus(status: VideoServerRuntimeStatus | null): {
+  state: "online" | "unconfigured";
+  message: string;
+} {
+  if (!status) {
+    return {
+      state: "online",
+      message: "视频 API 已联通，可以开始拆解与视频生成。",
+    };
+  }
+
+  if (status.configured) {
+    const provider =
+      status.provider === "openai"
+        ? "OpenAI"
+        : status.provider === "anthropic"
+          ? "Anthropic"
+          : "Auto";
+    const model = status.model || "shared default";
+
+    return {
+      state: "online",
+      message: `视频 API 已联通，服务端默认 AI 运行时已配置：${provider} / ${model}。`,
+    };
+  }
+
+  return {
+    state: "unconfigured",
+    message:
+      status.config_error ||
+      "视频 API 已联通，但服务端默认 AI 运行时尚未配置。你仍可以在下方 Runtime 面板填写浏览器覆盖配置，或保存一套共享默认值。",
+  };
 }
 
 const numericParameterKeys: VideoModelParameterKey[] = [
@@ -266,16 +359,40 @@ export function VideoWorkbench() {
           throw new Error("视频 API 没有返回可用的模型能力。");
         }
 
+        let runtimeStatus: VideoServerRuntimeStatus | null = null;
+        if (!useLegacyVideoApi) {
+          try {
+            const healthResponse = await fetch(videoApiUrl(videoApiRoutes.health), {
+              cache: "no-store",
+            });
+            if (healthResponse.ok) {
+              runtimeStatus = readVideoServerRuntimeStatus(
+                (await healthResponse.json()) as unknown
+              );
+            }
+          } catch {
+            runtimeStatus = null;
+          }
+        }
+
         if (cancelled) {
           return;
         }
+
+        const nextBackendStatus = useLegacyVideoApi
+          ? {
+              state: "online" as const,
+              message: "视频 API 已联通，可以开始拆解与视频生成。",
+            }
+          : describeBackendRuntimeStatus(runtimeStatus);
 
         startTransition(() => {
           setModels(nextModels);
           setSelectedModelId(nextModels[0].id);
           setDraft(createVideoGenerationDraft(nextModels[0]));
-          setBackendStatus("online");
+          setBackendStatus(nextBackendStatus.state);
           setBackendMessage("视频 API 已联通，可以开始拆解与视频生成。");
+          setBackendMessage(nextBackendStatus.message);
         });
       } catch (error) {
         if (cancelled) {
@@ -297,6 +414,16 @@ export function VideoWorkbench() {
       cancelled = true;
     };
   }, []);
+
+  function handleServerStatusChange(status: VideoServerRuntimeStatus | null) {
+    if (useLegacyVideoApi) {
+      return;
+    }
+
+    const nextStatus = describeBackendRuntimeStatus(status);
+    setBackendStatus(nextStatus.state);
+    setBackendMessage(nextStatus.message);
+  }
 
   function updateDraft<K extends keyof VideoGenerationDraft>(
     key: K,
@@ -607,7 +734,10 @@ export function VideoWorkbench() {
         ) : null}
       </article>
 
-      <VideoRuntimeConfigPanel />
+      <VideoRuntimeConfigPanel
+        useLegacyApi={useLegacyVideoApi}
+        onServerStatusChange={handleServerStatusChange}
+      />
 
       <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <div className="space-y-6">
