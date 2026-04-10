@@ -19,6 +19,8 @@ import {
   type VideoModelCapability,
   type VideoModelParameterKey,
 } from "@/lib/video-studio";
+import { VideoRuntimeConfigPanel } from "@/components/video-studio/video-runtime-config-panel";
+import { useVideoRuntimeStore } from "@/lib/video-runtime-store";
 
 const legacyVideoApiBaseUrl =
   process.env.NEXT_PUBLIC_VIDEO_API_BASE_URL?.replace(/\/$/, "") ?? "";
@@ -193,6 +195,7 @@ function buildTaskPayload(model: VideoModelCapability, draft: VideoGenerationDra
 }
 
 export function VideoWorkbench() {
+  const { aiRuntimeSettings } = useVideoRuntimeStore();
   const [backendStatus, setBackendStatus] = useState<
     "checking" | "online" | "offline" | "unconfigured"
   >("checking");
@@ -459,6 +462,14 @@ export function VideoWorkbench() {
       body.append("file", videoFile);
       body.append("interval_seconds", String(analysisInterval));
       body.append("max_frames", String(analysisFrames));
+      body.append(
+        "runtime",
+        JSON.stringify({
+          task: "frameAnalysis",
+          ...aiRuntimeSettings.frameAnalysis,
+        })
+      );
+      body.append("runtimeConfig", JSON.stringify(aiRuntimeSettings));
 
       const response = await fetch(videoApiUrl(videoApiRoutes.upload), {
         method: "POST",
@@ -519,6 +530,11 @@ export function VideoWorkbench() {
         body: JSON.stringify({
           form: copyForm,
           manifest: manifestRaw,
+          runtime: {
+            task: "copyGeneration",
+            ...aiRuntimeSettings.copyGeneration,
+          },
+          runtimeConfig: aiRuntimeSettings,
         }),
       });
       if (!response.ok) {
@@ -590,6 +606,8 @@ export function VideoWorkbench() {
           </div>
         ) : null}
       </article>
+
+      <VideoRuntimeConfigPanel />
 
       <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <div className="space-y-6">

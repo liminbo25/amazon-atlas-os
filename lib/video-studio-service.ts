@@ -926,31 +926,99 @@ export async function generateVideoCopyPlan({
     runtimeConfig,
     defaultModel: DEFAULT_VIDEO_MODEL,
   });
+  const referenceImages = await collectCopyReferenceImages(manifest);
 
-  const copyPlan = await requestStructuredJson<CopyPlan>({
+  let copyPlan = await requestStructuredJson<CopyPlan>({
     operationName: "video copy generation",
     requestText: (attempt) =>
-      requestAiTextCompletion({
-        config,
-        operationName: "video copy generation",
-        systemPrompt: [
-          "You are a senior Chinese short-form commerce video creative director.",
-          "Return exactly one valid JSON object.",
-          "Do not use markdown code fences.",
-          "Do not add commentary before or after JSON.",
-        ].join(" "),
-        userPrompt: buildVideoCopyPrompt({
-          form,
-          transcriptText,
-          structureBlocks,
-          visualAnalysis,
-          attempt,
-        }),
-        maxTokens: 5000,
-        temperature: 0.35,
-      }),
+      referenceImages.length > 0
+        ? requestAiVisionCompletion({
+            config,
+            operationName: "video copy generation",
+            systemPrompt: [
+              "You are a senior Chinese short-form commerce video creative director.",
+              "Return exactly one valid JSON object.",
+              "Do not use markdown code fences.",
+              "Do not add commentary before or after JSON.",
+            ].join(" "),
+            userPrompt: buildVideoCopyPrompt({
+              form,
+              transcriptText,
+              structureBlocks,
+              visualAnalysis,
+              attempt,
+              hasReferenceFrames: true,
+            }),
+            images: referenceImages,
+            maxTokens: 5000,
+            temperature: 0.35,
+          })
+        : requestAiTextCompletion({
+            config,
+            operationName: "video copy generation",
+            systemPrompt: [
+              "You are a senior Chinese short-form commerce video creative director.",
+              "Return exactly one valid JSON object.",
+              "Do not use markdown code fences.",
+              "Do not add commentary before or after JSON.",
+            ].join(" "),
+            userPrompt: buildVideoCopyPrompt({
+              form,
+              transcriptText,
+              structureBlocks,
+              visualAnalysis,
+              attempt,
+              hasReferenceFrames: false,
+            }),
+            maxTokens: 5000,
+            temperature: 0.35,
+          }),
     parseResult: parseVideoCopyPlan,
   });
+
+  let qualityIssues = collectVideoCopyQualityIssues(copyPlan);
+
+  if (qualityIssues.length > 0) {
+    copyPlan = await requestStructuredJson<CopyPlan>({
+      operationName: "video copy polish",
+      requestText: (attempt) =>
+        requestAiTextCompletion({
+          config,
+          operationName: "video copy polish",
+          systemPrompt: [
+            "You are a senior Chinese short-form commerce video creative director.",
+            "You rewrite weak outputs into finished direct-response creative.",
+            "Return exactly one valid JSON object.",
+            "Do not use markdown code fences.",
+            "Do not add commentary before or after JSON.",
+          ].join(" "),
+          userPrompt: buildVideoCopyPolishPrompt({
+            form,
+            copyPlan,
+            issues: qualityIssues,
+            attempt,
+          }),
+          maxTokens: 6000,
+          temperature: 0.4,
+        }),
+      parseResult: parseVideoCopyPlan,
+    });
+
+    qualityIssues = collectVideoCopyQualityIssues(copyPlan);
+  }
+
+  if (qualityIssues.length > 0) {
+    throw new RouteError(
+      `Video copy generation returned a script that still needs manual cleanup: ${qualityIssues
+        .slice(0, 4)
+        .join(" / ")}`,
+      {
+        status: 502,
+        code: "video_copy_quality_failed",
+        retryable: true,
+      }
+    );
+  }
 
   return { copy_plan: copyPlan };
 }
@@ -1820,13 +1888,320 @@ function classifyStage(text: string, index: number, total: number): VideoStage {
   return index === 0 ? "stop" : "pain";
 }
 
+async function collectCopyReferenceImages(
+  manifest: Record<string, unknown>
+): Promise<AiImageInput[]> {
+  const jobId =
+    normalizeStringValue(manifest.job_id, { allowEmpty: true }) ||
+    normalizeStringValue(manifest.jobId, { allowEmpty: true });
+
+  if (!jobId) {
+    return [];
+  }
+
+  const rawFrames = Array.isArray(manifest.frames) ? manifest.frames : [];
+  const frames = rawFrames
+    .map((item) => normalizeManifestFrame(item))
+    .filter((item): item is ManifestFrame => item !== null);
+
+  if (frames.length === 0) {
+    return [];
+  }
+
+  const sampledFrames = sampleFrames(frames, 4);
+  const images: AiImageInput[] = [];
+
+  for (const frame of sampledFrames) {
+    if (!frame.file) {
+      continue;
+    }
+
+    const framePath = path.join(
+      /*turbopackIgnore: true*/ getVideoOutputRoot(),
+      jobId,
+      frame.file
+    );
+
+    try {
+      const buffer = await fs.readFile(/*turbopackIgnore: true*/ framePath);
+      images.push({
+        data: buffer.toString("base64"),
+        mediaType: contentTypeForPath(framePath),
+      });
+    } catch {
+      continue;
+    }
+  }
+
+  return images;
+}
+
+function normalizeManifestFrame(value: unknown): ManifestFrame | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const file = normalizeStringValue(value.file, { allowEmpty: true });
+  if (!file) {
+    return null;
+  }
+
+  return {
+    index: normalizeNumberValue(value.index, {
+      min: 0,
+      integer: true,
+    }),
+    timestamp_seconds: normalizeNumberValue(
+      value.timestamp_seconds ?? value.timestampSeconds,
+      { min: 0, fallback: 0 }
+    ),
+    file,
+    relative_path: normalizeStringValue(value.relative_path ?? value.relativePath, {
+      allowEmpty: true,
+    }),
+    src: normalizeStringValue(value.src, { allowEmpty: true }),
+    note: normalizeStringValue(value.note, { allowEmpty: true }),
+  };
+}
+
+function compactStructureBlocksForPrompt(blocks: unknown[]): unknown[] {
+  return blocks
+    .filter((item) => isRecord(item))
+    .slice(0, 6)
+    .map((item) => ({
+      stage: normalizeStringValue(item.stage, { allowEmpty: true }),
+      title: trimText(normalizeStringValue(item.title, { allowEmpty: true }), 60),
+      summary: trimText(normalizeStringValue(item.summary, { allowEmpty: true }), 140),
+      recommendation: trimText(
+        normalizeStringValue(item.recommendation, { allowEmpty: true }),
+        140
+      ),
+      transcript_excerpt: trimText(
+        normalizeStringValue(item.transcript, { allowEmpty: true }),
+        180
+      ),
+    }));
+}
+
+function compactVisualAnalysisForPrompt(
+  value: Record<string, unknown>
+): Record<string, unknown> {
+  const frameObservations = Array.isArray(
+    value.frame_observations ?? value.frameObservations
+  )
+    ? ((value.frame_observations ?? value.frameObservations) as unknown[])
+        .filter((item) => isRecord(item))
+        .slice(0, 4)
+        .map((item) => ({
+          frame_index: normalizeNumberValue(
+            item.frame_index ?? item.frameIndex,
+            { min: 0, integer: true }
+          ),
+          timestamp_seconds: normalizeNumberValue(
+            item.timestamp_seconds ?? item.timestampSeconds,
+            { min: 0, fallback: 0 }
+          ),
+          description: trimText(
+            normalizeStringValue(item.description, { allowEmpty: true }),
+            120
+          ),
+          marketing_role: trimText(
+            normalizeStringValue(
+              item.marketing_role ?? item.marketingRole,
+              { allowEmpty: true }
+            ),
+            60
+          ),
+          selling_signal: trimText(
+            normalizeStringValue(
+              item.selling_signal ?? item.sellingSignal,
+              { allowEmpty: true }
+            ),
+            80
+          ),
+        }))
+    : [];
+
+  return {
+    summary: trimText(normalizeStringValue(value.summary, { allowEmpty: true }), 140),
+    visual_style: trimText(
+      normalizeStringValue(value.visual_style ?? value.visualStyle, {
+        allowEmpty: true,
+      }),
+      100
+    ),
+    hook_strategy: trimText(
+      normalizeStringValue(value.hook_strategy ?? value.hookStrategy, {
+        allowEmpty: true,
+      }),
+      100
+    ),
+    product_presence: trimText(
+      normalizeStringValue(value.product_presence ?? value.productPresence, {
+        allowEmpty: true,
+      }),
+      100
+    ),
+    proof_signals: trimText(
+      normalizeStringValue(value.proof_signals ?? value.proofSignals, {
+        allowEmpty: true,
+      }),
+      100
+    ),
+    cta_observation: trimText(
+      normalizeStringValue(value.cta_observation ?? value.ctaObservation, {
+        allowEmpty: true,
+      }),
+      100
+    ),
+    frame_observations: frameObservations,
+  };
+}
+
+function collectVideoCopyQualityIssues(copyPlan: CopyPlan): string[] {
+  const texts = [
+    copyPlan.summary,
+    copyPlan.prompt,
+    ...copyPlan.scriptDrafts.flatMap((draft) => [
+      draft.headline,
+      draft.summary,
+      draft.fullScript,
+      draft.caption,
+      draft.tone,
+      draft.positioning,
+      ...draft.stageLines.map((line) => line.line),
+    ]),
+  ]
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (texts.length === 0) {
+    return ["No usable creative text was returned."];
+  }
+
+  const combined = texts.join("\n");
+  const issues: string[] = [];
+  const bannedPhrases = [
+    "如果你的用户",
+    "这条视频就该",
+    "重点放大",
+    "这里重点",
+    "再补一个",
+    "这版脚本",
+    "这一版",
+    "应该先把",
+    "营销策略",
+    "脚本说明",
+  ];
+
+  for (const phrase of bannedPhrases) {
+    if (combined.includes(phrase)) {
+      issues.push(`Still contains analysis-style phrasing: ${phrase}`);
+    }
+  }
+
+  const englishChunks = combined.match(
+    /(?:\b[A-Za-z][A-Za-z-]{2,}\b(?:\s+|$)){4,}/g
+  );
+  if (englishChunks?.length) {
+    issues.push("Contains long English passages instead of natural Chinese creative.");
+  }
+
+  const asciiLetters = Array.from(combined).filter((char) =>
+    /[A-Za-z]/.test(char)
+  ).length;
+  const cjkChars = (combined.match(/[\u4e00-\u9fff]/g) || []).length;
+  if (asciiLetters >= 36 && asciiLetters > Math.max(18, Math.floor(cjkChars / 4))) {
+    issues.push("English ratio is too high for a Chinese short-video script.");
+  }
+
+  if (copyPlan.scriptDrafts.length < 3) {
+    issues.push("Expected at least 3 script drafts.");
+  }
+
+  for (const [index, draft] of copyPlan.scriptDrafts.entries()) {
+    if (draft.fullScript.trim().length < 80) {
+      issues.push(`Draft ${index + 1} is too short to be a finished script.`);
+    }
+
+    if (!draft.stageLines.length) {
+      issues.push(`Draft ${index + 1} is missing stage lines.`);
+    }
+
+    const longLines = draft.fullScript
+      .split("\n")
+      .map((line) => line.trim())
+      .filter((line) => line.length >= 70);
+    if (longLines.length >= 2) {
+      issues.push(`Draft ${index + 1} still reads like dense notes instead of spoken copy.`);
+    }
+  }
+
+  return Array.from(new Set(issues));
+}
+
+function buildVideoCopyPolishPrompt(options: {
+  form: Record<string, unknown>;
+  copyPlan: CopyPlan;
+  issues: string[];
+  attempt: number;
+}): string {
+  const productInfo = {
+    product_name: normalizeStringValue(options.form.productName, { allowEmpty: true }),
+    category: normalizeStringValue(options.form.category, { allowEmpty: true }),
+    market: normalizeStringValue(options.form.market, { allowEmpty: true }),
+    audience: normalizeStringValue(options.form.audience, { allowEmpty: true }),
+    problem: normalizeStringValue(options.form.problem, { allowEmpty: true }),
+    selling_points: normalizeStringValue(options.form.sellingPoints, {
+      allowEmpty: true,
+    }),
+    proof_assets: normalizeStringValue(options.form.proofAssets, { allowEmpty: true }),
+    hero_angle: normalizeStringValue(options.form.heroAngle, { allowEmpty: true }),
+    tone: normalizeStringValue(options.form.tone, { allowEmpty: true }),
+    desired_length: normalizeStringValue(options.form.desiredLength, {
+      allowEmpty: true,
+    }),
+  };
+
+  return `
+Rewrite the JSON below into finished Chinese direct-response video creative.
+
+Current quality issues:
+${options.issues.map((issue) => `- ${issue}`).join("\n")}
+
+Product info:
+${JSON.stringify(productInfo, null, 2)}
+
+Keep the same top-level JSON shape and keep every existing id stable.
+
+Hard rules:
+- All human-readable content must be natural spoken Simplified Chinese.
+- Do not write analysis notes, consultant language, or team instructions.
+- Every full_script must read like something a creator can shoot directly.
+- The prompt field must be a ready-to-paste Chinese AI video prompt with shot order, subject, action, product reveal, proof beats, lighting, camera movement, subtitle feel, and CTA.
+- Each draft should feel materially different in angle, not minor wording variants.
+- Return JSON only.
+${getRetryPromptSuffix(options.attempt)}
+
+Current JSON:
+${JSON.stringify(options.copyPlan, null, 2)}
+  `.trim();
+}
+
 function buildVideoCopyPrompt(options: {
   form: Record<string, unknown>;
   transcriptText: string;
   structureBlocks: unknown[];
   visualAnalysis: Record<string, unknown>;
   attempt: number;
+  hasReferenceFrames: boolean;
 }): string {
+  const compactStructureBlocks = compactStructureBlocksForPrompt(
+    options.structureBlocks
+  );
+  const compactVisualAnalysis = compactVisualAnalysisForPrompt(
+    options.visualAnalysis
+  );
   const productInfo = {
     product_name: normalizeStringValue(options.form.productName, { allowEmpty: true }),
     category: normalizeStringValue(options.form.category, { allowEmpty: true }),
@@ -1856,10 +2231,10 @@ Transcript:
 ${options.transcriptText || "No transcript was available. Use visual analysis and the product info."}
 
 Structure blocks:
-${JSON.stringify(options.structureBlocks.slice(0, 8), null, 2)}
+${JSON.stringify(compactStructureBlocks, null, 2)}
 
 Visual analysis:
-${JSON.stringify(options.visualAnalysis, null, 2)}
+${JSON.stringify(compactVisualAnalysis, null, 2)}
 
 Return exactly one JSON object:
 {
@@ -1905,6 +2280,7 @@ Hard rules:
 - Do not write consultant tone, analysis prose, or team instructions.
 - Every full_script must be directly usable for filming or for feeding into an AI video tool.
 - The prompt field must describe shot order, visual subject, action, product reveal, proof moments, subtitle feel, lighting, camera movement, and CTA beat.
+- Reference frames are attached in chronological order${options.hasReferenceFrames ? " and must be used as visual evidence." : "."}
 - Give at least 3 distinct script angles and 3 script drafts.
 - Return JSON only.
 ${getRetryPromptSuffix(options.attempt)}
