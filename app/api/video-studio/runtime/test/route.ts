@@ -7,6 +7,7 @@ import {
   resolveAiConfig,
   toErrorResponse,
 } from "@/lib/ai-route-helpers";
+import { resolveVideoAiRuntimeConfig } from "@/lib/video-llm-config";
 
 const DEFAULT_MODEL_BY_SERVICE = {
   frameAnalysis: "claude-sonnet-4-20250514",
@@ -20,8 +21,9 @@ export async function POST(request: Request) {
     const body = await readJsonBody(request);
     const runtimeConfig = readAiRuntimeConfig(body);
     const service = readServiceName(body);
+    const effectiveRuntimeConfig = await resolveVideoAiRuntimeConfig(runtimeConfig);
     const config = resolveAiConfig({
-      runtimeConfig,
+      runtimeConfig: effectiveRuntimeConfig,
       defaultModel: DEFAULT_MODEL_BY_SERVICE[service],
     });
 

@@ -1,4 +1,4 @@
-import { execFile } from "node:child_process";
+﻿import { execFile } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { promises as fs } from "node:fs";
 import os from "node:os";
@@ -23,6 +23,7 @@ import {
   type AiImageInput,
   type AiRuntimeConfig,
 } from "./ai-route-helpers";
+import { resolveVideoAiRuntimeConfig } from "./video-llm-config";
 import type { CopyPlan, VideoInputMode } from "./video-studio";
 
 const execFileAsync = promisify(execFile);
@@ -228,6 +229,14 @@ interface VideoManifestWire {
 interface AnalyzeVideoUploadOptions {
   request: Request;
   formData: FormData;
+  runtimeConfig?: AiRuntimeConfig;
+}
+
+interface AnalyzeVideoPathOptions {
+  request: Request;
+  videoPath: string;
+  intervalSeconds: number;
+  maxFrames: number;
   runtimeConfig?: AiRuntimeConfig;
 }
 
@@ -799,12 +808,51 @@ export async function analyzeVideoUpload({
   );
   await writeFileUpload(file, uploadPath);
 
-  const analysisNotes: string[] = [
-    "已通过 Next.js API 路由接收并保存视频上传。",
-  ];
+  return analyzeVideoFile({
+    request,
+    videoPath: uploadPath,
+    originalName,
+    intervalSeconds,
+    maxFrames,
+    runtimeConfig,
+    initialNotes: ["Video upload was received and saved through the Next.js API route."],
+  });
+}
 
-  const probe = await probeVideo(uploadPath).catch((error: unknown) => {
-    analysisNotes.push(formatOptionalFailure("视频元数据读取失败", error));
+export async function analyzeVideoPath({
+  request,
+  videoPath,
+  intervalSeconds,
+  maxFrames,
+  runtimeConfig,
+}: AnalyzeVideoPathOptions): Promise<{ manifest: VideoManifestWire }> {
+  const normalizedVideoPath = await ensureReadableVideoPath(videoPath);
+
+  return analyzeVideoFile({
+    request,
+    videoPath: normalizedVideoPath,
+    originalName: path.basename(normalizedVideoPath),
+    intervalSeconds,
+    maxFrames,
+    runtimeConfig,
+    initialNotes: ["Video analysis was started from an existing server-local file path."],
+  });
+}
+
+async function analyzeVideoFile(options: {
+  request: Request;
+  videoPath: string;
+  originalName: string;
+  intervalSeconds: number;
+  maxFrames: number;
+  runtimeConfig?: AiRuntimeConfig;
+  initialNotes?: string[];
+}): Promise<{ manifest: VideoManifestWire }> {
+  const analysisNotes = [...(options.initialNotes ?? [])];
+  const outputRoot = getVideoOutputRoot();
+
+  const probe = await probeVideo(options.videoPath).catch((error: unknown) => {
+    analysisNotes.push(formatOptionalFailure("Failed to read video metadata.", error));
     return {
       durationSeconds: 0,
       frameCount: 0,
@@ -814,57 +862,60 @@ export async function analyzeVideoUpload({
     } satisfies VideoProbeResult;
   });
 
-  const jobId = `${safeSlug(path.parse(originalName).name)}-${createTimestamp()}`;
+  const jobId = `${safeSlug(path.parse(options.originalName).name)}-${createTimestamp()}`;
   const jobDir = path.join(/*turbopackIgnore: true*/ outputRoot, jobId);
   await fs.mkdir(jobDir, { recursive: true });
 
   const frames = await extractFrames({
-    inputPath: uploadPath,
+    inputPath: options.videoPath,
     jobDir,
     jobId,
     durationSeconds: probe.durationSeconds,
-    intervalSeconds,
-    maxFrames,
+    intervalSeconds: options.intervalSeconds,
+    maxFrames: options.maxFrames,
   }).catch((error: unknown) => {
-    analysisNotes.push(formatOptionalFailure("关键帧抽取失败", error));
+    analysisNotes.push(formatOptionalFailure("Failed to extract key frames.", error));
     return [] satisfies ManifestFrame[];
   });
 
   if (frames.length > 0) {
-    analysisNotes.push(`已抽取 ${frames.length} 张关键帧。`);
+    analysisNotes.push(`Extracted ${frames.length} key frames.`);
   } else {
-    analysisNotes.push("未抽取到关键帧，后续会基于元数据和手动字幕继续生成结构。");
+    analysisNotes.push(
+      "No key frames were extracted. The structure analysis will fall back to metadata and transcript only."
+    );
   }
 
-  const transcriptResult = await transcribeVideo(uploadPath, originalName).catch(
-    (error: unknown) => ({
-      text: "",
-      segments: [] as TranscriptSegment[],
-      language: "unknown",
-      note: formatOptionalFailure("视频转写未完成", error),
-    })
-  );
+  const transcriptResult = await transcribeVideo(
+    options.videoPath,
+    options.originalName
+  ).catch((error: unknown) => ({
+    text: "",
+    segments: [] as TranscriptSegment[],
+    language: "unknown",
+    note: formatOptionalFailure("Video transcription did not complete.", error),
+  }));
   analysisNotes.push(transcriptResult.note);
 
   const visualAnalysis = await analyzeFramesWithAi({
     frames,
     jobId,
-    runtimeConfig,
+    runtimeConfig: options.runtimeConfig,
     transcriptText: transcriptResult.text,
     durationSeconds: probe.durationSeconds,
   }).catch((error: unknown) => {
-    analysisNotes.push(formatOptionalFailure("关键帧视觉分析未完成", error));
+    analysisNotes.push(formatOptionalFailure("Frame analysis did not complete.", error));
     return null;
   });
 
   if (visualAnalysis) {
-    analysisNotes.push("已使用统一 AI 配置完成关键帧视觉分析。");
+    analysisNotes.push("AI frame analysis completed successfully.");
   }
 
   const manifest: VideoManifestWire = {
     job_id: jobId,
-    video: uploadPath,
-    original_filename: originalName,
+    video: options.videoPath,
+    original_filename: options.originalName,
     duration_seconds: probe.durationSeconds,
     frame_count: probe.frameCount,
     fps: probe.fps,
@@ -890,7 +941,7 @@ export async function analyzeVideoUpload({
     "utf8"
   );
 
-  return { manifest: withFrameUrls(manifest, request) };
+  return { manifest: withFrameUrls(manifest, options.request) };
 }
 
 export async function generateVideoCopyPlan({
@@ -922,8 +973,9 @@ export async function generateVideoCopyPlan({
     );
   }
 
+  const effectiveRuntimeConfig = await resolveVideoAiRuntimeConfig(runtimeConfig);
   const config = resolveAiConfig({
-    runtimeConfig,
+    runtimeConfig: effectiveRuntimeConfig,
     defaultModel: DEFAULT_VIDEO_MODEL,
   });
   const referenceImages = await collectCopyReferenceImages(manifest);
@@ -1579,8 +1631,9 @@ async function analyzeFramesWithAi(options: {
       };
     })
   );
+  const effectiveRuntimeConfig = await resolveVideoAiRuntimeConfig(options.runtimeConfig);
   const config = resolveAiConfig({
-    runtimeConfig: options.runtimeConfig,
+    runtimeConfig: effectiveRuntimeConfig,
     defaultModel: DEFAULT_VIDEO_MODEL,
   });
 
@@ -2413,6 +2466,32 @@ function normalizeStageLine(
   };
 }
 
+async function ensureReadableVideoPath(videoPath: string): Promise<string> {
+  const normalizedVideoPath = path.resolve(/*turbopackIgnore: true*/ videoPath);
+
+  let stats;
+  try {
+    stats = await fs.stat(normalizedVideoPath);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
+      throw new RouteError("Video file was not found.", {
+        status: 404,
+        code: "video_file_not_found",
+      });
+    }
+
+    throw error;
+  }
+
+  if (!stats.isFile()) {
+    throw new RouteError("video_path must point to a file.", {
+      status: 400,
+      code: "video_file_invalid",
+    });
+  }
+
+  return normalizedVideoPath;
+}
 function readRequiredFile(formData: FormData, key: string): File {
   const value = formData.get(key);
   if (!isFileLike(value) || value.size <= 0) {
