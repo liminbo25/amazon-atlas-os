@@ -15,6 +15,48 @@ export interface GeminiResponse {
   error?: string;
 }
 
+function normalizeImageForProvider(image: string) {
+  const trimmed = image.trim();
+
+  if (trimmed.startsWith('data:image/')) {
+    return trimmed;
+  }
+
+  const base64Data = trimmed.includes(',') ? trimmed.split(',')[1] : trimmed;
+  return `data:image/png;base64,${base64Data}`;
+}
+
+async function requestImageGeneration(
+  apiBaseUrl: string,
+  geminiApiKey: string,
+  payload: Record<string, unknown>
+) {
+  const response = await fetch(`${apiBaseUrl}/images/generations`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${geminiApiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const responseText = await response.text();
+
+  return {
+    ok: response.ok,
+    status: response.status,
+    responseText,
+  };
+}
+
+function parseImageGenerationResponse(responseText: string) {
+  try {
+    return JSON.parse(responseText);
+  } catch {
+    throw new Error(`图片接口返回了非 JSON 内容：${responseText.slice(0, 200)}`);
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body: GeminiRequest = await request.json();
@@ -39,8 +81,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const clothingImageData = clothingImage.includes(',') ? clothingImage.split(',')[1] : clothingImage;
-      const modelImageData = modelImage.includes(',') ? modelImage.split(',')[1] : modelImage;
+      const clothingImageData = normalizeImageForProvider(clothingImage);
+      const modelImageData = normalizeImageForProvider(modelImage);
 
       const virtualTryOnPrompt = `Virtual try-on task: Transfer the exact clothing from image 1 onto the person in image 2.
 
@@ -67,40 +109,47 @@ CRITICAL REQUIREMENTS:
 
 OUTPUT: A photorealistic 4K ultra-high-definition image showing the person from image 2 wearing the exact clothing from image 1, with perfect detail preservation, sharp textures, and natural appearance. The output must be crisp and detailed at full resolution.`;
 
-      // 将两张图片作为数组传入 image 参数，确保模型能同时看到两张图
-      const response = await fetch(`${apiBaseUrl}/images/generations`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${geminiApiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'nano_banana_pro',
-          prompt: virtualTryOnPrompt,
-          // 两张图都传入 image 数组：第一张是衣服参考图，第二张是模特图
-          image: [
-            `data:image/jpeg;base64,${clothingImageData}`,
-            `data:image/jpeg;base64,${modelImageData}`
-          ],
-          n: 1,
-          size: size || '1024x1024',
-          quality: 'hd',
-          style: 'natural',
-        }),
-      });
+      const generationPayload = {
+        model: 'nano_banana_pro',
+        prompt: virtualTryOnPrompt,
+        // 两张图都传入 image 数组：第一张是衣服参考图，第二张是模特图
+        image: [clothingImageData, modelImageData],
+        n: 1,
+        size: size || '1024x1536',
+        quality: 'hd',
+        style: 'natural',
+      };
 
-      console.log('API 响应状态:', response.status);
+      let apiResult = await requestImageGeneration(
+        apiBaseUrl,
+        geminiApiKey,
+        generationPayload
+      );
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ API error:', response.status, errorText);
+      console.log('API 响应状态:', apiResult.status);
+
+      if (!apiResult.ok && generationPayload.size !== '1024x1024') {
+        console.warn(
+          '首次图片生成失败，改用 1024x1024 重试:',
+          apiResult.status,
+          apiResult.responseText.slice(0, 300)
+        );
+
+        apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, {
+          ...generationPayload,
+          size: '1024x1024',
+        });
+      }
+
+      if (!apiResult.ok) {
+        console.error('❌ API error:', apiResult.status, apiResult.responseText);
         return NextResponse.json(
-          { success: false, error: `API 请求失败：${response.status} - ${errorText}` },
-          { status: response.status }
+          { success: false, error: `API 请求失败：${apiResult.status} - ${apiResult.responseText}` },
+          { status: apiResult.status }
         );
       }
 
-      const data = await response.json();
+      const data = parseImageGenerationResponse(apiResult.responseText);
       console.log('API 返回数据结构:', JSON.stringify(data).substring(0, 200));
 
       // OpenAI 兼容格式：data.data[0].url 或 data.data[0].b64_json
@@ -163,7 +212,7 @@ OUTPUT: A photorealistic 4K ultra-high-definition image showing the person from 
       );
     }
 
-    const imageData = image.includes(',') ? image.split(',')[1] : image;
+    const imageData = normalizeImageForProvider(image);
 
     const enhancedPrompt = `请将此服装图片中的模特替换为：${prompt}。重要要求：
 1. 保持服装完全不变，包括款式、颜色、花纹、图案、材质质感都必须与原图一致
@@ -173,31 +222,23 @@ OUTPUT: A photorealistic 4K ultra-high-definition image showing the person from 
 5. 生成高质量的模特展示图`;
 
     // OpenAI 兼容格式请求
-    const response = await fetch(`${apiBaseUrl}/images/generations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${geminiApiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'nano_banana_pro',
-        prompt: enhancedPrompt,
-        image: [imageData],
-        n: 1,
-        size: '1500x2000',
-      }),
+    const apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, {
+      model: 'nano_banana_pro',
+      prompt: enhancedPrompt,
+      image: [imageData],
+      n: 1,
+      size: '1024x1536',
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API error:', response.status, errorText);
+    if (!apiResult.ok) {
+      console.error('API error:', apiResult.status, apiResult.responseText);
       return NextResponse.json(
-        { success: false, error: `API 请求失败：${response.status} - ${errorText}` },
-        { status: response.status }
+        { success: false, error: `API 请求失败：${apiResult.status} - ${apiResult.responseText}` },
+        { status: apiResult.status }
       );
     }
 
-    const data = await response.json();
+    const data = parseImageGenerationResponse(apiResult.responseText);
 
     if (data.data && data.data[0]) {
       let result: string;

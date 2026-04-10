@@ -12,6 +12,37 @@ interface MultiImageUploaderProps {
   maxImages?: number;
 }
 
+const TARGET_DATA_URL_LENGTH = 1_500_000;
+const IMAGE_COMPRESSION_STEPS = [
+  { maxEdge: 1600, quality: 0.88 },
+  { maxEdge: 1400, quality: 0.82 },
+  { maxEdge: 1200, quality: 0.76 },
+];
+
+function renderCompressedImage(
+  image: HTMLImageElement,
+  maxEdge: number,
+  quality: number
+) {
+  const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
+  const width = Math.max(1, Math.round(image.naturalWidth * scale));
+  const height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+
+  if (!context) {
+    throw new Error("Canvas is not available.");
+  }
+
+  canvas.width = width;
+  canvas.height = height;
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, width, height);
+  context.drawImage(image, 0, 0, width, height);
+
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
 export default function MultiImageUploader({
   onImagesChange,
   images,
@@ -28,7 +59,34 @@ export default function MultiImageUploader({
   const convertToBase64 = useCallback((file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
+      reader.onload = () => {
+        const image = new Image();
+
+        image.onload = () => {
+          try {
+            let compressed = renderCompressedImage(
+              image,
+              IMAGE_COMPRESSION_STEPS[0].maxEdge,
+              IMAGE_COMPRESSION_STEPS[0].quality
+            );
+
+            for (const step of IMAGE_COMPRESSION_STEPS.slice(1)) {
+              if (compressed.length <= TARGET_DATA_URL_LENGTH) {
+                break;
+              }
+
+              compressed = renderCompressedImage(image, step.maxEdge, step.quality);
+            }
+
+            resolve(compressed);
+          } catch (error) {
+            reject(error);
+          }
+        };
+
+        image.onerror = reject;
+        image.src = reader.result as string;
+      };
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
@@ -68,7 +126,7 @@ export default function MultiImageUploader({
 
         onImagesChange([...images, ...newImages]);
       } catch {
-        setUploadError("The selected file could not be read.");
+        setUploadError("The selected file could not be optimized.");
       } finally {
         setIsReading(false);
       }
@@ -178,7 +236,7 @@ export default function MultiImageUploader({
         </div>
 
         <p className="relative mt-5 text-lg font-semibold text-slate-950">
-          {isReading ? "Reading images..." : "Drop images here or browse"}
+          {isReading ? "Optimizing images..." : "Drop images here or browse"}
         </p>
         <p className="relative mt-2 max-w-md text-sm leading-6 text-slate-500">
           Supports JPG, PNG, and WebP.{" "}

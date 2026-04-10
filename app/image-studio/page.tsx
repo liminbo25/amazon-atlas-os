@@ -20,6 +20,12 @@ interface ProcessedImage {
   upscaleFormat?: UpscaleOutputFormat;
 }
 
+interface TryOnApiResponse {
+  success?: boolean;
+  result?: string;
+  error?: string;
+}
+
 interface UpscaleSettings {
   upscaleMode: UpscaleMode;
   target: number;
@@ -37,17 +43,6 @@ const quickNotes = [
 ];
 
 const formatOptions: UpscaleOutputFormat[] = ["jpg", "png", "webp"];
-
-async function getImageSize(
-  src: string
-): Promise<{ width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const image = new Image();
-    image.onload = () => resolve({ width: image.width, height: image.height });
-    image.onerror = reject;
-    image.src = src;
-  });
-}
 
 function formatFactor(value: number) {
   return Number.isInteger(value) ? value.toFixed(0) : value.toFixed(1);
@@ -200,6 +195,51 @@ export default function ClothingModelSwapPage() {
     }
   };
 
+  const normalizeGeneratedImageForDisplay = async (imageData: string) => {
+    if (!imageData.startsWith("http://") && !imageData.startsWith("https://")) {
+      return imageData;
+    }
+
+    const response = await fetch("/api/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl: imageData }),
+    });
+
+    const json = await response.json();
+
+    if (!response.ok || !json.success || !json.data) {
+      throw new Error(json.error || "The generated image URL was not usable.");
+    }
+
+    return json.data as string;
+  };
+
+  const readTryOnResponse = async (response: Response) => {
+    const responseText = await response.text();
+    let data: TryOnApiResponse | null = null;
+
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText) as TryOnApiResponse;
+      } catch {
+        data = null;
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error || responseText || `Request failed with ${response.status}`
+      );
+    }
+
+    if (!data) {
+      throw new Error("The try-on request returned an unreadable response.");
+    }
+
+    return data;
+  };
+
   const handleStartProcessing = async () => {
     if (clothingImages.length === 0) {
       setError("Upload at least one garment image before running.");
@@ -216,27 +256,6 @@ export default function ClothingModelSwapPage() {
     setProcessedImages([]);
     setProcessedCount(0);
 
-    let targetSize: { width: number; height: number };
-
-    try {
-      const originalSize = await getImageSize(modelImages[0]);
-      const targetLongSide = 2048;
-      const longSide = Math.max(originalSize.width, originalSize.height);
-      const scale = targetLongSide / longSide;
-
-      targetSize =
-        scale > 1
-          ? {
-              width: Math.round(originalSize.width * scale),
-              height: Math.round(originalSize.height * scale),
-            }
-          : originalSize;
-    } catch {
-      setError("Could not read the model image size.");
-      setIsProcessing(false);
-      return;
-    }
-
     const nextResults: ProcessedImage[] = [];
 
     for (const [index, clothingImage] of clothingImages.entries()) {
@@ -250,16 +269,11 @@ export default function ClothingModelSwapPage() {
             clothingImage,
             modelImage: modelImages[0],
             type: "virtual-tryon",
-            size: `${targetSize.width}x${targetSize.height}`,
+            size: "1024x1536",
           }),
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || `Request failed with ${response.status}`);
-        }
-
-        const data = await response.json();
+        const data = await readTryOnResponse(response);
 
         if (!data.success || !data.result) {
           throw new Error(data.error || "The try-on request did not return an image.");
@@ -272,10 +286,12 @@ export default function ClothingModelSwapPage() {
           throw new Error("The response format was not a valid image.");
         }
 
+        const displayResult = await normalizeGeneratedImageForDisplay(data.result);
+
         const nextItem = {
           clothing: clothingImage,
           model: modelImages[0],
-          result: data.result,
+          result: displayResult,
         };
 
         nextResults.push(nextItem);

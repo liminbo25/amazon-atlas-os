@@ -34,6 +34,10 @@ export async function POST(request: NextRequest) {
     // 获取 content-type
     const contentType = response.headers.get('content-type') || 'image/png';
 
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      throw new Error(`远程地址返回的不是图片：${contentType}`);
+    }
+
     return NextResponse.json({
       success: true,
       data: `data:${contentType};base64,${base64}`,
