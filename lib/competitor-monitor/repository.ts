@@ -237,6 +237,18 @@ export class CompetitorMonitorRepository {
     marketId?: string | null;
   } = {}): Promise<CompetitorMonitorMarketConfigRecord[]> {
     const db = await this.readDb();
+    const whereClauses = ["1 = 1"];
+    const params: StatementParams = {};
+
+    if (options.marketId) {
+      whereClauses.push("m.id = :marketId");
+      params.marketId = options.marketId;
+    }
+
+    if (options.activeOnly) {
+      whereClauses.push("m.is_active = 1");
+    }
+
     const rows = await allNamed(
       db,
       `
@@ -248,14 +260,10 @@ export class CompetitorMonitorRepository {
           m.is_active,
           m.last_synced_at
         FROM competitor_monitor_markets m
-        WHERE (:marketId IS NULL OR m.id = :marketId)
-          AND (:activeOnly = 0 OR m.is_active = 1)
+        WHERE ${whereClauses.join("\n          AND ")}
         ORDER BY m.created_at ASC
       `,
-      {
-        marketId: options.marketId ?? null,
-        activeOnly: options.activeOnly ? 1 : 0,
-      }
+      params
     );
 
     return Promise.all(
@@ -454,6 +462,40 @@ export class CompetitorMonitorRepository {
     dbSession?: CompetitorMonitorDatabase
   ): Promise<CompetitorMonitorAlert[]> {
     const db = dbSession ?? (await this.readDb());
+    const whereClauses = ["1 = 1"];
+    const params: StatementParams = {
+      limit: Math.max(1, Math.min(options.limit ?? 50, 200)),
+    };
+
+    if (options.marketplace) {
+      whereClauses.push("al.marketplace = :marketplace");
+      params.marketplace = options.marketplace;
+    }
+
+    if (options.asin) {
+      whereClauses.push("al.asin = :asin");
+      params.asin = options.asin;
+    }
+
+    if (options.status && options.status !== "all") {
+      whereClauses.push("al.status = :status");
+      params.status = options.status;
+    }
+
+    if (options.marketId) {
+      whereClauses.push(`
+        EXISTS (
+          SELECT 1
+          FROM competitor_monitor_market_asins ma
+          JOIN competitor_monitor_markets m ON m.id = ma.market_id
+          WHERE ma.market_id = :marketId
+            AND ma.asin = al.asin
+            AND m.marketplace = al.marketplace
+        )
+      `);
+      params.marketId = options.marketId;
+    }
+
     const rows = await allNamed(
       db,
       `
@@ -472,30 +514,11 @@ export class CompetitorMonitorRepository {
           al.created_at,
           al.resolved_at
         FROM competitor_monitor_alerts al
-        WHERE (:marketplace IS NULL OR al.marketplace = :marketplace)
-          AND (:asin IS NULL OR al.asin = :asin)
-          AND (:status IS NULL OR al.status = :status)
-          AND (
-            :marketId IS NULL
-            OR EXISTS (
-              SELECT 1
-              FROM competitor_monitor_market_asins ma
-              JOIN competitor_monitor_markets m ON m.id = ma.market_id
-              WHERE ma.market_id = :marketId
-                AND ma.asin = al.asin
-                AND m.marketplace = al.marketplace
-            )
-          )
+        WHERE ${whereClauses.join("\n          AND ")}
         ORDER BY CASE al.status WHEN 'open' THEN 0 ELSE 1 END, al.created_at DESC
         LIMIT :limit
       `,
-      {
-        marketId: options.marketId ?? null,
-        marketplace: options.marketplace ?? null,
-        asin: options.asin ?? null,
-        status: options.status && options.status !== "all" ? options.status : null,
-        limit: Math.max(1, Math.min(options.limit ?? 50, 200)),
-      }
+      params
     );
 
     const marketsByAlert = await Promise.all(
