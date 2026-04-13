@@ -13,19 +13,69 @@ interface MultiImageUploaderProps {
   renderImageFooter?: (options: { image: string; index: number }) => ReactNode;
 }
 
-const TARGET_DATA_URL_LENGTH = 900_000;
+interface UploadImageMeta {
+  wasCompressed: boolean;
+  originalBytes: number;
+  finalBytes: number;
+  originalMimeType: string;
+  finalMimeType: string;
+}
+
+interface ProcessedUpload {
+  dataUrl: string;
+  meta: UploadImageMeta;
+}
+
+const TARGET_DATA_URL_LENGTH = 1_600_000;
 const IMAGE_COMPRESSION_STEPS = [
+  { maxEdge: 2400, quality: 0.96 },
+  { maxEdge: 2200, quality: 0.94 },
+  { maxEdge: 2000, quality: 0.92 },
+  { maxEdge: 1800, quality: 0.9 },
   { maxEdge: 1600, quality: 0.88 },
-  { maxEdge: 1400, quality: 0.82 },
-  { maxEdge: 1200, quality: 0.76 },
-  { maxEdge: 1000, quality: 0.7 },
-  { maxEdge: 900, quality: 0.64 },
+  { maxEdge: 1400, quality: 0.85 },
 ];
+
+function clampToByteEstimate(dataUrl: string) {
+  const base64 = dataUrl.split(",")[1] ?? "";
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.round((base64.length * 3) / 4) - padding);
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) {
+    return `${bytes} B`;
+  }
+
+  if (bytes < 1024 * 1024) {
+    return `${(bytes / 1024).toFixed(1)} KB`;
+  }
+
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function getPreferredCompressionType(fileType: string) {
+  if (
+    fileType === "image/jpeg" ||
+    fileType === "image/png" ||
+    fileType === "image/webp"
+  ) {
+    return fileType;
+  }
+
+  return "image/jpeg";
+}
+
+function getMimeTypeFromDataUrl(dataUrl: string) {
+  const match = dataUrl.match(/^data:([^;,]+)[;,]/);
+  return match?.[1] ?? "image/jpeg";
+}
 
 function renderCompressedImage(
   image: HTMLImageElement,
   maxEdge: number,
-  quality: number
+  quality: number,
+  mimeType: string
 ) {
   const scale = Math.min(1, maxEdge / Math.max(image.naturalWidth, image.naturalHeight));
   const width = Math.max(1, Math.round(image.naturalWidth * scale));
@@ -39,11 +89,21 @@ function renderCompressedImage(
 
   canvas.width = width;
   canvas.height = height;
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, width, height);
+
+  if (mimeType === "image/jpeg") {
+    context.fillStyle = "#ffffff";
+    context.fillRect(0, 0, width, height);
+  } else {
+    context.clearRect(0, 0, width, height);
+  }
+
   context.drawImage(image, 0, 0, width, height);
 
-  return canvas.toDataURL("image/jpeg", quality);
+  if (mimeType === "image/png") {
+    return canvas.toDataURL(mimeType);
+  }
+
+  return canvas.toDataURL(mimeType, quality);
 }
 
 export default function MultiImageUploader({
@@ -57,44 +117,100 @@ export default function MultiImageUploader({
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [imageMetaMap, setImageMetaMap] = useState<Record<string, UploadImageMeta>>({});
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  const convertToBase64 = useCallback((file: File): Promise<string> => {
+  const convertToBase64 = useCallback((file: File): Promise<ProcessedUpload> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+
       reader.onload = () => {
+        const originalDataUrl = reader.result;
+
+        if (typeof originalDataUrl !== "string") {
+          reject(new Error("Could not read the selected image."));
+          return;
+        }
+
+        const originalMimeType = file.type || getMimeTypeFromDataUrl(originalDataUrl);
+
+        if (originalDataUrl.length <= TARGET_DATA_URL_LENGTH) {
+          resolve({
+            dataUrl: originalDataUrl,
+            meta: {
+              wasCompressed: false,
+              originalBytes: file.size,
+              finalBytes: file.size,
+              originalMimeType,
+              finalMimeType: originalMimeType,
+            },
+          });
+          return;
+        }
+
         const image = new Image();
 
         image.onload = () => {
           try {
-            let compressed = renderCompressedImage(
-              image,
-              IMAGE_COMPRESSION_STEPS[0].maxEdge,
-              IMAGE_COMPRESSION_STEPS[0].quality
-            );
+            const preferredCompressionType = getPreferredCompressionType(originalMimeType);
+            let compressedDataUrl = originalDataUrl;
 
-            for (const step of IMAGE_COMPRESSION_STEPS.slice(1)) {
-              if (compressed.length <= TARGET_DATA_URL_LENGTH) {
+            for (const step of IMAGE_COMPRESSION_STEPS) {
+              compressedDataUrl = renderCompressedImage(
+                image,
+                step.maxEdge,
+                step.quality,
+                preferredCompressionType
+              );
+
+              if (compressedDataUrl.length <= TARGET_DATA_URL_LENGTH) {
                 break;
               }
-
-              compressed = renderCompressedImage(image, step.maxEdge, step.quality);
             }
 
-            resolve(compressed);
+            resolve({
+              dataUrl: compressedDataUrl,
+              meta: {
+                wasCompressed: true,
+                originalBytes: file.size,
+                finalBytes: clampToByteEstimate(compressedDataUrl),
+                originalMimeType,
+                finalMimeType: getMimeTypeFromDataUrl(compressedDataUrl),
+              },
+            });
           } catch (error) {
             reject(error);
           }
         };
 
         image.onerror = reject;
-        image.src = reader.result as string;
+        image.src = originalDataUrl;
       };
+
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
   }, []);
+
+  const syncImageMeta = useCallback(
+    (nextImages: string[], uploads?: ProcessedUpload[]) => {
+      setImageMetaMap((current) => {
+        const merged = { ...current };
+
+        uploads?.forEach((upload) => {
+          merged[upload.dataUrl] = upload.meta;
+        });
+
+        return Object.fromEntries(
+          nextImages
+            .filter((image) => Boolean(image))
+            .map((image) => [image, merged[image]])
+        ) as Record<string, UploadImageMeta>;
+      });
+    },
+    []
+  );
 
   const handleFiles = useCallback(
     async (files: FileList) => {
@@ -111,31 +227,33 @@ export default function MultiImageUploader({
       setUploadError(null);
 
       try {
-        const newImages: string[] = [];
+        const uploads: ProcessedUpload[] = [];
 
         for (const file of validFiles) {
-          const base64 = await convertToBase64(file);
-          newImages.push(base64);
+          const processedUpload = await convertToBase64(file);
+          uploads.push(processedUpload);
         }
+
+        const newImages = uploads.map((upload) => upload.dataUrl);
+        let nextImages: string[];
 
         if (maxImages === 1) {
-          onImagesChange([newImages.at(-1)!]);
-          return;
+          nextImages = [newImages.at(-1)!];
+        } else if (maxImages) {
+          nextImages = [...images, ...newImages].slice(0, maxImages);
+        } else {
+          nextImages = [...images, ...newImages];
         }
 
-        if (maxImages) {
-          onImagesChange([...images, ...newImages].slice(0, maxImages));
-          return;
-        }
-
-        onImagesChange([...images, ...newImages]);
+        syncImageMeta(nextImages, uploads);
+        onImagesChange(nextImages);
       } catch {
-        setUploadError("所选图片无法完成压缩处理，请换一张图片重试。");
+        setUploadError("所选图片无法完成处理，请换一张图片重试。");
       } finally {
         setIsReading(false);
       }
     },
-    [convertToBase64, images, maxImages, onImagesChange]
+    [convertToBase64, images, maxImages, onImagesChange, syncImageMeta]
   );
 
   useEffect(() => {
@@ -159,6 +277,10 @@ export default function MultiImageUploader({
       input.removeEventListener("change", handleNativeChange);
     };
   }, [handleFiles]);
+
+  useEffect(() => {
+    syncImageMeta(images);
+  }, [images, syncImageMeta]);
 
   const handleDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
@@ -184,10 +306,16 @@ export default function MultiImageUploader({
 
   const removeImage = useCallback(
     (index: number) => {
-      onImagesChange(images.filter((_, currentIndex) => currentIndex !== index));
+      const nextImages = images.filter((_, currentIndex) => currentIndex !== index);
+      syncImageMeta(nextImages);
+      onImagesChange(nextImages);
     },
-    [images, onImagesChange]
+    [images, onImagesChange, syncImageMeta]
   );
+
+  const compressedCount = images.filter(
+    (image) => imageMetaMap[image]?.wasCompressed
+  ).length;
 
   return (
     <div className="w-full">
@@ -240,10 +368,10 @@ export default function MultiImageUploader({
         </div>
 
         <p className="relative mt-5 text-lg font-semibold text-slate-950">
-          {isReading ? "正在优化图片..." : "拖拽图片到这里，或点击选择"}
+          {isReading ? "正在检查图片..." : "拖拽图片到这里，或点击选择"}
         </p>
         <p className="relative mt-2 max-w-md text-sm leading-6 text-slate-500">
-          支持 JPG、PNG、WebP。
+          支持 JPG、PNG、WebP。默认优先保留原图，仅在图片过大时才做前端压缩。
           {" "}
           {maxImages ? `最多上传 ${maxImages} 张。` : "可按需继续添加。"}
         </p>
@@ -260,59 +388,87 @@ export default function MultiImageUploader({
         </p>
       ) : null}
 
+      {compressedCount > 0 ? (
+        <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+          当前有 {compressedCount} 张图片因体积过大已做前端压缩，卡片上会显示“已压缩”标记。
+        </p>
+      ) : null}
+
       {images.length > 0 ? (
         <div className="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {images.map((image, index) => (
-            <div
-              key={`${image.slice(0, 32)}-${index}`}
-              className="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
-            >
-              <div className="relative aspect-[4/5] bg-slate-100">
-                <img
-                  src={image}
-                  alt={`${title} ${index + 1}`}
-                  className="h-full w-full object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    removeImage(index);
-                  }}
-                  className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950/80 text-white opacity-0 transition group-hover:opacity-100"
-                >
-                  <svg
-                    className="h-4 w-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M6 18 18 6M6 6l12 12"
-                    />
-                  </svg>
-                </button>
-              </div>
+          {images.map((image, index) => {
+            const imageMeta = imageMetaMap[image];
 
-              <div className="flex items-center justify-between px-4 py-3 text-sm">
-                <span className="font-medium text-slate-700">图片 {index + 1}</span>
-                {maxImages ? (
-                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
-                    {index + 1}/{maxImages}
-                  </span>
+            return (
+              <div
+                key={`${image.slice(0, 32)}-${index}`}
+                className="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
+              >
+                <div className="relative aspect-[4/5] bg-slate-100">
+                  <img
+                    src={image}
+                    alt={`${title} ${index + 1}`}
+                    className="h-full w-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      removeImage(index);
+                    }}
+                    className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950/80 text-white opacity-0 transition group-hover:opacity-100"
+                  >
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18 18 6M6 6l12 12"
+                      />
+                    </svg>
+                  </button>
+
+                  {imageMeta?.wasCompressed ? (
+                    <div className="absolute left-3 top-3 rounded-full bg-amber-300 px-3 py-1 text-[11px] font-semibold text-slate-950 shadow-sm">
+                      已压缩
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="space-y-3 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-700">图片 {index + 1}</span>
+                    {maxImages ? (
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
+                        {index + 1}/{maxImages}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {imageMeta?.wasCompressed ? (
+                    <div
+                      className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-6 text-amber-800"
+                      title={`原图约 ${formatBytes(imageMeta.originalBytes)}，当前约 ${formatBytes(imageMeta.finalBytes)}`}
+                    >
+                      已压缩：{formatBytes(imageMeta.originalBytes)} →{" "}
+                      {formatBytes(imageMeta.finalBytes)}
+                    </div>
+                  ) : null}
+                </div>
+
+                {renderImageFooter ? (
+                  <div className="border-t border-slate-200 px-4 py-4">
+                    {renderImageFooter({ image, index })}
+                  </div>
                 ) : null}
               </div>
-
-              {renderImageFooter ? (
-                <div className="border-t border-slate-200 px-4 py-4">
-                  {renderImageFooter({ image, index })}
-                </div>
-              ) : null}
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : null}
     </div>
