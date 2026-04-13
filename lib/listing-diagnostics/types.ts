@@ -15,11 +15,70 @@ export type ListingDiagnosticsSourceStatus = "covered" | "partial" | "missing";
 export type ListingDiagnosticsSeverity = "high" | "medium" | "low";
 export type ListingDiagnosticsFindingTone = "risk" | "opportunity" | "info";
 export type ListingDiagnosticsActionPriority = "now" | "next" | "later";
+export type ListingDiagnosticsSpApiMode = "off" | "server-default" | "runtime";
+
+export interface ListingDiagnosticsSpApiRuntimeCredentials {
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+  sellerId: string;
+}
+
+export interface ListingDiagnosticsSpApiConfig {
+  mode: ListingDiagnosticsSpApiMode;
+  runtime: ListingDiagnosticsSpApiRuntimeCredentials;
+}
+
+export interface ListingDiagnosticsCapabilitiesResponse {
+  sellerSprite: {
+    configured: boolean;
+  };
+  spApi: {
+    supported: true;
+    serverDefaultConfigured: boolean;
+    supportedModes: ListingDiagnosticsSpApiMode[];
+    requiredRuntimeFields: Array<keyof ListingDiagnosticsSpApiRuntimeCredentials>;
+    marketplaces: Record<
+      string,
+      {
+        marketplaceId: string;
+        region: string;
+      }
+    >;
+  };
+}
+
+export interface ListingDiagnosticsSpApiVerificationSummary {
+  enabled: boolean;
+  mode: Exclude<ListingDiagnosticsSpApiMode, "off">;
+  sellerIdMasked: string;
+  catalogStatus: ListingDiagnosticsSourceStatus;
+  accountStatus: ListingDiagnosticsSourceStatus;
+  verifiedFindingIds: string[];
+  blockingVerifiedFindingIds: string[];
+  scoreCeiling: number | null;
+  scoreCapApplied: boolean;
+}
+
+export interface ListingDiagnosticsSpApiTestResponse {
+  ok: true;
+  mode: Exclude<ListingDiagnosticsSpApiMode, "off">;
+  sellerIdMasked: string;
+  marketplace: string;
+  tokenExchange: "success";
+  targetAsin: string | null;
+  checks: {
+    catalog: "verified" | "skipped";
+    account: "verified" | "skipped";
+  };
+  message: string;
+}
 
 export interface ListingDiagnosticsRequest {
   targetAsin: string;
   competitorAsins: string[];
   marketplace: string;
+  spApi?: ListingDiagnosticsSpApiConfig;
 }
 
 export interface ListingDiagnosticsEntitySnapshot {
@@ -53,7 +112,7 @@ export interface ListingDiagnosticsSourceCoverageItem {
   id: string;
   label: string;
   source: string;
-  entity: "target" | "competitors" | "benchmark";
+  entity: "target" | "competitors" | "benchmark" | "catalog" | "account";
   status: ListingDiagnosticsSourceStatus;
   available: number;
   expected: number;
@@ -111,6 +170,7 @@ export interface ListingDiagnosticsResult {
   target: ListingDiagnosticsEntitySnapshot;
   competitors: ListingDiagnosticsEntitySnapshot[];
   benchmark: ListingDiagnosticsBenchmark;
+  spApiVerification: ListingDiagnosticsSpApiVerificationSummary | null;
   inferredCount: number;
 }
 
@@ -148,6 +208,7 @@ export interface ListingDiagnosticsStoreState {
   targetAsin: string;
   competitorAsins: string[];
   marketplace: string;
+  spApiConfig: ListingDiagnosticsSpApiConfig;
   status: ListingDiagnosticsStatus;
   result: ListingDiagnosticsResult | null;
   errorMessage: string | null;
@@ -158,6 +219,11 @@ export interface ListingDiagnosticsStore extends ListingDiagnosticsStoreState {
   setTargetAsin: (asin: string) => void;
   setMarketplace: (marketplace: string) => void;
   setCompetitorAsin: (index: number, asin: string) => void;
+  setSpApiMode: (mode: ListingDiagnosticsSpApiMode) => void;
+  updateSpApiRuntime: (
+    patch: Partial<ListingDiagnosticsSpApiRuntimeCredentials>
+  ) => void;
+  resetSpApiRuntime: () => void;
   addCompetitorSlot: () => void;
   removeCompetitorSlot: (index: number) => void;
   startAnalysis: () => void;

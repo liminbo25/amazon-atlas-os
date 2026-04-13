@@ -4,13 +4,25 @@ import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import type {
   ListingDiagnosticsApiResponse,
+  ListingDiagnosticsSpApiConfig,
   ListingDiagnosticsStore,
 } from "@/lib/listing-diagnostics/types";
+
+export const DEFAULT_LISTING_DIAGNOSTICS_SP_API_CONFIG: ListingDiagnosticsSpApiConfig = {
+  mode: "off",
+  runtime: {
+    clientId: "",
+    clientSecret: "",
+    refreshToken: "",
+    sellerId: "",
+  },
+};
 
 const initialState = {
   targetAsin: "",
   competitorAsins: ["", "", ""],
   marketplace: "US",
+  spApiConfig: DEFAULT_LISTING_DIAGNOSTICS_SP_API_CONFIG,
   status: "idle",
   result: null,
   errorMessage: null,
@@ -20,6 +32,9 @@ const initialState = {
   | "setTargetAsin"
   | "setMarketplace"
   | "setCompetitorAsin"
+  | "setSpApiMode"
+  | "updateSpApiRuntime"
+  | "resetSpApiRuntime"
   | "addCompetitorSlot"
   | "removeCompetitorSlot"
   | "startAnalysis"
@@ -46,6 +61,30 @@ export const useListingDiagnosticsStore = create<ListingDiagnosticsStore>()(
           competitorAsins: state.competitorAsins.map((value, valueIndex) =>
             valueIndex === index ? asin.toUpperCase() : value
           ),
+        })),
+      setSpApiMode: (mode) =>
+        set((state) => ({
+          spApiConfig: {
+            ...state.spApiConfig,
+            mode,
+          },
+        })),
+      updateSpApiRuntime: (patch) =>
+        set((state) => ({
+          spApiConfig: {
+            ...state.spApiConfig,
+            runtime: {
+              ...state.spApiConfig.runtime,
+              ...patch,
+            },
+          },
+        })),
+      resetSpApiRuntime: () =>
+        set((state) => ({
+          spApiConfig: {
+            ...DEFAULT_LISTING_DIAGNOSTICS_SP_API_CONFIG,
+            mode: state.spApiConfig.mode,
+          },
         })),
       addCompetitorSlot: () =>
         set((state) => ({
@@ -100,6 +139,7 @@ export const useListingDiagnosticsStore = create<ListingDiagnosticsStore>()(
         targetAsin: state.targetAsin,
         competitorAsins: state.competitorAsins,
         marketplace: state.marketplace,
+        spApiConfig: state.spApiConfig,
         result: state.result,
         status: state.result ? state.status : "idle",
       }),

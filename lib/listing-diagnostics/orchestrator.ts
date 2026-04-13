@@ -1,5 +1,6 @@
 import { fetchCompetitorData } from "@/lib/seller-sprite-client";
 import { listingDiagnosticsRules } from "@/lib/listing-diagnostics/rules";
+import { buildListingDiagnosticsSpApiEnhancement } from "@/lib/listing-diagnostics/sp-api";
 import {
   average,
   extractReviewThemes,
@@ -96,23 +97,54 @@ export async function runListingDiagnostics(
     })
   );
 
-  const findings = sortFindings(dedupeById(ruleResults.flatMap((result) => result.findings)));
+  const spApiEnhancement = await buildListingDiagnosticsSpApiEnhancement({
+    targetAsin: normalizedRequest.targetAsin,
+    marketplace: normalizedRequest.marketplace,
+    config: request.spApi,
+  });
+
+  const findings = sortFindings(
+    dedupeById([
+      ...ruleResults.flatMap((result) => result.findings),
+      ...(spApiEnhancement?.findings ?? []),
+    ])
+  );
   const computedActions = sortActions(
-    dedupeById(ruleResults.flatMap((result) => result.actions))
+    dedupeById([
+      ...ruleResults.flatMap((result) => result.actions),
+      ...(spApiEnhancement?.actions ?? []),
+    ])
   ).slice(0, 6);
   const dimensions = ruleResults.map((result) => result.dimension);
 
-  const overallScore = Math.round(
+  const computedOverallScore = Math.round(
     dimensions.reduce((total, dimension) => total + dimension.score * dimension.weight, 0) /
       dimensions.reduce((total, dimension) => total + dimension.weight, 0)
   );
+  const overallScore =
+    spApiEnhancement?.scoreCeiling !== null && spApiEnhancement?.scoreCeiling !== undefined
+      ? Math.min(computedOverallScore, spApiEnhancement.scoreCeiling)
+      : computedOverallScore;
+  const scoreCapApplied =
+    spApiEnhancement?.scoreCeiling !== null &&
+    spApiEnhancement?.scoreCeiling !== undefined &&
+    computedOverallScore > spApiEnhancement.scoreCeiling;
   const confidence = Math.round(
-    buildConfidenceScore(sourceCoverage, ruleResults) * 100
+    buildConfidenceScore(
+      [...sourceCoverage, ...(spApiEnhancement?.coverageItems ?? [])],
+      ruleResults
+    ) * 100
   );
 
-  const warnings = buildWarnings(sourceCoverage, findings);
-  const status: ListingDiagnosticsStatus =
-    sourceCoverage.some((item) => item.status !== "covered") ||
+  const combinedSourceCoverage = [
+    ...sourceCoverage,
+    ...(spApiEnhancement?.coverageItems ?? []),
+  ];
+  const warnings = buildWarnings(combinedSourceCoverage, findings).concat(
+    spApiEnhancement?.warnings ?? []
+  );
+  const status: ListingDiagnosticsResult["status"] =
+    combinedSourceCoverage.some((item) => item.status !== "covered") ||
     dimensions.some((dimension) => dimension.inferred)
       ? "partial"
       : "success";
@@ -139,25 +171,37 @@ export async function runListingDiagnostics(
     status,
     overallScore,
     confidence,
-    headline: buildHeadline(overallScore, confidence, findings),
-    summary: buildSummary(dimensions, findings, status),
+    headline:
+      spApiEnhancement?.headline ?? buildHeadline(overallScore, confidence, findings),
+    summary: buildSummary(
+      dimensions,
+      findings,
+      status,
+      spApiEnhancement?.summary.verifiedFindingIds.length ?? 0
+    ),
     dimensions,
     findings,
     actionPlan,
-    sourceCoverage,
-    warnings,
+    sourceCoverage: combinedSourceCoverage,
+    warnings: Array.from(new Set(warnings)),
     target,
     competitors,
     benchmark,
+    spApiVerification: spApiEnhancement
+      ? {
+          ...spApiEnhancement.summary,
+          scoreCapApplied,
+        }
+      : null,
     inferredCount:
       findings.filter((item) => item.inferred).length +
       actionPlan.filter((item) => item.inferred).length +
-      sourceCoverage.filter((item) => item.inferred).length,
+      combinedSourceCoverage.filter((item) => item.inferred).length,
   };
 
   return {
     status,
-    warnings,
+    warnings: Array.from(new Set(warnings)),
     result,
   };
 }
@@ -394,6 +438,9 @@ function buildConfidenceScore(
     "competitor-reviews": 0.08,
     "competitor-keywords": 0.07,
     "derived-benchmark": 0.05,
+    "sp-api-catalog": 0.05,
+    "sp-api-account-listing": 0.04,
+    "sp-api-account-restrictions": 0.03,
   };
 
   const sourceScore = sourceCoverage.reduce((total, item) => {
@@ -404,7 +451,7 @@ function buildConfidenceScore(
     0
   );
   const weightTotal =
-    Object.values(sourceWeights).reduce((total, value) => total + value, 0) +
+    sourceCoverage.reduce((total, item) => total + (sourceWeights[item.id] ?? 0), 0) +
     ruleResults.reduce((total, result) => total + result.dimension.weight, 0);
 
   return weightTotal > 0 ? (sourceScore + ruleScore) / weightTotal : 0;
@@ -454,7 +501,8 @@ function buildHeadline(
 function buildSummary(
   dimensions: ListingDiagnosticsResult["dimensions"],
   findings: ListingDiagnosticsFinding[],
-  status: ListingDiagnosticsStatus
+  status: ListingDiagnosticsStatus,
+  verifiedFindingCount = 0
 ): string {
   const strongest = [...dimensions].sort((left, right) => right.score - left.score)[0];
   const weakest = [...dimensions].sort((left, right) => left.score - right.score)[0];
@@ -463,7 +511,12 @@ function buildSummary(
     return "No dimensions were scored.";
   }
 
-  return `${strongest.label} is currently the strongest dimension, while ${weakest.label} needs the most attention. ${findings.length} findings were generated in this ${status} run.`;
+  const verificationSentence =
+    verifiedFindingCount > 0
+      ? ` ${verifiedFindingCount} catalog/account finding(s) were verified by Amazon SP-API.`
+      : "";
+
+  return `${strongest.label} is currently the strongest dimension, while ${weakest.label} needs the most attention. ${findings.length} findings were generated in this ${status} run.${verificationSentence}`;
 }
 
 function dedupeById<T extends { id: string }>(items: T[]): T[] {

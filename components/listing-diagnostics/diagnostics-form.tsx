@@ -1,6 +1,7 @@
 "use client";
 
 import { Plus, Search, X } from "lucide-react";
+import { SpApiRuntimePanel } from "@/components/listing-diagnostics/sp-api-runtime-panel";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import type {
+  ListingDiagnosticsSpApiConfig,
+  ListingDiagnosticsSpApiMode,
+  ListingDiagnosticsSpApiRuntimeCredentials,
+} from "@/lib/listing-diagnostics/types";
 
 const MARKETPLACE_OPTIONS = ["US", "CA", "UK", "DE", "FR", "IT", "ES", "JP"];
 
@@ -19,10 +25,16 @@ interface DiagnosticsFormProps {
   targetAsin: string;
   marketplace: string;
   competitorAsins: string[];
+  spApiConfig: ListingDiagnosticsSpApiConfig;
   isSubmitting: boolean;
   onTargetAsinChange: (value: string) => void;
   onMarketplaceChange: (value: string) => void;
   onCompetitorAsinChange: (index: number, value: string) => void;
+  onSpApiModeChange: (value: ListingDiagnosticsSpApiMode) => void;
+  onSpApiRuntimeChange: (
+    patch: Partial<ListingDiagnosticsSpApiRuntimeCredentials>
+  ) => void;
+  onSpApiReset: () => void;
   onAddCompetitor: () => void;
   onRemoveCompetitor: (index: number) => void;
   onReset: () => void;
@@ -33,10 +45,14 @@ export function DiagnosticsForm({
   targetAsin,
   marketplace,
   competitorAsins,
+  spApiConfig,
   isSubmitting,
   onTargetAsinChange,
   onMarketplaceChange,
   onCompetitorAsinChange,
+  onSpApiModeChange,
+  onSpApiRuntimeChange,
+  onSpApiReset,
   onAddCompetitor,
   onRemoveCompetitor,
   onReset,
@@ -53,8 +69,9 @@ export function DiagnosticsForm({
             Listing Diagnosis Phase 1
           </CardTitle>
           <p className="text-sm leading-7 text-slate-600">
-            SellerSprite MCP only. This MVP scores listing structure, keyword
-            coverage, review signal, and market position with deterministic rules.
+            SellerSprite remains the MVP scoring path. Optional SP-API
+            verification can confirm Amazon catalog and seller-account blockers
+            without changing the deterministic scoring flow.
           </p>
         </CardHeader>
 
@@ -156,12 +173,22 @@ export function DiagnosticsForm({
             </div>
           </div>
 
+          <SpApiRuntimePanel
+            targetAsin={targetAsin}
+            marketplace={marketplace}
+            config={spApiConfig}
+            disabled={isSubmitting}
+            onModeChange={onSpApiModeChange}
+            onRuntimeChange={onSpApiRuntimeChange}
+            onReset={onSpApiReset}
+          />
+
           <div className="rounded-[1.6rem] border border-slate-200 bg-[linear-gradient(135deg,rgba(246,182,63,0.12),rgba(229,237,246,0.5))] p-4">
             <p className="text-sm font-semibold text-slate-900">Phase 1 scope</p>
             <p className="mt-2 text-sm leading-7 text-slate-600">
-              This route does not use SP-API yet. Confidence and inferred labels
-              reflect where SellerSprite returned direct target data versus derived
-              competitor benchmark signals.
+              SellerSprite remains the MVP scoring path. When SP-API verification is
+              enabled, the result can also verify target catalog and seller-account
+              issues without changing the rest of the deterministic diagnosis flow.
             </p>
           </div>
         </CardContent>

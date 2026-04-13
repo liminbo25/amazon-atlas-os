@@ -48,6 +48,9 @@ export function DiagnosticsResults({
 }: DiagnosticsResultsProps) {
   const deferredResult = useDeferredValue(result);
   const visibleResult = deferredResult ?? result;
+  const verifiedFindingIds = new Set(
+    visibleResult?.spApiVerification?.verifiedFindingIds ?? []
+  );
 
   if (status === "loading") {
     return (
@@ -155,6 +158,33 @@ export function DiagnosticsResults({
         </Card>
       ) : null}
 
+      {visibleResult.spApiVerification?.scoreCapApplied ? (
+        <Card className="border-red-200 bg-red-50/90">
+          <CardContent className="flex flex-col gap-3 pt-6">
+            <div className="flex items-start gap-3">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-red-700 shadow-sm">
+                <AlertTriangle className="h-5 w-5" />
+              </span>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-red-950">Amazon verified blocker</p>
+                  <Badge variant="outline">
+                    score capped at {visibleResult.spApiVerification.scoreCeiling}/100
+                  </Badge>
+                  <Badge variant="secondary">
+                    {visibleResult.spApiVerification.blockingVerifiedFindingIds.length} blocking
+                  </Badge>
+                </div>
+                <p className="text-sm text-red-900">
+                  Amazon SP-API confirmed account or catalog blockers for this ASIN, so the
+                  overall score is being held down until those verified issues are cleared.
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <Card className="border-slate-200/80 bg-white/90">
           <CardHeader className="border-b border-slate-200/80">
@@ -166,6 +196,16 @@ export function DiagnosticsResults({
               >
                 {visibleResult.status}
               </Badge>
+              {visibleResult.spApiVerification?.enabled ? (
+                <Badge variant="outline">
+                  SP-API {visibleResult.spApiVerification.mode}
+                </Badge>
+              ) : null}
+              {visibleResult.spApiVerification?.verifiedFindingIds.length ? (
+                <Badge variant="secondary">
+                  {visibleResult.spApiVerification.verifiedFindingIds.length} verified
+                </Badge>
+              ) : null}
               {visibleResult.inferredCount > 0 ? (
                 <Badge variant="outline">inferred labels on</Badge>
               ) : null}
@@ -194,6 +234,19 @@ export function DiagnosticsResults({
                 icon={<Radar className="h-4 w-4" />}
               />
             </div>
+
+            {visibleResult.spApiVerification?.enabled ? (
+              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/75 p-4 text-sm text-slate-600">
+                <p className="font-semibold text-slate-900">Amazon verification</p>
+                <p className="mt-2 leading-7">
+                  Catalog coverage is {visibleResult.spApiVerification.catalogStatus} and
+                  account coverage is {visibleResult.spApiVerification.accountStatus}.
+                  {visibleResult.spApiVerification.sellerIdMasked
+                    ? ` Seller ${visibleResult.spApiVerification.sellerIdMasked} was used for account checks.`
+                    : ""}
+                </p>
+              </div>
+            ) : null}
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
               {visibleResult.dimensions.map((dimension) => (
@@ -304,7 +357,11 @@ export function DiagnosticsResults({
           <div className="grid gap-4">
             {visibleResult.findings.length > 0 ? (
               visibleResult.findings.map((finding) => (
-                <FindingCard key={finding.id} finding={finding} />
+                <FindingCard
+                  key={finding.id}
+                  finding={finding}
+                  isVerified={verifiedFindingIds.has(finding.id)}
+                />
               ))
             ) : (
               <EmptyPanel
@@ -318,7 +375,11 @@ export function DiagnosticsResults({
         <TabsContent value="actions" className="pt-5">
           <div className="grid gap-4">
             {visibleResult.actionPlan.map((item) => (
-              <ActionCard key={item.id} action={item} />
+              <ActionCard
+                key={item.id}
+                action={item}
+                isVerified={item.linkedFindingIds.some((id) => verifiedFindingIds.has(id))}
+              />
             ))}
           </div>
         </TabsContent>
@@ -383,7 +444,13 @@ function BenchmarkValue({ label, value }: { label: string; value: string }) {
   );
 }
 
-function FindingCard({ finding }: { finding: ListingDiagnosticsFinding }) {
+function FindingCard({
+  finding,
+  isVerified,
+}: {
+  finding: ListingDiagnosticsFinding;
+  isVerified: boolean;
+}) {
   return (
     <Card className="border-slate-200/80 bg-white/90">
       <CardContent className="space-y-4 pt-6">
@@ -395,6 +462,7 @@ function FindingCard({ finding }: { finding: ListingDiagnosticsFinding }) {
           <Badge variant="outline">
             confidence {Math.round(finding.confidence * 100)}%
           </Badge>
+          {isVerified ? <Badge variant="secondary">verified</Badge> : null}
           {finding.inferred ? <Badge variant="secondary">inferred</Badge> : null}
         </div>
 
@@ -420,7 +488,13 @@ function FindingCard({ finding }: { finding: ListingDiagnosticsFinding }) {
   );
 }
 
-function ActionCard({ action }: { action: ListingDiagnosticsActionPlanItem }) {
+function ActionCard({
+  action,
+  isVerified,
+}: {
+  action: ListingDiagnosticsActionPlanItem;
+  isVerified: boolean;
+}) {
   return (
     <Card className="border-slate-200/80 bg-white/90">
       <CardContent className="space-y-4 pt-6">
@@ -431,6 +505,7 @@ function ActionCard({ action }: { action: ListingDiagnosticsActionPlanItem }) {
           <Badge variant="outline">
             confidence {Math.round(action.confidence * 100)}%
           </Badge>
+          {isVerified ? <Badge variant="secondary">verified</Badge> : null}
           {action.inferred ? <Badge variant="secondary">inferred</Badge> : null}
         </div>
 
@@ -453,6 +528,8 @@ function ActionCard({ action }: { action: ListingDiagnosticsActionPlanItem }) {
 }
 
 function CoverageRow({ item }: { item: ListingDiagnosticsSourceCoverageItem }) {
+  const isVerifiedSource = item.source === "Amazon SP-API";
+
   return (
     <TableRow>
       <TableCell>
@@ -466,6 +543,7 @@ function CoverageRow({ item }: { item: ListingDiagnosticsSourceCoverageItem }) {
           <Badge variant={item.status === "covered" ? "secondary" : "outline"}>
             {item.status}
           </Badge>
+          {isVerifiedSource ? <Badge variant="secondary">verified</Badge> : null}
           {item.inferred ? <Badge variant="outline">inferred</Badge> : null}
         </div>
       </TableCell>

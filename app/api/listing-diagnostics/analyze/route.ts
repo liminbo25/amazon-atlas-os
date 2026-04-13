@@ -3,12 +3,28 @@ import {
   runListingDiagnostics,
 } from "@/lib/listing-diagnostics/orchestrator";
 import {
+  ListingDiagnosticsSpApiError,
+} from "@/lib/listing-diagnostics/sp-api";
+import {
   isSellerSpriteClientError,
   SellerSpriteClientError,
 } from "@/lib/seller-sprite-client";
+import type {
+  ListingDiagnosticsSpApiConfig,
+  ListingDiagnosticsSpApiMode,
+  ListingDiagnosticsSpApiRuntimeCredentials,
+} from "@/lib/listing-diagnostics/types";
 
 const DEFAULT_MARKETPLACE = "US";
 const ASIN_PATTERN = /^[A-Z0-9]{10}$/;
+const SP_API_RUNTIME_FIELDS: Array<keyof ListingDiagnosticsSpApiRuntimeCredentials> = [
+  "clientId",
+  "clientSecret",
+  "refreshToken",
+  "sellerId",
+];
+
+export const runtime = "nodejs";
 
 class ListingDiagnosticsRequestError extends Error {
   readonly code: string;
@@ -161,6 +177,87 @@ function parseMarketplace(value: unknown): string {
   return marketplace;
 }
 
+function parseSpApiMode(value: unknown): ListingDiagnosticsSpApiMode {
+  if (value === undefined) {
+    return "off";
+  }
+
+  if (value === "off" || value === "server-default" || value === "runtime") {
+    return value;
+  }
+
+  throw new ListingDiagnosticsRequestError(
+    'spApi.mode must be "off", "server-default", or "runtime".',
+    "sp_api_mode_invalid"
+  );
+}
+
+function parseSpApiRuntime(
+  value: unknown,
+  mode: ListingDiagnosticsSpApiMode
+): ListingDiagnosticsSpApiRuntimeCredentials {
+  if (!isRecord(value)) {
+    if (mode === "runtime") {
+      throw new ListingDiagnosticsRequestError(
+        "spApi.runtime must be an object in runtime mode.",
+        "sp_api_runtime_invalid"
+      );
+    }
+
+    return {
+      clientId: "",
+      clientSecret: "",
+      refreshToken: "",
+      sellerId: "",
+    };
+  }
+
+  const runtimeConfig = {
+    clientId: typeof value.clientId === "string" ? value.clientId.trim() : "",
+    clientSecret:
+      typeof value.clientSecret === "string" ? value.clientSecret.trim() : "",
+    refreshToken:
+      typeof value.refreshToken === "string" ? value.refreshToken.trim() : "",
+    sellerId: typeof value.sellerId === "string" ? value.sellerId.trim() : "",
+  };
+
+  if (mode === "runtime") {
+    const missingFields = SP_API_RUNTIME_FIELDS.filter(
+      (field) => runtimeConfig[field].length === 0
+    );
+
+    if (missingFields.length > 0) {
+      throw new ListingDiagnosticsRequestError(
+        `spApi.runtime is missing ${missingFields.join(", ")}.`,
+        "sp_api_runtime_invalid"
+      );
+    }
+  }
+
+  return runtimeConfig;
+}
+
+function parseSpApiConfig(value: unknown): ListingDiagnosticsSpApiConfig | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+
+  if (!isRecord(value)) {
+    throw new ListingDiagnosticsRequestError(
+      "spApi must be an object.",
+      "sp_api_invalid"
+    );
+  }
+
+  const mode = parseSpApiMode(value.mode);
+  const runtimeConfig = parseSpApiRuntime(value.runtime, mode);
+
+  return {
+    mode,
+    runtime: runtimeConfig,
+  };
+}
+
 function mapSellerSpriteError(error: SellerSpriteClientError): {
   message: string;
   code: string;
@@ -192,11 +289,13 @@ export async function POST(request: Request) {
     const targetAsin = parseAsin(body.targetAsin, "targetAsin");
     const competitorAsins = parseCompetitorAsins(body.competitorAsins, targetAsin);
     const marketplace = parseMarketplace(body.marketplace);
+    const spApi = parseSpApiConfig(body.spApi);
 
     const response = await runListingDiagnostics({
       targetAsin,
       competitorAsins,
       marketplace,
+      spApi,
     });
 
     return Response.json(response);
@@ -225,6 +324,18 @@ export async function POST(request: Request) {
       );
     }
 
+    if (error instanceof ListingDiagnosticsSpApiError) {
+      return Response.json(
+        {
+          error: error.message,
+          code: error.code,
+        },
+        {
+          status: error.statusCode,
+        }
+      );
+    }
+
     if (error instanceof Error && isSellerSpriteClientError(error)) {
       const mapped = mapSellerSpriteError(error);
       return Response.json(
@@ -238,7 +349,10 @@ export async function POST(request: Request) {
       );
     }
 
-    console.error("[listing-diagnostics/analyze] unexpected error", error);
+    console.error("[listing-diagnostics/analyze] unexpected error", {
+      name: error instanceof Error ? error.name : typeof error,
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
     return Response.json(
       {
         error: "Listing diagnostics failed unexpectedly.",

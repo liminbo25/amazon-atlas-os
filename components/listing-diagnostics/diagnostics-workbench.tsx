@@ -11,6 +11,7 @@ import { useListingDiagnosticsStore } from "@/lib/listing-diagnostics/store";
 import type { ListingDiagnosticsApiResponse } from "@/lib/listing-diagnostics/types";
 
 const ASIN_PATTERN = /^[A-Z0-9]{10}$/;
+type SpApiRuntimeField = "clientId" | "clientSecret" | "refreshToken" | "sellerId";
 
 export function DiagnosticsWorkbench() {
   const [isPending, startTransition] = useTransition();
@@ -18,6 +19,7 @@ export function DiagnosticsWorkbench() {
     targetAsin,
     competitorAsins,
     marketplace,
+    spApiConfig,
     status,
     result,
     errorMessage,
@@ -25,6 +27,9 @@ export function DiagnosticsWorkbench() {
     setTargetAsin,
     setMarketplace,
     setCompetitorAsin,
+    setSpApiMode,
+    updateSpApiRuntime,
+    resetSpApiRuntime,
     addCompetitorSlot,
     removeCompetitorSlot,
     startAnalysis,
@@ -79,10 +84,28 @@ export function DiagnosticsWorkbench() {
       return;
     }
 
+    if (spApiConfig.mode === "runtime") {
+      const runtimeEntries = Object.entries(spApiConfig.runtime) as Array<
+        [keyof typeof spApiConfig.runtime, string]
+      >;
+      const missingFields = runtimeEntries
+        .filter(([, value]) => value.trim().length === 0)
+        .map(([key]) => key);
+
+      if (missingFields.length > 0) {
+        failAnalysis(
+          `SP-API runtime mode requires ${missingFields.map(formatSpApiFieldLabel).join(", ")}.`,
+          "sp_api_runtime_incomplete"
+        );
+        return;
+      }
+    }
+
     const payload = {
       targetAsin: normalizedTargetAsin,
       competitorAsins: normalizedCompetitorAsins,
       marketplace,
+      spApi: spApiConfig,
     };
 
     startAnalysis();
@@ -128,10 +151,14 @@ export function DiagnosticsWorkbench() {
         targetAsin={targetAsin}
         marketplace={marketplace}
         competitorAsins={competitorAsins}
+        spApiConfig={spApiConfig}
         isSubmitting={isSubmitting}
         onTargetAsinChange={setTargetAsin}
         onMarketplaceChange={setMarketplace}
         onCompetitorAsinChange={setCompetitorAsin}
+        onSpApiModeChange={setSpApiMode}
+        onSpApiRuntimeChange={updateSpApiRuntime}
+        onSpApiReset={resetSpApiRuntime}
         onAddCompetitor={addCompetitorSlot}
         onRemoveCompetitor={removeCompetitorSlot}
         onReset={reset}
@@ -150,4 +177,17 @@ export function DiagnosticsWorkbench() {
       />
     </section>
   );
+}
+
+function formatSpApiFieldLabel(field: SpApiRuntimeField): string {
+  switch (field) {
+    case "clientId":
+      return "LWA client ID";
+    case "clientSecret":
+      return "LWA client secret";
+    case "refreshToken":
+      return "refresh token";
+    case "sellerId":
+      return "seller ID";
+  }
 }
