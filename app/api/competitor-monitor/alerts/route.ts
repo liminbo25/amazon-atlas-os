@@ -13,7 +13,7 @@ export async function GET(request: Request) {
         : null;
 
     return Response.json(
-      listCompetitorMonitorAlerts({
+      await listCompetitorMonitorAlerts({
         marketId: searchParams.get("marketId"),
         marketplace: searchParams.get("marketplace"),
         asin: searchParams.get("asin"),

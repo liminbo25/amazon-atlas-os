@@ -6,6 +6,27 @@ import {
 
 export const runtime = "nodejs";
 
+export async function GET(request: Request) {
+  try {
+    assertCompetitorMonitorCronSecret(request);
+    const { searchParams } = new URL(request.url);
+    const marketId = searchParams.get("marketId")?.trim() || null;
+
+    return Response.json({
+      sync: await runCompetitorMonitorDailySync({
+        marketId,
+        trigger: "cron",
+      }),
+    });
+  } catch (error) {
+    if (!(error instanceof RouteError) || error.status >= 500) {
+      logRouteError("competitor-monitor-sync-daily", error);
+    }
+
+    return toErrorResponse(error, "competitor-monitor daily sync failed.");
+  }
+}
+
 export async function POST(request: Request) {
   try {
     assertCompetitorMonitorCronSecret(request);
