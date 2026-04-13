@@ -125,7 +125,7 @@ export function AiRequestErrorAlert({
           <div className="sm:col-span-2">
             <span className="font-medium text-slate-700">Base URL:</span>{" "}
             <span className="font-mono break-all">
-              {runtimeConfig.baseUrl.trim() || "Server default"}
+              {formatRuntimeBaseUrl(runtimeConfig.baseUrl)}
             </span>
           </div>
           <div className="sm:col-span-2">
@@ -229,6 +229,39 @@ function isAuthenticationIssue(error: ApiRequestError): boolean {
 
 function isRequestIssue(error: ApiRequestError): boolean {
   return Boolean(error.status && error.status >= 400 && error.status < 500);
+}
+
+function formatRuntimeBaseUrl(baseUrl: string): string {
+  const value = baseUrl.trim();
+
+  if (!value) {
+    return "Server default";
+  }
+
+  try {
+    const url = new URL(value);
+    url.hash = "";
+    url.search = "";
+    url.pathname = normalizeRuntimePath(url.pathname);
+    return url.toString().replace(/\/+$/, "");
+  } catch {
+    const normalized = normalizeRuntimePath(value);
+    return normalized.replace(/\/+$/, "");
+  }
+}
+
+function normalizeRuntimePath(path: string): string {
+  return (
+    path
+      .replace(/\/+$/, "")
+      .replace(/\/v1\/chat\/completions$/i, "")
+      .replace(/\/chat\/completions$/i, "")
+      .replace(/\/v1\/responses$/i, "")
+      .replace(/\/responses$/i, "")
+      .replace(/\/v1\/messages$/i, "")
+      .replace(/\/messages$/i, "")
+      .replace(/\/v1$/i, "") || "/"
+  );
 }
 
 function parseJsonRecord(value: string): Record<string, unknown> | null {

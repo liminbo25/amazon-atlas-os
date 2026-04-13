@@ -8,6 +8,7 @@ const navItems = [
   { href: "/", label: "Overview" },
   { href: "/image-studio", label: "Image Studio" },
   { href: "/listing-studio", label: "Listing Studio" },
+  { href: "/ad-optimizer", label: "Ad Optimizer" },
   { href: "/competitor-monitor", label: "Competitor Monitor" },
   { href: "/video-studio", label: "Video Studio" },
 ];
@@ -44,7 +45,7 @@ export function StudioHeader({
                   Amazon Atlas OS
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  One entry point for image, listing, repository-backed competitor monitoring, and video workflows.
+                  One entry point for image, listing, ad optimization, repository-backed competitor monitoring, and video workflows.
                 </p>
               </div>
             </div>

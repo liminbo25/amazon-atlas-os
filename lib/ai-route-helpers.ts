@@ -2,7 +2,10 @@ type UnknownRecord = Record<string, unknown>;
 
 const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com";
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com";
-const DEFAULT_AI_TIMEOUT_MS = 90_000;
+const DEFAULT_AI_TIMEOUT_MS = parsePositiveIntegerEnv(
+  process.env.AI_REQUEST_TIMEOUT_MS,
+  120_000
+);
 const DEFAULT_RETRY_DELAY_MS = 350;
 const ANTHROPIC_VERSION = "2023-06-01";
 
@@ -104,6 +107,18 @@ export class RouteError extends Error {
     this.retryable = options.retryable ?? false;
     this.logDetails = options.logDetails;
   }
+}
+
+function parsePositiveIntegerEnv(
+  rawValue: string | undefined,
+  fallback: number
+): number {
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 export function isRecord(value: unknown): value is UnknownRecord {
@@ -742,11 +757,25 @@ function resolveOpenAiConfig(
   runtimeConfig: AiRuntimeConfig,
   defaultModel?: string
 ): ResolvedAiConfig {
-  const apiKey = runtimeConfig.apiKey?.trim() || readNonEmptyEnv("OPENAI_API_KEY");
+  const requestedModel =
+    runtimeConfig.model?.trim() ||
+    readNonEmptyEnv("OPENAI_MODEL") ||
+    readNonEmptyEnv("GEMINI_MODEL") ||
+    (defaultModel?.trim().toLowerCase().startsWith("claude")
+      ? "gemini-2.5-flash"
+      : defaultModel?.trim()) ||
+    "";
+  const preferGeminiGateway =
+    !runtimeConfig.baseURL?.trim() && shouldPreferGeminiGateway(requestedModel);
+  const apiKey =
+    runtimeConfig.apiKey?.trim() ||
+    (preferGeminiGateway
+      ? readNonEmptyEnv("GEMINI_API_KEY") || readNonEmptyEnv("OPENAI_API_KEY")
+      : readNonEmptyEnv("OPENAI_API_KEY") || readNonEmptyEnv("GEMINI_API_KEY"));
 
   if (!apiKey) {
     throw new RouteError(
-      "AI credentials are missing. Set OPENAI_API_KEY or provide a runtime API key.",
+      "AI credentials are missing. Set OPENAI_API_KEY, GEMINI_API_KEY, or provide a runtime API key.",
       {
         status: 500,
         code: "openai_credentials_missing",
@@ -759,15 +788,13 @@ function resolveOpenAiConfig(
     : "OPENAI_BASE_URL";
   const rawBaseURL =
     runtimeConfig.baseURL?.trim() ||
-    readNonEmptyEnv("OPENAI_BASE_URL") ||
+    (preferGeminiGateway
+      ? readNonEmptyEnv("GEMINI_API_BASE_URL") || readNonEmptyEnv("OPENAI_BASE_URL")
+      : readNonEmptyEnv("OPENAI_BASE_URL") || readNonEmptyEnv("GEMINI_API_BASE_URL")) ||
     DEFAULT_OPENAI_BASE_URL;
   const baseURL = normalizeAiBaseURL(rawBaseURL, baseURLSource, "openai");
 
-  const model =
-    runtimeConfig.model?.trim() ||
-    readNonEmptyEnv("OPENAI_MODEL") ||
-    defaultModel?.trim() ||
-    "";
+  const model = requestedModel;
 
   if (!model) {
     throw new RouteError(
@@ -815,6 +842,29 @@ function resolveAiProvider(
     model: runtimeConfig.model || defaultModel,
   });
 
+  if (inferred) {
+    return inferred;
+  }
+
+  const hasAnthropicEnv = Boolean(
+    readNonEmptyEnv("ANTHROPIC_API_KEY") ||
+      readNonEmptyEnv("ANTHROPIC_AUTH_TOKEN") ||
+      readNonEmptyEnv("ANTHROPIC_BASE_URL") ||
+      readNonEmptyEnv("ANTHROPIC_MODEL")
+  );
+  const hasOpenAiLikeEnv = Boolean(
+    readNonEmptyEnv("OPENAI_API_KEY") ||
+      readNonEmptyEnv("OPENAI_BASE_URL") ||
+      readNonEmptyEnv("OPENAI_MODEL") ||
+      readNonEmptyEnv("GEMINI_API_KEY") ||
+      readNonEmptyEnv("GEMINI_API_BASE_URL") ||
+      readNonEmptyEnv("GEMINI_MODEL")
+  );
+
+  if (hasOpenAiLikeEnv && !hasAnthropicEnv) {
+    return "openai";
+  }
+
   return inferred ?? "anthropic";
 }
 
@@ -833,7 +883,13 @@ function inferProvider(options: {
     model.startsWith("gpt") ||
     model.startsWith("o1") ||
     model.startsWith("o3") ||
-    model.startsWith("o4")
+    model.startsWith("o4") ||
+    model.startsWith("gemini") ||
+    model.startsWith("deepseek") ||
+    model.startsWith("qwen") ||
+    model === "vision-model" ||
+    model === "coder-model" ||
+    model.includes("/")
   ) {
     return "openai";
   }
@@ -851,6 +907,27 @@ function inferProvider(options: {
   }
 
   return null;
+}
+
+function shouldPreferGeminiGateway(model: string): boolean {
+  const normalizedModel = model.trim().toLowerCase();
+
+  if (!normalizedModel) {
+    return false;
+  }
+
+  if (
+    normalizedModel.startsWith("gemini") ||
+    normalizedModel.startsWith("deepseek") ||
+    normalizedModel.startsWith("qwen") ||
+    normalizedModel === "vision-model" ||
+    normalizedModel === "coder-model" ||
+    normalizedModel.includes("/")
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 function normalizeRouteError(

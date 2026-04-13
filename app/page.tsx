@@ -1,5 +1,6 @@
 import Link from "next/link";
 import {
+  BadgeDollarSign,
   ArrowRight,
   ImagePlus,
   ListChecks,
@@ -31,6 +32,16 @@ const modules = [
     accent: "from-sky-200 via-cyan-100 to-white",
   },
   {
+    href: "/ad-optimizer",
+    title: "Ad Optimizer",
+    subtitle: "Search-term diagnostics to bulk-ready actions",
+    description:
+      "Upload current and previous search-term reports plus a bulk identity sheet, then generate harvest, negate, and bid-adjustment actions with review-safe exports.",
+    status: "New",
+    icon: BadgeDollarSign,
+    accent: "from-lime-200 via-emerald-100 to-white",
+  },
+  {
     href: "/competitor-monitor",
     title: "Competitor Monitor",
     subtitle: "Repository-backed watchlists, ASIN detail, and alert triage",
@@ -53,10 +64,10 @@ const modules = [
 ];
 
 const nextModules = [
-  "Ad intelligence and campaign diagnostics",
   "Listing QA and issue detection",
   "Keyword radar and ranking snapshots",
   "Creative asset library and workflow memory",
+  "Deeper placement automation and budget pacing",
 ];
 
 export default function Home() {
@@ -69,7 +80,7 @@ export default function Home() {
       />
 
       <section className="page-shell mt-8">
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
           {modules.map((module) => {
             const Icon = module.icon;
 

@@ -57,8 +57,8 @@ const runtimeSections: Array<{
     title: "Image Analysis",
     description: "Step 1 image understanding request",
     step: "Step 1 /api/analyze-images",
-    placeholderBaseUrl: "https://api.anthropic.com",
-    placeholderModel: "claude-sonnet-4-20250514",
+    placeholderBaseUrl: "http://127.0.0.1:8317/v1",
+    placeholderModel: "vision-model",
     Icon: Image,
   },
   {
@@ -67,7 +67,7 @@ const runtimeSections: Array<{
     description: "Step 3 review and copy insight request",
     step: "Step 3 /api/keywords",
     placeholderBaseUrl: "https://api.openai.com",
-    placeholderModel: "gpt-4.1",
+    placeholderModel: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
     Icon: MessagesSquare,
   },
   {
@@ -76,7 +76,7 @@ const runtimeSections: Array<{
     description: "Step 4 copy generation request",
     step: "Step 4 /api/generate-copy",
     placeholderBaseUrl: "https://api.openai.com",
-    placeholderModel: "gpt-5.4-mini",
+    placeholderModel: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
     Icon: FileText,
   },
 ];
@@ -89,6 +89,8 @@ const providerOptions: Array<{
   { value: "anthropic", label: "Anthropic" },
   { value: "openai", label: "OpenAI-compatible" },
 ];
+
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 export function RuntimeConfigPanel() {
   const {
@@ -106,6 +108,19 @@ export function RuntimeConfigPanel() {
       runtimeSections.filter(({ key }) => isRuntimeCustomized(aiRuntimeSettings[key])).length,
     [aiRuntimeSettings]
   );
+  const localhostMismatchSections = useMemo(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+
+    if (LOOPBACK_HOSTS.has(window.location.hostname)) {
+      return [];
+    }
+
+    return runtimeSections.filter(({ key }) =>
+      isLoopbackBaseUrl(aiRuntimeSettings[key].baseUrl)
+    );
+  }, [aiRuntimeSettings]);
 
   const updateServiceSettings = (
     service: AiRuntimeServiceKey,
@@ -238,6 +253,17 @@ export function RuntimeConfigPanel() {
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {localhostMismatchSections.length > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+            当前页面运行在远程站点，但你把
+            {" "}
+            {localhostMismatchSections.map((section) => section.title).join(" / ")}
+            {" "}
+            配到了 `127.0.0.1` 或 `localhost`。这些请求会从站点服务器发起，服务器访问不到你电脑本地代理，所以会报连接失败。
+            请改用本地页面，例如 `http://localhost:3010/listing-studio`，或者把代理换成一个可公网访问的地址。
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
           {runtimeSections.map((section) => (
             <Badge key={section.key} variant="outline" className="gap-1">
@@ -502,5 +528,20 @@ function formatTestHeading(result: RuntimeTestResult): string {
       return "Test failed";
     default:
       return "Not tested yet";
+  }
+}
+
+function isLoopbackBaseUrl(baseUrl: string): boolean {
+  const value = baseUrl.trim();
+
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return LOOPBACK_HOSTS.has(url.hostname);
+  } catch {
+    return /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?/i.test(value);
   }
 }

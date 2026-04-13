@@ -21,7 +21,29 @@ import {
   toErrorResponse,
 } from "@/lib/ai-route-helpers";
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B";
+
+const PRIMARY_PROMPT_PLAN: VocPromptPlan = {
+  negativeReviewLimit: 18,
+  positiveReviewLimit: 12,
+  listingLimit: 3,
+  bulletPointLimit: 5,
+  titleMaxLength: 160,
+  bulletMaxLength: 180,
+  reviewTitleMaxLength: 80,
+  reviewContentMaxLength: 260,
+};
+
+const RETRY_PROMPT_PLAN: VocPromptPlan = {
+  negativeReviewLimit: 10,
+  positiveReviewLimit: 8,
+  listingLimit: 2,
+  bulletPointLimit: 4,
+  titleMaxLength: 120,
+  bulletMaxLength: 140,
+  reviewTitleMaxLength: 60,
+  reviewContentMaxLength: 180,
+};
 
 const VOC_SYSTEM_PROMPT = [
   "You analyze Amazon competitor listings and review VOC.",
@@ -40,6 +62,17 @@ interface KeywordsResponsePayload {
   painPoints: PainPoint[];
   valuePoints: ValuePoint[];
   competitorAnalysis: CompetitorCopyAnalysis[];
+}
+
+interface VocPromptPlan {
+  negativeReviewLimit: number;
+  positiveReviewLimit: number;
+  listingLimit: number;
+  bulletPointLimit: number;
+  titleMaxLength: number;
+  bulletMaxLength: number;
+  reviewTitleMaxLength: number;
+  reviewContentMaxLength: number;
 }
 
 export async function POST(request: Request) {
@@ -390,27 +423,39 @@ function buildVocPrompt(
   payload: KeywordsRequestPayload,
   attempt: number
 ): string {
+  const promptPlan = resolvePromptPlan(attempt);
   const allNegativeReviews = Object.values(payload.reviews).flat();
   const allPositiveReviews = Object.values(payload.positiveReviews).flat();
+  const sampledNegativeReviews = selectRepresentativeReviews(
+    allNegativeReviews,
+    promptPlan.negativeReviewLimit
+  );
+  const sampledPositiveReviews = selectRepresentativeReviews(
+    allPositiveReviews,
+    promptPlan.positiveReviewLimit
+  );
+  const sampledListings = payload.listings.slice(0, promptPlan.listingLimit);
 
-  const negativeReviewSummary = allNegativeReviews
-    .slice(0, 60)
-    .map((review) => formatReview(review))
+  const negativeReviewSummary = sampledNegativeReviews
+    .map((review) => formatReview(review, promptPlan))
     .join("\n");
 
-  const positiveReviewSummary = allPositiveReviews
-    .slice(0, 60)
-    .map((review) => formatReview(review))
+  const positiveReviewSummary = sampledPositiveReviews
+    .map((review) => formatReview(review, promptPlan))
     .join("\n");
 
-  const listingSummary = payload.listings
+  const listingSummary = sampledListings
     .map((listing) =>
       [
         `ASIN: ${listing.asin}`,
-        `Title: ${listing.title}`,
+        `Title: ${truncateText(listing.title, promptPlan.titleMaxLength)}`,
         "Bullet points:",
         listing.bulletPoints
-          .map((point, index) => `${index + 1}. ${point}`)
+          .slice(0, promptPlan.bulletPointLimit)
+          .map(
+            (point, index) =>
+              `${index + 1}. ${truncateText(point, promptPlan.bulletMaxLength)}`
+          )
           .join("\n"),
         `Price: $${listing.price} | Rating: ${listing.rating} | Reviews: ${listing.reviews} | BSR: #${listing.bsr}`,
       ].join("\n")
@@ -421,14 +466,15 @@ function buildVocPrompt(
 Use the supplied competitor listings and reviews to produce a VOC summary for downstream listing strategy work.
 
 Return all analysis text in Simplified Chinese.
+The input below is a representative sample chosen from the supplied dataset to keep latency stable.
 
 Competitor listings:
-${listingSummary}
+${listingSummary || "None"}
 
-Negative reviews (${allNegativeReviews.length}):
+Negative reviews (sampled ${sampledNegativeReviews.length} of ${allNegativeReviews.length}):
 ${negativeReviewSummary || "None"}
 
-Positive reviews (${allPositiveReviews.length}):
+Positive reviews (sampled ${sampledPositiveReviews.length} of ${allPositiveReviews.length}):
 ${positiveReviewSummary || "None"}
 
 Return exactly one JSON object with this shape:
@@ -436,30 +482,30 @@ Return exactly one JSON object with this shape:
   "painPoints": [
     {
       "rank": 1,
-      "category": "痛点类型",
+      "category": "Pain point category",
       "frequency": 12,
       "percentage": 24,
-      "typicalQuotes": ["原文摘录1", "原文摘录2"],
-      "sellingPointSuggestion": "对应卖点建议"
+      "typicalQuotes": ["Direct quote 1", "Direct quote 2"],
+      "sellingPointSuggestion": "Specific listing angle"
     }
   ],
   "valuePoints": [
     {
-      "category": "价值点类型",
+      "category": "Positive value category",
       "frequency": 8,
       "percentage": 16,
-      "typicalQuotes": ["原文摘录1", "原文摘录2"],
-      "leverageSuggestion": "如何在 Listing 中放大这个价值点"
+      "typicalQuotes": ["Direct quote 1", "Direct quote 2"],
+      "leverageSuggestion": "How to amplify this value in the listing"
     }
   ],
   "competitorAnalysis": [
     {
       "asin": "B0XXXXXXX",
-      "titleStructure": "标题结构分析",
-      "bulletPointLogic": ["第1点逻辑", "第2点逻辑", "第3点逻辑"],
-      "keywordCoverage": ["关键词1", "关键词2"],
-      "strengths": ["优势1", "优势2"],
-      "weaknesses": ["弱点1", "弱点2"]
+      "titleStructure": "Title structure analysis",
+      "bulletPointLogic": ["Bullet logic 1", "Bullet logic 2", "Bullet logic 3"],
+      "keywordCoverage": ["keyword 1", "keyword 2"],
+      "strengths": ["Strength 1", "Strength 2"],
+      "weaknesses": ["Weakness 1", "Weakness 2"]
     }
   ]
 }
@@ -474,10 +520,102 @@ ${getRetryPromptSuffix(attempt)}
   `.trim();
 }
 
-function formatReview(review: ReviewData): string {
-  const title = review.title || "无标题";
-  const content = review.content || "无正文";
-  return `[${review.rating}星] ${title}: ${content}`;
+function resolvePromptPlan(attempt: number): VocPromptPlan {
+  return attempt > 1 ? RETRY_PROMPT_PLAN : PRIMARY_PROMPT_PLAN;
+}
+
+function selectRepresentativeReviews(
+  reviews: ReviewData[],
+  limit: number
+): ReviewData[] {
+  if (reviews.length <= limit) {
+    return sortReviewsBySignal(reviews);
+  }
+
+  const reviewBuckets = new Map<string, ReviewData[]>();
+
+  for (const review of sortReviewsBySignal(reviews)) {
+    const bucketKey = review.asin || "unknown";
+    const bucket = reviewBuckets.get(bucketKey) ?? [];
+    bucket.push(review);
+    reviewBuckets.set(bucketKey, bucket);
+  }
+
+  const sampled: ReviewData[] = [];
+  while (sampled.length < limit) {
+    let pulledAny = false;
+
+    for (const bucket of reviewBuckets.values()) {
+      const nextReview = bucket.shift();
+      if (!nextReview) {
+        continue;
+      }
+
+      sampled.push(nextReview);
+      pulledAny = true;
+
+      if (sampled.length >= limit) {
+        break;
+      }
+    }
+
+    if (!pulledAny) {
+      break;
+    }
+  }
+
+  return sampled;
+}
+
+function sortReviewsBySignal(reviews: ReviewData[]): ReviewData[] {
+  return [...reviews].sort((left, right) => {
+    const scoreDifference = scoreReview(right) - scoreReview(left);
+    if (scoreDifference !== 0) {
+      return scoreDifference;
+    }
+
+    const timestampDifference = readReviewTimestamp(right) - readReviewTimestamp(left);
+    if (timestampDifference !== 0) {
+      return timestampDifference;
+    }
+
+    return (
+      `${right.title} ${right.content}`.length - `${left.title} ${left.content}`.length
+    );
+  });
+}
+
+function scoreReview(review: ReviewData): number {
+  const titleLength = Math.min(review.title.trim().length, 80);
+  const contentLength = Math.min(review.content.trim().length, 320);
+  const helpfulVotes = Math.min(review.helpfulVotes, 20) * 10;
+  const verifiedBonus = review.verifiedPurchase ? 40 : 0;
+
+  return titleLength * 2 + contentLength + helpfulVotes + verifiedBonus;
+}
+
+function readReviewTimestamp(review: ReviewData): number {
+  const timestamp = Date.parse(review.date);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function formatReview(review: ReviewData, promptPlan: VocPromptPlan): string {
+  const title =
+    truncateText(review.title, promptPlan.reviewTitleMaxLength) || "No title";
+  const content =
+    truncateText(review.content, promptPlan.reviewContentMaxLength) || "No content";
+
+  return `[ASIN ${review.asin}] [${review.rating} stars] ${title}: ${content}`;
+}
+
+function truncateText(value: string, maxLength: number): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+
+  if (!normalized || normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, Math.max(0, maxLength - 1)).trimEnd()}...`;
 }
 
 function normalizeStringRecord(value: unknown): Record<string, string> {

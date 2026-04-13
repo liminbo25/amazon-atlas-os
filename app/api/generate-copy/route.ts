@@ -17,13 +17,15 @@ import {
 import { selectTrafficKeywords } from "@/lib/traffic-keyword-helpers";
 import type {
   ComplianceResult,
+  DataAnalysisResult,
   ListingVersion,
   PainPoint,
+  ProductProfile,
   TrafficKeyword,
   ValuePoint,
 } from "@/lib/types";
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B";
 
 const LISTING_SYSTEM_PROMPT = [
   "You generate Amazon listing copy for an internal workflow.",
@@ -33,10 +35,12 @@ const LISTING_SYSTEM_PROMPT = [
 ].join(" ");
 
 interface GenerateCopyRequestPayload {
+  productProfile: ProductProfile;
   painPoints: PainPoint[];
   valuePoints: ValuePoint[];
   coreSellingPoints: string;
   trafficKeywords: Record<string, TrafficKeyword[]>;
+  dataAnalysis: DataAnalysisResult | null;
   lightMode: boolean;
 }
 
@@ -71,31 +75,36 @@ export async function POST(request: Request) {
       logRouteError("generate-copy", error);
     }
 
-    return toErrorResponse(error, "Listing generation failed.");
+    return toErrorResponse(error, "文案生成失败。");
   }
 }
 
 function validateGenerateCopyRequest(
   body: Record<string, unknown>
 ): GenerateCopyRequestPayload {
+  const productProfile = normalizeProductProfile(body.productProfile);
   const painPoints = normalizePainPointInputs(body.painPoints);
   const valuePoints = normalizeValuePointInputs(body.valuePoints);
   const coreSellingPoints = normalizeStringValue(body.coreSellingPoints, {
     allowEmpty: true,
   });
   const trafficKeywords = normalizeTrafficKeywordGroups(body.trafficKeywords ?? {});
+  const dataAnalysis = normalizeDataAnalysis(body.dataAnalysis);
   const lightMode = body.lightMode === true;
 
   const keywordCount = Object.values(trafficKeywords).flat().length;
 
   if (
+    !productProfile.productName &&
+    !productProfile.productDescription &&
     painPoints.length === 0 &&
     valuePoints.length === 0 &&
     !coreSellingPoints &&
-    keywordCount === 0
+    keywordCount === 0 &&
+    !dataAnalysis
   ) {
     throw new RouteError(
-      "Provide at least one pain point, value point, core selling point, or traffic keyword.",
+      "请至少提供产品信息、VOC 数据、关键词数据或多源分析结果中的一种。",
       {
         status: 400,
         code: "listing_inputs_required",
@@ -104,12 +113,76 @@ function validateGenerateCopyRequest(
   }
 
   return {
+    productProfile,
     painPoints,
     valuePoints,
     coreSellingPoints,
     trafficKeywords,
+    dataAnalysis,
     lightMode,
   };
+}
+
+function normalizeProductProfile(value: unknown): ProductProfile {
+  if (!isRecord(value)) {
+    return {
+      brandName: "",
+      productName: "",
+      productCategory: "",
+      productDescription: "",
+      coreKeywords: "",
+    };
+  }
+
+  return {
+    brandName: normalizeStringValue(value.brandName, { allowEmpty: true }),
+    productName: normalizeStringValue(value.productName, { allowEmpty: true }),
+    productCategory: normalizeStringValue(value.productCategory, { allowEmpty: true }),
+    productDescription: normalizeStringValue(value.productDescription, {
+      allowEmpty: true,
+    }),
+    coreKeywords: normalizeStringValue(value.coreKeywords, { allowEmpty: true }),
+  };
+}
+
+function normalizeDataAnalysis(value: unknown): DataAnalysisResult | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const result: DataAnalysisResult = {
+    marketOverview: normalizeStringValue(value.marketOverview, { allowEmpty: true }),
+    sellerSpriteInsights: normalizeTextList(value.sellerSpriteInsights, {
+      maxItems: 6,
+      unique: true,
+    }),
+    abaInsights: normalizeTextList(value.abaInsights, {
+      maxItems: 6,
+      unique: true,
+    }),
+    rufusInsights: normalizeTextList(value.rufusInsights, {
+      maxItems: 6,
+      unique: true,
+    }),
+    aiRecommendations: normalizeTextList(value.aiRecommendations, {
+      maxItems: 6,
+      unique: true,
+    }),
+    cosmoFocus: normalizeTextList(value.cosmoFocus, {
+      maxItems: 6,
+      unique: true,
+    }),
+  };
+
+  const hasUsefulContent =
+    Boolean(result.marketOverview) ||
+    result.sellerSpriteInsights.length > 0 ||
+    result.abaInsights.length > 0 ||
+    result.rufusInsights.length > 0 ||
+    result.aiRecommendations.length > 0 ||
+    result.cosmoFocus.length > 0;
+
+  return hasUsefulContent ? result : null;
 }
 
 function normalizePainPointInputs(value: unknown): PainPoint[] {
@@ -407,8 +480,36 @@ function buildListingPrompt(
     )
     .join(", ");
 
+  const productSummary = [
+    `Brand: ${payload.productProfile.brandName || "None"}`,
+    `Product name: ${payload.productProfile.productName || "None"}`,
+    `Category: ${payload.productProfile.productCategory || "None"}`,
+    `Product description: ${payload.productProfile.productDescription || "None"}`,
+    `Seed keywords: ${payload.productProfile.coreKeywords || "None"}`,
+  ].join("\n");
+
+  const dataAnalysisSummary = payload.dataAnalysis
+    ? [
+        `Market overview: ${payload.dataAnalysis.marketOverview || "None"}`,
+        `SellerSprite insights: ${
+          payload.dataAnalysis.sellerSpriteInsights.join(" | ") || "None"
+        }`,
+        `ABA insights: ${payload.dataAnalysis.abaInsights.join(" | ") || "None"}`,
+        `Rufus insights: ${
+          payload.dataAnalysis.rufusInsights.join(" | ") || "None"
+        }`,
+        `AI recommendations: ${
+          payload.dataAnalysis.aiRecommendations.join(" | ") || "None"
+        }`,
+        `COSMO focus: ${payload.dataAnalysis.cosmoFocus.join(" | ") || "None"}`,
+      ].join("\n")
+    : "None";
+
   return `
-Generate Amazon listing copy for an internal listing workflow.
+Generate Amazon listing copy for an internal workflow that combines COSMO-oriented structuring, VOC diagnosis, and keyword data.
+
+Product context:
+${productSummary}
 
 Use the following VOC insights:
 
@@ -423,6 +524,9 @@ ${payload.coreSellingPoints || "None"}
 
 Selected traffic keywords:
 ${keywordSummary || "None"}
+
+Additional multi-source data analysis:
+${dataAnalysisSummary}
 
 Return exactly one JSON object in this shape:
 {
@@ -463,7 +567,9 @@ Return exactly one JSON object in this shape:
 Rules:
 - All customer-facing listing copy must be in English.
 - Make the three versions meaningfully different in angle and emphasis.
+- Use a COSMO-oriented structure: front-load category relevance and high-intent terms in the title, sequence bullets from primary conversion promise to pain-point resolution, and keep semantic coverage consistent across the whole listing.
 - Each bullet point should solve or preempt a competitor pain point when evidence exists.
+- Reflect the product context, seed keywords, and any available SellerSprite / ABA / Rufus insights when they add clear value.
 - Integrate keywords naturally and avoid keyword stuffing.
 - Prefer keywords with real traffic and ranking signals over generic high-volume terms.
 - Avoid these prohibited words: best, guaranteed, #1, cure, FDA approved, sale, discount, free shipping, amazing, perfect, incredible.

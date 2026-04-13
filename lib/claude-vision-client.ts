@@ -13,7 +13,7 @@ import {
 } from "./ai-route-helpers";
 import type { VisionAnalysisResult } from "./types";
 
-const DEFAULT_MODEL = "claude-sonnet-4-20250514";
+const DEFAULT_MODEL = "vision-model";
 
 const ANALYSIS_SYSTEM_PROMPT = [
   "You analyze product images for an internal Amazon listing workflow.",

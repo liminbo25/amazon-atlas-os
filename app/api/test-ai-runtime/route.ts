@@ -9,9 +9,9 @@ import {
 } from "@/lib/ai-route-helpers";
 
 const DEFAULT_MODEL_BY_SERVICE = {
-  imageAnalysis: "claude-sonnet-4-20250514",
-  vocAnalysis: "claude-sonnet-4-20250514",
-  listingGeneration: "claude-sonnet-4-20250514",
+  imageAnalysis: "vision-model",
+  vocAnalysis: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+  listingGeneration: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
 } as const;
 
 export async function POST(request: Request) {

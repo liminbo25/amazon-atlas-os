@@ -29,15 +29,27 @@ export const DEFAULT_AI_RUNTIME_SETTINGS: AiRuntimeSettings = {
 const initialState = {
   currentStep: 1,
   aiRuntimeSettings: DEFAULT_AI_RUNTIME_SETTINGS,
+  productProfile: {
+    brandName: "",
+    productName: "",
+    productCategory: "",
+    productDescription: "",
+    coreKeywords: "",
+  },
   targetMarket: "US",
   competitorAsins: ["", "", ""],
   coreSellingPoints: "",
   productImages: [] as import("./types").ProductImage[],
   visionAnalysis: null as import("./types").VisionAnalysisResult | null,
+  supportAssets: {
+    abaReport: null as import("./types").AbaReportFile | null,
+    rufusScreenshots: [] as import("./types").RufusScreenshot[],
+  },
   competitorListings: [],
   competitorReviews: {},
   positiveReviews: {},
   trafficKeywords: {},
+  dataAnalysis: null as import("./types").DataAnalysisResult | null,
   painPoints: [],
   valuePoints: [],
   competitorAnalysis: [],
@@ -65,15 +77,30 @@ export const useListingStore = create<ListingStore>()(
         set({
           aiRuntimeSettings: DEFAULT_AI_RUNTIME_SETTINGS,
         }),
+      updateProductProfile: (patch) =>
+        set((state) => ({
+          productProfile: {
+            ...state.productProfile,
+            ...patch,
+          },
+        })),
       setTargetMarket: (market) => set({ targetMarket: market }),
       setCompetitorAsins: (asins) => set({ competitorAsins: asins }),
       setCoreSellingPoints: (points) => set({ coreSellingPoints: points }),
       setProductImages: (images) => set({ productImages: images }),
       setVisionAnalysis: (analysis) => set({ visionAnalysis: analysis }),
+      setSupportAssets: (patch) =>
+        set((state) => ({
+          supportAssets: {
+            ...state.supportAssets,
+            ...patch,
+          },
+        })),
       setCompetitorListings: (listings) => set({ competitorListings: listings }),
       setCompetitorReviews: (reviews) => set({ competitorReviews: reviews }),
       setPositiveReviews: (reviews) => set({ positiveReviews: reviews }),
       setTrafficKeywords: (keywords) => set({ trafficKeywords: keywords }),
+      setDataAnalysis: (result) => set({ dataAnalysis: result }),
       setPainPoints: (points) => set({ painPoints: points }),
       setValuePoints: (points) => set({ valuePoints: points }),
       setCompetitorAnalysis: (analysis) => set({ competitorAnalysis: analysis }),

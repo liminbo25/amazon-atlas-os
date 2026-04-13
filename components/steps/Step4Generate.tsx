@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { checkFieldCompliance } from "@/lib/compliance";
 import { useListingStore } from "@/lib/store";
 import {
@@ -32,10 +32,12 @@ import {
   Check,
   Copy,
   FileText,
+  Lightbulb,
   Loader2,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   Zap,
 } from "lucide-react";
 
@@ -67,8 +69,30 @@ function LengthBadge({
 
   return (
     <Badge variant={exceeded ? "destructive" : "outline"} className="mt-1">
-      {current}/{limit} chars
+      {current}/{limit}
     </Badge>
+  );
+}
+
+function SourceSummaryCard({
+  title,
+  description,
+  badge,
+}: {
+  title: string;
+  description: string;
+  badge: string;
+}) {
+  return (
+    <div className="rounded-2xl border bg-white/85 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold">{title}</p>
+          <p className="text-sm text-muted-foreground">{description}</p>
+        </div>
+        <Badge variant="outline">{badge}</Badge>
+      </div>
+    </div>
   );
 }
 
@@ -82,9 +106,9 @@ function CompliancePanel({
   totalViolations: number;
 }) {
   const fieldNames: Record<string, string> = {
-    title: "Title",
-    bulletPoints: "Bullet Points",
-    description: "Description",
+    title: "标题",
+    bulletPoints: "五点",
+    description: "描述",
     searchTerms: "Search Terms",
   };
 
@@ -100,23 +124,19 @@ function CompliancePanel({
           ) : (
             <ShieldAlert className="h-5 w-5 text-red-500" />
           )}
-          <CardTitle className="text-base">Compliance Check</CardTitle>
-          <Badge variant="outline">Version: {versionName}</Badge>
+          <CardTitle className="text-base">合规检查</CardTitle>
+          <Badge variant="outline">{versionName}</Badge>
           {totalViolations > 0 ? (
-            <Badge variant="destructive">{totalViolations} issue(s)</Badge>
+            <Badge variant="destructive">{totalViolations} 项问题</Badge>
           ) : null}
         </div>
-        <CardDescription>
-          Compliance results refresh immediately when you edit the current version.
-        </CardDescription>
+        <CardDescription>编辑当前版本后，合规检测会即时刷新。</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-4">
         {totalViolations === 0 ? (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              No obvious prohibited claims were found in the current version.
-            </p>
+            <p className="text-sm text-muted-foreground">当前版本未发现明显禁用词风险。</p>
             <div className="flex flex-wrap gap-2">
               {passedFields.map((result) => (
                 <Badge
@@ -124,7 +144,7 @@ function CompliancePanel({
                   variant="outline"
                   className="border-green-200 bg-green-50 text-green-700"
                 >
-                  {fieldNames[result.field] || result.field} passed
+                  {fieldNames[result.field] || result.field} 已通过
                 </Badge>
               ))}
             </div>
@@ -150,11 +170,9 @@ function CompliancePanel({
                   />
                   <div>
                     <span className="font-mono font-semibold">{`"${violation.word}"`}</span>
-                    <span className="ml-2 text-muted-foreground">
-                      - {violation.reason}
-                    </span>
+                    <span className="ml-2 text-muted-foreground">- {violation.reason}</span>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Context: {violation.context}
+                      上下文: {violation.context}
                     </p>
                   </div>
                 </div>
@@ -169,10 +187,12 @@ function CompliancePanel({
 
 export function Step4Generate() {
   const {
-    painPoints,
-    valuePoints,
+    productProfile,
     coreSellingPoints,
     trafficKeywords,
+    dataAnalysis,
+    painPoints,
+    valuePoints,
     listingVersions,
     complianceResults,
     aiRuntimeSettings,
@@ -191,20 +211,32 @@ export function Step4Generate() {
   const inFlightRef = useRef(false);
   const lastAutoGenerateKeyRef = useRef<string | null>(null);
 
-  const totalKeywordCount = Object.values(trafficKeywords).reduce(
-    (sum, keywords) => sum + keywords.length,
-    0
+  const totalKeywordCount = useMemo(
+    () =>
+      Object.values(trafficKeywords).reduce(
+        (sum, keywords) => sum + keywords.length,
+        0
+      ),
+    [trafficKeywords]
   );
+
   const hasGenerationInputs =
+    Boolean(productProfile.productName.trim()) ||
     painPoints.length > 0 ||
     valuePoints.length > 0 ||
     coreSellingPoints.trim().length > 0 ||
-    totalKeywordCount > 0;
+    totalKeywordCount > 0 ||
+    dataAnalysis !== null;
+
   const requestKey = [
+    productProfile.productName.trim(),
+    productProfile.productCategory.trim(),
+    productProfile.coreKeywords.trim(),
     painPoints.length,
     valuePoints.length,
     coreSellingPoints.trim(),
     totalKeywordCount,
+    dataAnalysis?.marketOverview ?? "",
     lightMode ? "light" : "standard",
   ].join("::");
 
@@ -215,10 +247,9 @@ export function Step4Generate() {
 
     if (!hasGenerationInputs) {
       setFetchError(
-        new ApiRequestError(
-          "Complete VOC analysis or provide core selling points before generating listing copy.",
-          { status: 400 }
-        )
+        new ApiRequestError("请先补充产品、VOC、关键词或多源分析数据后再生成文案。", {
+          status: 400,
+        })
       );
       return;
     }
@@ -238,10 +269,12 @@ export function Step4Generate() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          productProfile,
           painPoints,
           valuePoints,
           coreSellingPoints,
           trafficKeywords,
+          dataAnalysis,
           lightMode,
           runtime: listingRuntime,
           runtimeConfig: aiRuntimeSettings,
@@ -249,7 +282,7 @@ export function Step4Generate() {
       });
 
       if (!response.ok) {
-        throw await parseApiRequestError(response, "Listing generation failed");
+        throw await parseApiRequestError(response, "三源文案生成失败");
       }
 
       const data = (await response.json()) as {
@@ -272,7 +305,7 @@ export function Step4Generate() {
       setHasGeneratedOnce(true);
       setActiveVersion(versions[0]?.versionName ?? "");
     } catch (error) {
-      setFetchError(normalizeApiRequestError(error, "Listing generation failed"));
+      setFetchError(normalizeApiRequestError(error, "三源文案生成失败"));
       setHasGeneratedOnce(true);
     } finally {
       inFlightRef.current = false;
@@ -281,9 +314,11 @@ export function Step4Generate() {
   }, [
     aiRuntimeSettings,
     coreSellingPoints,
+    dataAnalysis,
     hasGenerationInputs,
     lightMode,
     painPoints,
+    productProfile,
     setComplianceResults,
     setListingVersions,
     trafficKeywords,
@@ -358,10 +393,10 @@ export function Step4Generate() {
       await navigator.clipboard.writeText(text);
       setCopied(id);
       setCopyError(null);
-      window.setTimeout(() => setCopied(null), 2000);
+      window.setTimeout(() => setCopied(null), 1800);
     } catch (error) {
       console.error("copy_failed", error);
-      setCopyError("Copy failed. Please select the text manually and try again.");
+      setCopyError("复制失败，请手动选择内容后再复制。");
     }
   };
 
@@ -370,7 +405,7 @@ export function Step4Generate() {
       type="button"
       size="sm"
       variant="ghost"
-      aria-label="Copy current field"
+      aria-label="复制当前字段"
       onClick={() => void copyToClipboard(text, id)}
     >
       {copied === id ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
@@ -384,14 +419,14 @@ export function Step4Generate() {
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
             <FileText className="h-10 w-10 text-muted-foreground" />
             <div className="space-y-1">
-              <p className="text-base font-medium">Not enough input for generation</p>
+              <p className="text-base font-medium">三源文案生成所需输入还不完整</p>
               <p className="text-sm text-muted-foreground">
-                Complete Step 3 or add core selling points before generating listing copy.
+                请先补充产品输入、VOC、关键词数据或 Step 2 的多源分析结果。
               </p>
             </div>
             <Button variant="outline" onClick={() => setCurrentStep(3)}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Step 3
+              返回 Step 3
             </Button>
           </CardContent>
         </Card>
@@ -405,8 +440,8 @@ export function Step4Generate() {
         <Loader2 className="h-8 w-8 animate-spin text-[#FF9900]" />
         <p className="text-sm text-muted-foreground">
           {lightMode
-            ? "AI is generating a lighter, faster listing set..."
-            : "AI is generating listing versions and compliance checks..."}
+            ? "AI 正在以轻量模式生成三源文案..."
+            : "AI 正在融合 COSMO、VOC 与关键词数据生成文案..."}
         </p>
       </div>
     );
@@ -416,23 +451,23 @@ export function Step4Generate() {
     return (
       <div className="space-y-6">
         <AiRequestErrorAlert
-          heading="Listing generation failed"
+          heading="三源文案生成失败"
           error={fetchError}
           runtimeConfig={aiRuntimeSettings.listingGeneration}
           actions={
             <>
               <Button variant="outline" onClick={() => void generateListings()}>
-                Retry
+                重试生成
               </Button>
               <Button
                 variant={lightMode ? "default" : "outline"}
                 className={lightMode ? "bg-slate-900 hover:bg-slate-800" : ""}
                 onClick={() => setLightMode((current) => !current)}
               >
-                {lightMode ? "Light mode on" : "Try light mode"}
+                {lightMode ? "轻量模式已开启" : "尝试轻量模式"}
               </Button>
               <Button variant="ghost" onClick={() => setCurrentStep(3)}>
-                Back
+                返回上一步
               </Button>
             </>
           }
@@ -448,24 +483,24 @@ export function Step4Generate() {
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
             <FileText className="h-10 w-10 text-muted-foreground" />
             <div className="space-y-1">
-              <p className="text-base font-medium">No listing version was generated</p>
+              <p className="text-base font-medium">这次没有生成出可展示的文案版本</p>
               <p className="text-sm text-muted-foreground">
-                Retry generation or go back and refine the VOC inputs.
+                可以重试生成，或返回上一步补充 VOC / 关键词 / 多源分析输入。
               </p>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
               <Button variant="outline" onClick={() => void generateListings()}>
-                Retry
+                重新生成
               </Button>
               <Button
                 variant={lightMode ? "default" : "outline"}
                 className={lightMode ? "bg-slate-900 hover:bg-slate-800" : ""}
                 onClick={() => setLightMode((current) => !current)}
               >
-                {lightMode ? "Light mode on" : "Try light mode"}
+                {lightMode ? "轻量模式已开启" : "尝试轻量模式"}
               </Button>
               <Button variant="ghost" onClick={() => setCurrentStep(3)}>
-                Back to Step 3
+                返回 Step 3
               </Button>
             </div>
           </CardContent>
@@ -480,18 +515,16 @@ export function Step4Generate() {
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <CardTitle>Step 4: Listing Generation</CardTitle>
+              <CardTitle>Step 4: 三源文案生成</CardTitle>
               <Badge variant={lightMode ? "default" : "outline"}>
-                {lightMode ? "Light mode" : "Standard mode"}
+                {lightMode ? "轻量模式" : "标准模式"}
               </Badge>
             </div>
             <CardDescription>
-              Generate multiple listing versions from VOC insights, then keep editing with
-              live compliance feedback.
+              将 COSMO 算法导向、VOC 诊断和关键词数据整合为可编辑的 Listing 文案版本。
             </CardDescription>
             <div className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-              Light mode sends fewer VOC points and keywords and asks the model for a
-              shorter response. Use it when third-party gateways time out.
+              轻量模式会减少输入样本并压缩输出长度，适合网关易超时的环境。
             </div>
           </div>
 
@@ -503,15 +536,79 @@ export function Step4Generate() {
               onClick={() => setLightMode((current) => !current)}
             >
               <Zap className="mr-2 h-4 w-4" />
-              {lightMode ? "Light mode on" : "Enable light mode"}
+              {lightMode ? "轻量模式已开启" : "开启轻量模式"}
             </Button>
             <Button variant="outline" onClick={() => void generateListings()}>
               <RefreshCw className="mr-2 h-4 w-4" />
-              Regenerate
+              重新生成
             </Button>
           </div>
         </CardHeader>
       </Card>
+
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <SourceSummaryCard
+          title="COSMO 导向"
+          description={
+            dataAnalysis?.cosmoFocus.join("；") ||
+            "基于标题相关性、场景覆盖与语义一致性组织文案。"
+          }
+          badge={`${dataAnalysis?.cosmoFocus.length ?? 0} 条`}
+        />
+        <SourceSummaryCard
+          title="VOC 诊断"
+          description={`已提炼 ${painPoints.length} 个痛点、${valuePoints.length} 个价值点。`}
+          badge={`${painPoints.length + valuePoints.length} 条`}
+        />
+        <SourceSummaryCard
+          title="关键词数据"
+          description={
+            totalKeywordCount > 0
+              ? `当前已接入 ${totalKeywordCount} 个关键词样本。`
+              : "当前无关键词样本，将更多依赖产品与 VOC 输入。"
+          }
+          badge={`${totalKeywordCount} 个`}
+        />
+        <SourceSummaryCard
+          title="数据分析"
+          description={
+            dataAnalysis?.marketOverview ||
+            "暂无额外多源总结，将以产品输入、VOC 与关键词为主。"
+          }
+          badge={dataAnalysis ? "已接入" : "未接入"}
+        />
+      </div>
+
+      {(coreSellingPoints.trim() || productProfile.productName.trim()) && (
+        <Card className="border-[#FF9900]/20 bg-orange-50/40">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Sparkles className="h-5 w-5 text-[#FF9900]" />
+              当前文案生成上下文
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">产品信息</p>
+              <div className="space-y-1 text-sm text-muted-foreground">
+                <p>品牌：{productProfile.brandName || "未填写"}</p>
+                <p>产品：{productProfile.productName || "未填写"}</p>
+                <p>品类：{productProfile.productCategory || "未填写"}</p>
+                <p>核心词：{productProfile.coreKeywords || "未填写"}</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="flex items-center gap-2 text-sm font-medium">
+                <Lightbulb className="h-4 w-4 text-amber-500" />
+                差异化卖点
+              </p>
+              <p className="text-sm text-muted-foreground">
+                {coreSellingPoints || "暂无额外卖点说明"}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {copyError ? (
         <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
@@ -535,13 +632,14 @@ export function Step4Generate() {
             className="space-y-4"
           >
             <div className="rounded-lg bg-muted/50 p-3 text-sm">
-              <span className="font-medium">Style:</span> {version.style}
+              <span className="font-medium">风格定位：</span>
+              {version.style}
             </div>
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <div>
-                  <CardTitle className="text-base">Product Title</CardTitle>
+                  <CardTitle className="text-base">标题</CardTitle>
                   <LengthBadge current={version.title.length} limit={TITLE_LIMIT} />
                 </div>
                 <CopyBtn text={version.title} id={`${version.versionName}-title`} />
@@ -563,7 +661,7 @@ export function Step4Generate() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base">Bullet Points</CardTitle>
+                <CardTitle className="text-base">五点描述</CardTitle>
                 <CopyBtn
                   text={version.bulletPoints.join("\n\n")}
                   id={`${version.versionName}-bullets`}
@@ -597,7 +695,7 @@ export function Step4Generate() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base">Description</CardTitle>
+                <CardTitle className="text-base">产品描述</CardTitle>
                 <CopyBtn text={version.description} id={`${version.versionName}-desc`} />
               </CardHeader>
               <CardContent>
@@ -658,13 +756,13 @@ export function Step4Generate() {
       <div className="flex justify-between">
         <Button variant="outline" onClick={() => setCurrentStep(3)}>
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Previous
+          上一步
         </Button>
         <Button
           onClick={() => setCurrentStep(5)}
           className="bg-[#FF9900] hover:bg-[#FF9900]/90"
         >
-          Next: Export
+          下一步：导出
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>

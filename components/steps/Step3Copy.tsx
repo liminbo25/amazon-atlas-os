@@ -464,7 +464,7 @@ export function Step3Copy() {
           onClick={() => setCurrentStep(4)}
           className="bg-[#FF9900] hover:bg-[#FF9900]/90"
         >
-          下一步：生成 Listing
+          下一步：三源文案生成
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>

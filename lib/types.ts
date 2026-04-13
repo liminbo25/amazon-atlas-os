@@ -33,6 +33,14 @@ export interface TrafficKeyword {
   conversionShare: number;
 }
 
+export interface ProductProfile {
+  brandName: string;
+  productName: string;
+  productCategory: string;
+  productDescription: string;
+  coreKeywords: string;
+}
+
 // ===== VOC 分析 =====
 export type PainPointCategory =
   | "质量问题"
@@ -111,6 +119,37 @@ export interface VisionAnalysisResult {
   suggestions: string;
 }
 
+export interface AbaReportFile {
+  fileName: string;
+  size: number;
+  content: string;
+  headers: string[];
+  rows: string[][];
+}
+
+export type ScreenshotMediaType = "image/jpeg" | "image/png" | "image/webp";
+
+export interface RufusScreenshot {
+  id: string;
+  name: string;
+  preview: string;
+  mediaType: ScreenshotMediaType;
+}
+
+export interface SupportAssets {
+  abaReport: AbaReportFile | null;
+  rufusScreenshots: RufusScreenshot[];
+}
+
+export interface DataAnalysisResult {
+  marketOverview: string;
+  sellerSpriteInsights: string[];
+  abaInsights: string[];
+  rufusInsights: string[];
+  aiRecommendations: string[];
+  cosmoFocus: string[];
+}
+
 export type AiProvider = "anthropic" | "openai";
 
 export type AiRuntimeServiceKey =
@@ -142,17 +181,20 @@ export interface ListingStore {
   aiRuntimeSettings: AiRuntimeSettings;
 
   // Step 1: 需求确认
+  productProfile: ProductProfile;
   targetMarket: string;
   competitorAsins: string[];
   coreSellingPoints: string;
   productImages: ProductImage[];
   visionAnalysis: VisionAnalysisResult | null;
+  supportAssets: SupportAssets;
 
   // Step 2: 竞品数据采集
   competitorListings: CompetitorListing[];
   competitorReviews: Record<string, ReviewData[]>; // asin -> negative reviews
   positiveReviews: Record<string, ReviewData[]>; // asin -> positive reviews
   trafficKeywords: Record<string, TrafficKeyword[]>; // asin -> keywords
+  dataAnalysis: DataAnalysisResult | null;
 
   // Step 3: VOC 深度分析
   painPoints: PainPoint[];
@@ -173,15 +215,18 @@ export interface ListingStore {
     patch: Partial<AiRuntimeServiceConfig>
   ) => void;
   resetAiRuntimeSettings: () => void;
+  updateProductProfile: (patch: Partial<ProductProfile>) => void;
   setTargetMarket: (market: string) => void;
   setCompetitorAsins: (asins: string[]) => void;
   setCoreSellingPoints: (points: string) => void;
   setProductImages: (images: ProductImage[]) => void;
   setVisionAnalysis: (analysis: VisionAnalysisResult | null) => void;
+  setSupportAssets: (patch: Partial<SupportAssets>) => void;
   setCompetitorListings: (listings: CompetitorListing[]) => void;
   setCompetitorReviews: (reviews: Record<string, ReviewData[]>) => void;
   setPositiveReviews: (reviews: Record<string, ReviewData[]>) => void;
   setTrafficKeywords: (keywords: Record<string, TrafficKeyword[]>) => void;
+  setDataAnalysis: (result: DataAnalysisResult | null) => void;
   setPainPoints: (points: PainPoint[]) => void;
   setValuePoints: (points: ValuePoint[]) => void;
   setCompetitorAnalysis: (analysis: CompetitorCopyAnalysis[]) => void;

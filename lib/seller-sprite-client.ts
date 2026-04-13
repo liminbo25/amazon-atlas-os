@@ -525,6 +525,24 @@ function createFallbackListing(asin: string): CompetitorListing {
   };
 }
 
+function readFirstNumber(
+  data: Record<string, unknown>,
+  keys: string[]
+): number {
+  for (const key of keys) {
+    if (!(key in data)) {
+      continue;
+    }
+
+    const value = getInteger(data[key]);
+    if (value > 0) {
+      return value;
+    }
+  }
+
+  return 0;
+}
+
 function normalizeAsin(value: unknown): string {
   if (typeof value !== "string") {
     return "";
@@ -592,10 +610,30 @@ function buildListingFromDetail(
     price: getNumber(data.price),
     rating: getNumber(data.rating),
     reviews: getInteger(data.ratings),
-    monthlySales: 0,
+    monthlySales: readFirstNumber(data, [
+      "monthlySales",
+      "monthlySalesEstimate",
+      "estimatedMonthlySales",
+      "salesEstimate",
+      "monthly_units_sold",
+      "sales",
+    ]),
     bsr: getInteger(data.bsrRank),
     mainImage: getString(data.imageUrl),
   };
+}
+
+function isListingEmpty(listing: CompetitorListing): boolean {
+  return (
+    !listing.title.trim() &&
+    listing.bulletPoints.length === 0 &&
+    listing.price === 0 &&
+    listing.rating === 0 &&
+    listing.reviews === 0 &&
+    listing.monthlySales === 0 &&
+    listing.bsr === 0 &&
+    !listing.mainImage.trim()
+  );
 }
 
 function parseAsinFamilyFromDetail(data: Record<string, unknown>): {
@@ -1021,9 +1059,21 @@ async function fetchSingleCompetitorData(
   let listing: CompetitorListing;
   if (listingResult.status === "fulfilled") {
     listing = listingResult.value;
+    if (isListingEmpty(listing)) {
+      throw new SellerSpriteClientError({
+        code: "bad-response",
+        asin,
+        toolName: "asin_detail",
+        message: `SellerSprite returned an empty listing payload for ASIN ${asin}.`,
+      });
+    }
   } else {
-    logAsinFallback(asin, "listing", listingResult.reason);
-    listing = createFallbackListing(asin);
+    throw toSellerSpriteError(listingResult.reason, {
+      code: "upstream",
+      message: `SellerSprite listing lookup failed for ASIN ${asin}.`,
+      toolName: "asin_detail",
+      asin,
+    });
   }
 
   let allReviews: ReviewData[];
