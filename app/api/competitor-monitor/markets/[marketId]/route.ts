@@ -12,7 +12,7 @@ interface MarketRouteContext {
 export async function GET(_request: Request, context: MarketRouteContext) {
   try {
     const { marketId } = await context.params;
-    return Response.json(getCompetitorMonitorMarketDetail(marketId));
+    return Response.json(await getCompetitorMonitorMarketDetail(marketId));
   } catch (error) {
     logRouteError("competitor-monitor-market-detail", error);
     return toErrorResponse(error, "competitor-monitor market detail lookup failed.");

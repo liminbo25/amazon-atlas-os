@@ -42,7 +42,7 @@ export const competitorMonitorClient = {
   async getDashboard(): Promise<
     CompetitorMonitorUiResponse<CompetitorMonitorUiDashboardData>
   > {
-    const dashboard = getCompetitorMonitorDashboard();
+    const dashboard = await getCompetitorMonitorDashboard();
     const marketDetails = await loadMarketDetails(dashboard.markets.map((market) => market.id));
 
     return {
@@ -57,7 +57,7 @@ export const competitorMonitorClient = {
   async listMarkets(
     filters: MarketFilters = {}
   ): Promise<CompetitorMonitorUiResponse<CompetitorMonitorUiMarketListData>> {
-    const marketList = listCompetitorMonitorMarkets();
+    const marketList = await listCompetitorMonitorMarkets();
     const marketDetails = await loadMarketDetails(marketList.markets.map((market) => market.id));
 
     return {
@@ -74,7 +74,7 @@ export const competitorMonitorClient = {
     marketId: string
   ): Promise<CompetitorMonitorUiResponse<CompetitorMonitorUiMarketDetailData> | null> {
     try {
-      const response = getCompetitorMonitorMarketDetail(marketId);
+      const response = await getCompetitorMonitorMarketDetail(marketId);
 
       return {
         data: {
@@ -100,7 +100,7 @@ export const competitorMonitorClient = {
     }
 
     try {
-      const response = getCompetitorMonitorAsinDetail({
+      const response = await getCompetitorMonitorAsinDetail({
         asin,
         marketplace: relatedMarkets[0].marketplace,
       });
@@ -126,13 +126,13 @@ export const competitorMonitorClient = {
   async listAlerts(
     filters: AlertFilters = {}
   ): Promise<CompetitorMonitorUiResponse<CompetitorMonitorUiAlertCenterData>> {
-    const marketList = listCompetitorMonitorMarkets();
+    const marketList = await listCompetitorMonitorMarkets();
     const marketDetails = await loadMarketDetails(marketList.markets.map((market) => market.id));
     const marketData = adaptCompetitorMonitorMarketList({
       markets: marketList.markets,
       marketDetails,
     });
-    const alerts = listCompetitorMonitorAlerts({
+    const alerts = await listCompetitorMonitorAlerts({
       marketId: filters.marketId ?? null,
       status: normalizeAlertStatus(filters.status),
       limit: 200,
@@ -150,7 +150,7 @@ export const competitorMonitorClient = {
 };
 
 async function findMarketsContainingAsin(asin: string) {
-  const marketList = listCompetitorMonitorMarkets();
+  const marketList = await listCompetitorMonitorMarkets();
   const marketDetails = await loadMarketDetails(marketList.markets.map((market) => market.id));
 
   return marketDetails.filter((market) =>
@@ -160,7 +160,7 @@ async function findMarketsContainingAsin(asin: string) {
 
 async function loadMarketDetails(marketIds: string[]) {
   return Promise.all(
-    marketIds.map(async (marketId) => getCompetitorMonitorMarketDetail(marketId).market)
+    marketIds.map(async (marketId) => (await getCompetitorMonitorMarketDetail(marketId)).market)
   );
 }
 

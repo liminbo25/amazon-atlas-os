@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 export async function GET() {
   try {
-    return Response.json(getCompetitorMonitorDashboard());
+    return Response.json(await getCompetitorMonitorDashboard());
   } catch (error) {
     logRouteError("competitor-monitor-dashboard", error);
     return toErrorResponse(error, "competitor-monitor dashboard lookup failed.");

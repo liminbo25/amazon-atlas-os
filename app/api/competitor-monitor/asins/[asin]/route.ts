@@ -15,7 +15,7 @@ export async function GET(request: Request, context: AsinRouteContext) {
     const { searchParams } = new URL(request.url);
 
     return Response.json(
-      getCompetitorMonitorAsinDetail({
+      await getCompetitorMonitorAsinDetail({
         asin,
         marketplace: searchParams.get("marketplace"),
       })

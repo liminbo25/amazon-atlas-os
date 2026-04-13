@@ -34,9 +34,9 @@ export function parseCompetitorMonitorMarketInput(
   };
 }
 
-export function saveCompetitorMonitorMarket(
+export async function saveCompetitorMonitorMarket(
   input: CompetitorMonitorMarketInput
-): CompetitorMonitorMarketMutationResponse {
+): Promise<CompetitorMonitorMarketMutationResponse> {
   const repository = getCompetitorMonitorRepository();
   const normalizedInput = {
     id: input.id,
@@ -47,8 +47,8 @@ export function saveCompetitorMonitorMarket(
     isActive: input.isActive ?? true,
   };
 
-  const saved = repository.saveMarket(normalizedInput);
-  const market = repository.getMarketDetail(saved.marketId);
+  const saved = await repository.saveMarket(normalizedInput);
+  const market = await repository.getMarketDetail(saved.marketId);
   if (!market) {
     throw new RouteError("competitor-monitor market could not be loaded after save.", {
       status: 500,
@@ -62,28 +62,30 @@ export function saveCompetitorMonitorMarket(
   };
 }
 
-export function getCompetitorMonitorDashboard(): CompetitorMonitorDashboardResponse {
+export async function getCompetitorMonitorDashboard(): Promise<CompetitorMonitorDashboardResponse> {
   const repository = getCompetitorMonitorRepository();
   return {
-    summary: repository.getDashboardSummary(getCompetitorMonitorDefaultMarketplace()),
-    markets: repository.listMarkets(),
-    alerts: repository.listAlerts({
+    summary: await repository.getDashboardSummary(
+      getCompetitorMonitorDefaultMarketplace()
+    ),
+    markets: await repository.listMarkets(),
+    alerts: await repository.listAlerts({
       status: "open",
       limit: 10,
     }),
   };
 }
 
-export function listCompetitorMonitorMarkets(): CompetitorMonitorMarketListResponse {
+export async function listCompetitorMonitorMarkets(): Promise<CompetitorMonitorMarketListResponse> {
   return {
-    markets: getCompetitorMonitorRepository().listMarkets(),
+    markets: await getCompetitorMonitorRepository().listMarkets(),
   };
 }
 
-export function getCompetitorMonitorMarketDetail(
+export async function getCompetitorMonitorMarketDetail(
   marketId: string
-): CompetitorMonitorMarketDetailResponse {
-  const market = getCompetitorMonitorRepository().getMarketDetail(
+): Promise<CompetitorMonitorMarketDetailResponse> {
+  const market = await getCompetitorMonitorRepository().getMarketDetail(
     normalizeRequiredString(marketId, "marketId")
   );
   if (!market) {
@@ -96,13 +98,13 @@ export function getCompetitorMonitorMarketDetail(
   return { market };
 }
 
-export function getCompetitorMonitorAsinDetail(options: {
+export async function getCompetitorMonitorAsinDetail(options: {
   asin: string;
   marketplace?: string | null;
-}): CompetitorMonitorAsinDetailResponse {
+}): Promise<CompetitorMonitorAsinDetailResponse> {
   const asin = normalizeAsin(options.asin, "asin");
   const marketplace = normalizeMarketplace(options.marketplace);
-  const detail = getCompetitorMonitorRepository().getAsinDetail(asin, marketplace);
+  const detail = await getCompetitorMonitorRepository().getAsinDetail(asin, marketplace);
   if (!detail) {
     throw new RouteError("competitor-monitor asin was not found.", {
       status: 404,
@@ -115,15 +117,15 @@ export function getCompetitorMonitorAsinDetail(options: {
   };
 }
 
-export function listCompetitorMonitorAlerts(options: {
+export async function listCompetitorMonitorAlerts(options: {
   marketId?: string | null;
   marketplace?: string | null;
   asin?: string | null;
   status?: "open" | "resolved" | "all" | null;
   limit?: number | null;
-}): CompetitorMonitorAlertListResponse {
+}): Promise<CompetitorMonitorAlertListResponse> {
   return {
-    alerts: getCompetitorMonitorRepository().listAlerts({
+    alerts: await getCompetitorMonitorRepository().listAlerts({
       marketId: normalizeOptionalString(options.marketId) || undefined,
       marketplace: options.marketplace
         ? normalizeMarketplace(options.marketplace)

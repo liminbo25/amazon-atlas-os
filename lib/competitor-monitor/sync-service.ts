@@ -16,10 +16,12 @@ import type {
 } from "./types";
 
 export function assertCompetitorMonitorCronSecret(request: Request): void {
-  const expected = process.env.COMPETITOR_MONITOR_CRON_SECRET?.trim();
+  const expected =
+    process.env.COMPETITOR_MONITOR_CRON_SECRET?.trim() ||
+    process.env.CRON_SECRET?.trim();
   if (!expected) {
     throw new RouteError(
-      "COMPETITOR_MONITOR_CRON_SECRET is required for competitor-monitor sync.",
+      "COMPETITOR_MONITOR_CRON_SECRET or CRON_SECRET is required for competitor-monitor sync.",
       {
         status: 500,
         code: "competitor_monitor_cron_secret_missing",
@@ -48,13 +50,13 @@ export async function runCompetitorMonitorDailySync(options: {
 } = {}): Promise<CompetitorMonitorSyncSummary> {
   const repository = getCompetitorMonitorRepository();
   const trigger = options.trigger ?? "cron";
-  const run = repository.createSyncRun({
+  const run = await repository.createSyncRun({
     triggerType: trigger,
     requestedMarketId: options.marketId ?? null,
   });
 
   try {
-    const markets = repository.listMarketConfigs({
+    const markets = await repository.listMarketConfigs({
       activeOnly: !options.marketId,
       marketId: options.marketId ?? null,
     });
@@ -84,7 +86,10 @@ export async function runCompetitorMonitorDailySync(options: {
         asinResults: [],
       };
 
-      repository.completeSyncRun(run.id, emptySummary as unknown as Record<string, unknown>);
+      await repository.completeSyncRun(
+        run.id,
+        emptySummary as unknown as Record<string, unknown>
+      );
       return emptySummary;
     }
 
@@ -115,16 +120,16 @@ export async function runCompetitorMonitorDailySync(options: {
         asins.map((asin) => syncSingleAsin(marketplace, asin))
       );
 
-      settledResults.forEach((settledResult, index) => {
+      for (const [index, settledResult] of settledResults.entries()) {
         if (settledResult.status === "fulfilled") {
           asinResults.push(settledResult.value);
-          return;
+          continue;
         }
 
         const asin = asins[index] ?? "";
         const observedAt = isoNow();
         const message = toErrorMessage(settledResult.reason);
-        repository.markAsinSyncFailure({
+        await repository.markAsinSyncFailure({
           marketplace,
           asin,
           observedAt,
@@ -139,11 +144,11 @@ export async function runCompetitorMonitorDailySync(options: {
           alertsCreated: 0,
           error: message,
         });
-      });
+      }
     }
 
     const finishedAt = isoNow();
-    repository.markMarketsSynced(
+    await repository.markMarketsSynced(
       markets.map((market) => market.id),
       finishedAt
     );
@@ -189,10 +194,10 @@ export async function runCompetitorMonitorDailySync(options: {
       asinResults,
     };
 
-    repository.completeSyncRun(run.id, summary as unknown as Record<string, unknown>);
+    await repository.completeSyncRun(run.id, summary as unknown as Record<string, unknown>);
     return summary;
   } catch (error) {
-    repository.failSyncRun(run.id, toErrorMessage(error));
+    await repository.failSyncRun(run.id, toErrorMessage(error));
     throw error;
   }
 }
@@ -232,13 +237,16 @@ async function syncSingleAsin(
       observedAt,
     };
 
-    const previousSnapshot = repository.getCurrentComparableSnapshot(marketplace, asin);
+    const previousSnapshot = await repository.getCurrentComparableSnapshot(
+      marketplace,
+      asin
+    );
     const currentSnapshot = toComparableSnapshot(observation);
     const alertCandidates = buildCompetitorMonitorAlerts({
       previousSnapshot,
       currentSnapshot,
     });
-    const persisted = repository.persistObservation({
+    const persisted = await repository.persistObservation({
       observation,
       alertCandidates,
     });
@@ -253,7 +261,7 @@ async function syncSingleAsin(
     };
   } catch (error) {
     const message = toErrorMessage(error);
-    repository.markAsinSyncFailure({
+    await repository.markAsinSyncFailure({
       marketplace,
       asin,
       observedAt,
