@@ -2,7 +2,7 @@
 
 /* eslint-disable @next/next/no-img-element */
 
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useId, useRef, useState } from "react";
 
 interface MultiImageUploaderProps {
   onImagesChange: (images: string[]) => void;
@@ -10,6 +10,7 @@ interface MultiImageUploaderProps {
   title?: string;
   description?: string;
   maxImages?: number;
+  renderImageFooter?: (options: { image: string; index: number }) => ReactNode;
 }
 
 const TARGET_DATA_URL_LENGTH = 900_000;
@@ -48,9 +49,10 @@ function renderCompressedImage(
 export default function MultiImageUploader({
   onImagesChange,
   images,
-  title = "Upload images",
+  title = "上传图片",
   description,
   maxImages,
+  renderImageFooter,
 }: MultiImageUploaderProps) {
   const [isDragging, setIsDragging] = useState(false);
   const [isReading, setIsReading] = useState(false);
@@ -101,7 +103,7 @@ export default function MultiImageUploader({
       );
 
       if (validFiles.length === 0) {
-        setUploadError("Please choose a JPG, PNG, or WebP image.");
+        setUploadError("请选择 JPG、PNG 或 WebP 图片。");
         return;
       }
 
@@ -128,7 +130,7 @@ export default function MultiImageUploader({
 
         onImagesChange([...images, ...newImages]);
       } catch {
-        setUploadError("The selected file could not be optimized.");
+        setUploadError("所选图片无法完成压缩处理，请换一张图片重试。");
       } finally {
         setIsReading(false);
       }
@@ -238,16 +240,17 @@ export default function MultiImageUploader({
         </div>
 
         <p className="relative mt-5 text-lg font-semibold text-slate-950">
-          {isReading ? "Optimizing images..." : "Drop images here or browse"}
+          {isReading ? "正在优化图片..." : "拖拽图片到这里，或点击选择"}
         </p>
         <p className="relative mt-2 max-w-md text-sm leading-6 text-slate-500">
-          Supports JPG, PNG, and WebP.{" "}
-          {maxImages ? `Up to ${maxImages} image${maxImages > 1 ? "s" : ""}.` : "Add as many as you need."}
+          支持 JPG、PNG、WebP。
+          {" "}
+          {maxImages ? `最多上传 ${maxImages} 张。` : "可按需继续添加。"}
         </p>
 
         <div className="relative mt-6 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
           <span className="h-2 w-2 rounded-full bg-emerald-500" />
-          {images.length} selected
+          已选择 {images.length} 张
         </div>
       </label>
 
@@ -295,13 +298,19 @@ export default function MultiImageUploader({
               </div>
 
               <div className="flex items-center justify-between px-4 py-3 text-sm">
-                <span className="font-medium text-slate-700">Image {index + 1}</span>
+                <span className="font-medium text-slate-700">图片 {index + 1}</span>
                 {maxImages ? (
                   <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
                     {index + 1}/{maxImages}
                   </span>
                 ) : null}
               </div>
+
+              {renderImageFooter ? (
+                <div className="border-t border-slate-200 px-4 py-4">
+                  {renderImageFooter({ image, index })}
+                </div>
+              ) : null}
             </div>
           ))}
         </div>

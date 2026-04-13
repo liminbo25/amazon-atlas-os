@@ -1,11 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from "next/server";
+
+type GeminiRequestType = "virtual-tryon" | "white-background" | "model-swap";
 
 export interface GeminiRequest {
   image?: string;
   clothingImage?: string;
   modelImage?: string;
   prompt?: string;
-  type?: 'virtual-tryon' | 'model-swap';
+  garmentNote?: string;
+  type?: GeminiRequestType;
   size?: string;
 }
 
@@ -15,14 +18,17 @@ export interface GeminiResponse {
   error?: string;
 }
 
+const DEFAULT_API_BASE_URL = "https://ai.yijiarj.cn/v1";
+const DEFAULT_MODEL = "nano_banana_pro";
+
 function normalizeImageForProvider(image: string) {
   const trimmed = image.trim();
 
-  if (trimmed.startsWith('data:image/')) {
+  if (trimmed.startsWith("data:image/")) {
     return trimmed;
   }
 
-  const base64Data = trimmed.includes(',') ? trimmed.split(',')[1] : trimmed;
+  const base64Data = trimmed.includes(",") ? trimmed.split(",")[1] : trimmed;
   return `data:image/png;base64,${base64Data}`;
 }
 
@@ -32,261 +38,253 @@ async function requestImageGeneration(
   payload: Record<string, unknown>
 ) {
   const response = await fetch(`${apiBaseUrl}/images/generations`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${geminiApiKey}`,
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${geminiApiKey}`,
     },
     body: JSON.stringify(payload),
   });
 
-  const responseText = await response.text();
-
   return {
     ok: response.ok,
     status: response.status,
-    responseText,
+    responseText: await response.text(),
   };
 }
 
 function parseImageGenerationResponse(responseText: string) {
   try {
-    return JSON.parse(responseText);
+    return JSON.parse(responseText) as {
+      data?: Array<{ b64_json?: string; url?: string }>;
+      error?: { message?: string };
+    };
   } catch {
-    throw new Error(`图片接口返回了非 JSON 内容：${responseText.slice(0, 200)}`);
+    throw new Error(
+      `图片接口返回了无法解析的内容：${responseText.slice(0, 200)}`
+    );
   }
+}
+
+function extractImageFromResponse(data: {
+  data?: Array<{ b64_json?: string; url?: string }>;
+}) {
+  const firstItem = data.data?.[0];
+
+  if (!firstItem) {
+    return null;
+  }
+
+  if (firstItem.b64_json) {
+    if (
+      firstItem.b64_json.startsWith("http://") ||
+      firstItem.b64_json.startsWith("https://")
+    ) {
+      return firstItem.b64_json;
+    }
+
+    return `data:image/png;base64,${firstItem.b64_json}`;
+  }
+
+  if (firstItem.url) {
+    return firstItem.url;
+  }
+
+  return null;
+}
+
+async function runImageGeneration(options: {
+  apiBaseUrl: string;
+  geminiApiKey: string;
+  payload: Record<string, unknown>;
+  fallbackSize?: string;
+}) {
+  const { apiBaseUrl, geminiApiKey, payload, fallbackSize } = options;
+
+  let apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, payload);
+
+  if (!apiResult.ok && fallbackSize && payload.size !== fallbackSize) {
+    apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, {
+      ...payload,
+      size: fallbackSize,
+    });
+  }
+
+  if (!apiResult.ok) {
+    throw new Error(
+      `API 请求失败：${apiResult.status} - ${apiResult.responseText}`
+    );
+  }
+
+  const data = parseImageGenerationResponse(apiResult.responseText);
+  const result = extractImageFromResponse(data);
+
+  if (result) {
+    return result;
+  }
+
+  if (data.error?.message) {
+    throw new Error(data.error.message);
+  }
+
+  throw new Error("接口返回中没有找到图片结果。");
+}
+
+function buildVirtualTryOnPrompt(garmentNote?: string) {
+  const noteText = garmentNote?.trim()
+    ? `5. ADDITIONAL GARMENT NOTE: ${garmentNote.trim()}`
+    : "";
+
+  return `Virtual try-on task: transfer the exact clothing from image 1 onto the person in image 2.
+
+CRITICAL REQUIREMENTS:
+1. Preserve the exact garment from image 1: pattern, color, texture, logo, trim, seams, and fabric appearance must remain unchanged.
+2. Only replace the clothing area. Keep the person's face, body, pose, and scene from image 2 natural and coherent.
+3. Fit the garment realistically to the person's pose and body shape, keeping the drape, wrinkles, and proportions believable.
+4. Maintain sharp details and clean edges suitable for e-commerce usage.
+${noteText}
+
+OUTPUT: one high-quality realistic image.`;
+}
+
+function buildWhiteBackgroundPrompt() {
+  return `Replace the existing background with a clean pure white background (#FFFFFF).
+
+CRITICAL REQUIREMENTS:
+1. Keep the main subject unchanged, including face, body, clothing, product details, color, and texture.
+2. Preserve natural edges and fine details such as hair, sleeves, hems, and accessories.
+3. Remove the original scene/background only. Do not redesign the subject.
+4. The final image should look neat, realistic, and suitable for e-commerce presentation.`;
+}
+
+function buildModelSwapPrompt(prompt: string) {
+  return `请将这张服装图片中的模特替换为：${prompt}。
+
+要求：
+1. 保持服装本身完全不变，包括颜色、花纹、版型和材质质感。
+2. 只替换人物模特，不要破坏服装细节。
+3. 生成自然、清晰、适合展示的成图。`;
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const body: GeminiRequest = await request.json();
-    const { image, prompt, clothingImage, modelImage, type = 'model-swap', size } = body;
+    const body = (await request.json()) as GeminiRequest;
+    const {
+      image,
+      prompt,
+      clothingImage,
+      modelImage,
+      garmentNote,
+      type = "model-swap",
+      size,
+    } = body;
 
     const geminiApiKey = process.env.GEMINI_API_KEY;
-    const apiBaseUrl = process.env.GEMINI_API_BASE_URL || 'https://ai.yijiarj.cn/v1';
+    const apiBaseUrl =
+      process.env.GEMINI_API_BASE_URL || DEFAULT_API_BASE_URL;
 
     if (!geminiApiKey) {
       return NextResponse.json(
-        { success: false, error: '未配置 GEMINI_API_KEY 环境变量' },
+        { success: false, error: "未配置 GEMINI_API_KEY 环境变量。" },
         { status: 500 }
       );
     }
 
-    // Virtual Try-On: clothing image + model image
-    if (type === 'virtual-tryon') {
+    if (type === "virtual-tryon") {
       if (!clothingImage || !modelImage) {
         return NextResponse.json(
-          { success: false, error: '缺少衣服图或模特图' },
+          { success: false, error: "缺少服装图或模特参考图。" },
           { status: 400 }
         );
       }
 
-      const clothingImageData = normalizeImageForProvider(clothingImage);
-      const modelImageData = normalizeImageForProvider(modelImage);
-
-      const virtualTryOnPrompt = `Virtual try-on task: Transfer the exact clothing from image 1 onto the person in image 2.
-
-CRITICAL REQUIREMENTS:
-1. CLOTHING PRESERVATION (HIGHEST PRIORITY):
-   - Copy the EXACT garment from image 1: every pattern, color, texture, print, logo, and design detail must be IDENTICAL
-   - Preserve fabric type, material appearance, and surface texture
-   - Keep all decorative elements: buttons, zippers, pockets, seams, stitching
-   - Maintain the original color palette precisely - no color shifts or alterations
-
-2. GARMENT FITTING:
-   - Naturally fit the clothing to the person's body shape and pose in image 2
-   - Adjust garment draping and wrinkles to match body contours realistically
-   - Ensure proper garment length, sleeve fit, and overall proportions
-
-3. PERSON PRESERVATION:
-   - Keep the person's face, body, pose, and background from image 2 completely unchanged
-   - Only replace the clothing area
-
-4. LIGHTING & REALISM:
-   - Match lighting, shadows, and highlights to the environment in image 2
-   - Create realistic fabric shadows and body contours
-   - Ensure seamless integration between clothing and person
-
-OUTPUT: A photorealistic 4K ultra-high-definition image showing the person from image 2 wearing the exact clothing from image 1, with perfect detail preservation, sharp textures, and natural appearance. The output must be crisp and detailed at full resolution.`;
-
-      const generationPayload = {
-        model: 'nano_banana_pro',
-        prompt: virtualTryOnPrompt,
-        // 两张图都传入 image 数组：第一张是衣服参考图，第二张是模特图
-        image: [clothingImageData, modelImageData],
-        n: 1,
-        size: size || '1024x1536',
-        quality: 'hd',
-        style: 'natural',
-      };
-
-      let apiResult = await requestImageGeneration(
+      const result = await runImageGeneration({
         apiBaseUrl,
         geminiApiKey,
-        generationPayload
-      );
+        payload: {
+          model: DEFAULT_MODEL,
+          prompt: buildVirtualTryOnPrompt(garmentNote),
+          image: [
+            normalizeImageForProvider(clothingImage),
+            normalizeImageForProvider(modelImage),
+          ],
+          n: 1,
+          size: size || "1024x1536",
+          quality: "hd",
+          style: "natural",
+        },
+        fallbackSize: "1024x1024",
+      });
 
-      console.log('API 响应状态:', apiResult.status);
-
-      if (!apiResult.ok && generationPayload.size !== '1024x1024') {
-        console.warn(
-          '首次图片生成失败，改用 1024x1024 重试:',
-          apiResult.status,
-          apiResult.responseText.slice(0, 300)
-        );
-
-        apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, {
-          ...generationPayload,
-          size: '1024x1024',
-        });
-      }
-
-      if (!apiResult.ok) {
-        console.error('❌ API error:', apiResult.status, apiResult.responseText);
-        return NextResponse.json(
-          { success: false, error: `API 请求失败：${apiResult.status} - ${apiResult.responseText}` },
-          { status: apiResult.status }
-        );
-      }
-
-      const data = parseImageGenerationResponse(apiResult.responseText);
-      console.log('API 返回数据结构:', JSON.stringify(data).substring(0, 200));
-
-      // OpenAI 兼容格式：data.data[0].url 或 data.data[0].b64_json
-      if (data.data && data.data[0]) {
-        let result: string;
-
-        // 检查 b64_json 字段
-        if (data.data[0].b64_json) {
-          const b64Data = data.data[0].b64_json;
-
-          // 判断是 URL 还是真正的 base64
-          if (b64Data.startsWith('http://') || b64Data.startsWith('https://')) {
-            // 实际上是 URL
-            result = b64Data;
-            console.log('✅ 成功生成图片，类型: URL (来自 b64_json 字段)');
-          } else {
-            // 真正的 base64 数据
-            result = `data:image/png;base64,${b64Data}`;
-            console.log('✅ 成功生成图片，类型: base64');
-          }
-        } else if (data.data[0].url) {
-          // 使用 url 字段
-          result = data.data[0].url;
-          console.log('✅ 成功生成图片，类型: URL (来自 url 字段)');
-        } else {
-          console.error('❌ 未找到图片数据');
-          return NextResponse.json(
-            { success: false, error: 'API 返回中未找到图片数据' },
-            { status: 500 }
-          );
-        }
-
-        console.log('结果长度:', result.length);
-        console.log('结果前缀:', result.substring(0, 100));
-
-        return NextResponse.json({
-          success: true,
-          result: result
-        });
-      }
-
-      if (data.error) {
-        return NextResponse.json(
-          { success: false, error: data.error.message || 'API 错误' },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json(
-        { success: false, error: 'API 返回中未找到生成的图片' },
-        { status: 500 }
-      );
+      return NextResponse.json({
+        success: true,
+        result,
+      });
     }
 
-    // Model Swap: single image + prompt (original functionality)
+    if (type === "white-background") {
+      if (!image) {
+        return NextResponse.json(
+          { success: false, error: "缺少待换白底的图片。" },
+          { status: 400 }
+        );
+      }
+
+      const result = await runImageGeneration({
+        apiBaseUrl,
+        geminiApiKey,
+        payload: {
+          model: DEFAULT_MODEL,
+          prompt: buildWhiteBackgroundPrompt(),
+          image: [normalizeImageForProvider(image)],
+          n: 1,
+          size: size || "1024x1024",
+          quality: "hd",
+          style: "natural",
+        },
+        fallbackSize: "1024x1024",
+      });
+
+      return NextResponse.json({
+        success: true,
+        result,
+      });
+    }
+
     if (!image || !prompt) {
       return NextResponse.json(
-        { success: false, error: '缺少图片或提示词' },
+        { success: false, error: "缺少图片或提示词。" },
         { status: 400 }
       );
     }
 
-    const imageData = normalizeImageForProvider(image);
-
-    const enhancedPrompt = `请将此服装图片中的模特替换为：${prompt}。重要要求：
-1. 保持服装完全不变，包括款式、颜色、花纹、图案、材质质感都必须与原图一致
-2. 只替换人物模特，新模特要与原服装风格搭配协调
-3. 背景可以适当调整以配合新模特
-4. 保持原图的光影和色调风格
-5. 生成高质量的模特展示图`;
-
-    // OpenAI 兼容格式请求
-    const apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, {
-      model: 'nano_banana_pro',
-      prompt: enhancedPrompt,
-      image: [imageData],
-      n: 1,
-      size: '1024x1536',
+    const result = await runImageGeneration({
+      apiBaseUrl,
+      geminiApiKey,
+      payload: {
+        model: DEFAULT_MODEL,
+        prompt: buildModelSwapPrompt(prompt),
+        image: [normalizeImageForProvider(image)],
+        n: 1,
+        size: size || "1024x1536",
+        quality: "hd",
+        style: "natural",
+      },
+      fallbackSize: "1024x1024",
     });
 
-    if (!apiResult.ok) {
-      console.error('API error:', apiResult.status, apiResult.responseText);
-      return NextResponse.json(
-        { success: false, error: `API 请求失败：${apiResult.status} - ${apiResult.responseText}` },
-        { status: apiResult.status }
-      );
-    }
-
-    const data = parseImageGenerationResponse(apiResult.responseText);
-
-    if (data.data && data.data[0]) {
-      let result: string;
-
-      // 检查 b64_json 字段
-      if (data.data[0].b64_json) {
-        const b64Data = data.data[0].b64_json;
-
-        // 判断是 URL 还是真正的 base64
-        if (b64Data.startsWith('http://') || b64Data.startsWith('https://')) {
-          // 实际上是 URL
-          result = b64Data;
-        } else {
-          // 真正的 base64 数据
-          result = `data:image/png;base64,${b64Data}`;
-        }
-      } else if (data.data[0].url) {
-        // 使用 url 字段
-        result = data.data[0].url;
-      } else {
-        return NextResponse.json(
-          { success: false, error: 'API 返回中未找到图片数据' },
-          { status: 500 }
-        );
-      }
-
-      return NextResponse.json({
-        success: true,
-        result: result
-      });
-    }
-
-    if (data.error) {
-      return NextResponse.json(
-        { success: false, error: data.error.message || 'API 错误' },
-        { status: 500 }
-      );
-    }
-
-    return NextResponse.json(
-      { success: false, error: 'API 返回中未找到生成的图片' },
-      { status: 500 }
-    );
-
+    return NextResponse.json({
+      success: true,
+      result,
+    });
   } catch (error) {
-    console.error('API route error:', error);
+    console.error("Gemini route error:", error);
+
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : '服务器内部错误' },
+      {
+        success: false,
+        error: error instanceof Error ? error.message : "服务器内部错误。",
+      },
       { status: 500 }
     );
   }

@@ -98,13 +98,13 @@ function toReplicateImageInput(image: string) {
   const match = image.match(/^data:([^;,]+)(?:;charset=[^;,]+)?;base64,(.+)$/);
 
   if (!match) {
-    throw new Error("Upscale input must be an image URL or a base64 data URL.");
+    throw new Error("增强输入必须是图片 URL 或 base64 data URL。");
   }
 
   const [, mimeType, base64Data] = match;
   const buffer = Buffer.from(base64Data, "base64");
 
-  return new File([buffer], `try-on-result.${getFileExtension(mimeType)}`, {
+  return new File([buffer], `image-upscale.${getFileExtension(mimeType)}`, {
     type: mimeType,
   });
 }
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
 
     if (!body.image) {
       return NextResponse.json(
-        { success: false, error: "Missing image input for upscaling." },
+        { success: false, error: "缺少待增强的图片。" },
         { status: 400 }
       );
     }
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
         {
           success: false,
           error:
-            "Missing REPLICATE_API_TOKEN. Add it to your local environment before enhancing images.",
+            "缺少 REPLICATE_API_TOKEN，请先在环境变量中配置后再使用高清增强。",
         },
         { status: 500 }
       );
@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
     const result = getOutputUrl(output);
 
     if (!result) {
-      throw new Error("Replicate did not return a usable image result.");
+      throw new Error("Replicate 没有返回可用的增强图片。");
     }
 
     return NextResponse.json({
@@ -188,7 +188,7 @@ export async function POST(request: NextRequest) {
       {
         success: false,
         error:
-          error instanceof Error ? error.message : "Image enhancement failed.",
+          error instanceof Error ? error.message : "图片增强失败，请稍后重试。",
       },
       { status: 500 }
     );
