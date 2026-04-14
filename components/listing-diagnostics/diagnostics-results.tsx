@@ -9,6 +9,7 @@ import {
   Radar,
   Sparkles,
 } from "lucide-react";
+import { DiagnosticsExportControls } from "@/components/listing-diagnostics/diagnostics-export-controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +22,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  buildListingDiagnosticsEvidenceRows,
+  formatEvidenceVerificationLabel,
+  groupActionPlanByPriority,
+  type ListingDiagnosticsActionPlanSection,
+  type ListingDiagnosticsEvidenceRow,
+} from "@/lib/listing-diagnostics/reporting";
 import type {
   ListingDiagnosticsActionPlanItem,
   ListingDiagnosticsFinding,
@@ -51,6 +59,12 @@ export function DiagnosticsResults({
   const verifiedFindingIds = new Set(
     visibleResult?.spApiVerification?.verifiedFindingIds ?? []
   );
+  const actionSections = visibleResult
+    ? groupActionPlanByPriority(visibleResult.actionPlan)
+    : [];
+  const evidenceRows = visibleResult
+    ? buildListingDiagnosticsEvidenceRows(visibleResult)
+    : [];
 
   if (status === "loading") {
     return (
@@ -346,10 +360,13 @@ export function DiagnosticsResults({
         </Card>
       </div>
 
+      <DiagnosticsExportControls result={visibleResult} />
+
       <Tabs defaultValue="findings" className="glass-panel rounded-[2rem] border border-white/70 bg-white/85 p-5">
         <TabsList variant="line">
           <TabsTrigger value="findings">Findings</TabsTrigger>
           <TabsTrigger value="actions">Action plan</TabsTrigger>
+          <TabsTrigger value="evidence">Evidence</TabsTrigger>
           <TabsTrigger value="coverage">Source coverage</TabsTrigger>
         </TabsList>
 
@@ -373,15 +390,52 @@ export function DiagnosticsResults({
         </TabsContent>
 
         <TabsContent value="actions" className="pt-5">
-          <div className="grid gap-4">
-            {visibleResult.actionPlan.map((item) => (
-              <ActionCard
-                key={item.id}
-                action={item}
-                isVerified={item.linkedFindingIds.some((id) => verifiedFindingIds.has(id))}
-              />
-            ))}
-          </div>
+          {actionSections.length > 0 ? (
+            <div className="grid gap-4">
+              {actionSections.map((section) => (
+                <ActionPrioritySection
+                  key={section.id}
+                  section={section}
+                  verifiedFindingIds={verifiedFindingIds}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyPanel
+              title="No action plan was generated"
+              description="The current run did not return any sequenced next steps."
+            />
+          )}
+        </TabsContent>
+
+        <TabsContent value="evidence" className="pt-5">
+          {evidenceRows.length > 0 ? (
+            <Card className="border-slate-200/80 bg-white/90">
+              <CardContent className="pt-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Signal</TableHead>
+                      <TableHead>Source</TableHead>
+                      <TableHead>Confidence</TableHead>
+                      <TableHead>Verification</TableHead>
+                      <TableHead>Evidence</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {evidenceRows.map((row) => (
+                      <EvidenceTableRow key={row.id} row={row} />
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          ) : (
+            <EmptyPanel
+              title="No evidence rows are available"
+              description="The current result did not expose any structured evidence rows."
+            />
+          )}
         </TabsContent>
 
         <TabsContent value="coverage" className="pt-5">
@@ -491,17 +545,21 @@ function FindingCard({
 function ActionCard({
   action,
   isVerified,
+  showPriorityBadge = true,
 }: {
   action: ListingDiagnosticsActionPlanItem;
   isVerified: boolean;
+  showPriorityBadge?: boolean;
 }) {
   return (
     <Card className="border-slate-200/80 bg-white/90">
       <CardContent className="space-y-4 pt-6">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={action.priority === "now" ? "secondary" : "outline"}>
-            {action.priority}
-          </Badge>
+          {showPriorityBadge ? (
+            <Badge variant={action.priority === "now" ? "secondary" : "outline"}>
+              {action.priority}
+            </Badge>
+          ) : null}
           <Badge variant="outline">
             confidence {Math.round(action.confidence * 100)}%
           </Badge>
@@ -522,6 +580,40 @@ function ActionCard({
             <span>Linked findings: {action.linkedFindingIds.join(", ")}</span>
           </div>
         ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActionPrioritySection({
+  section,
+  verifiedFindingIds,
+}: {
+  section: ListingDiagnosticsActionPlanSection;
+  verifiedFindingIds: Set<string>;
+}) {
+  return (
+    <Card className="border-slate-200/80 bg-white/90">
+      <CardHeader className="border-b border-slate-200/80">
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant={section.id === "now" ? "secondary" : "outline"}>
+            {section.label}
+          </Badge>
+          <Badge variant="outline">{section.items.length} items</Badge>
+        </div>
+        <CardTitle className="text-lg text-slate-950">
+          {section.description}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-6">
+        {section.items.map((item) => (
+          <ActionCard
+            key={item.id}
+            action={item}
+            isVerified={item.linkedFindingIds.some((id) => verifiedFindingIds.has(id))}
+            showPriorityBadge={false}
+          />
+        ))}
       </CardContent>
     </Card>
   );
@@ -553,6 +645,29 @@ function CoverageRow({ item }: { item: ListingDiagnosticsSourceCoverageItem }) {
       <TableCell>{Math.round(item.confidence * 100)}%</TableCell>
       <TableCell className="whitespace-normal text-sm text-slate-600">
         {item.detail}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function EvidenceTableRow({ row }: { row: ListingDiagnosticsEvidenceRow }) {
+  return (
+    <TableRow>
+      <TableCell>
+        <div>
+          <p className="font-medium text-slate-900">{row.signal}</p>
+          <p className="mt-1 text-xs text-slate-500">{row.category}</p>
+        </div>
+      </TableCell>
+      <TableCell className="text-sm text-slate-700">{row.source}</TableCell>
+      <TableCell>{Math.round(row.confidence * 100)}%</TableCell>
+      <TableCell>
+        <Badge variant={getEvidenceBadgeVariant(row.verification)}>
+          {formatEvidenceVerificationLabel(row.verification)}
+        </Badge>
+      </TableCell>
+      <TableCell className="whitespace-normal text-sm leading-7 text-slate-600">
+        {row.evidence}
       </TableCell>
     </TableRow>
   );
@@ -597,4 +712,17 @@ function formatWhole(value: number | null): string {
   }
 
   return Math.round(value).toLocaleString();
+}
+
+function getEvidenceBadgeVariant(
+  verification: ListingDiagnosticsEvidenceRow["verification"]
+) {
+  switch (verification) {
+    case "verified":
+      return "secondary" as const;
+    case "inferred":
+      return "outline" as const;
+    case "direct":
+      return "outline" as const;
+  }
 }
