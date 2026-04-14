@@ -3,28 +3,50 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MultiImageUploader from "@/components/image-studio/MultiImageUploader";
 import { StudioHeader } from "@/components/portal/studio-header";
 
 type AsyncStatus = "idle" | "processing" | "success" | "error";
+type GenerationMode =
+  | "multi-clothing-single-model"
+  | "single-clothing-multi-model"
+  | "all-combinations";
 type UpscaleMode = "target" | "factor";
 type UpscaleOutputFormat = "jpg" | "png" | "webp";
+
+interface GenerationModeOption {
+  title: string;
+  shortTitle: string;
+  description: string;
+  clothingMaxImages: number;
+  modelMaxImages: number;
+  clothingTitle: string;
+  clothingDescription: string;
+  modelTitle: string;
+  modelDescription: string;
+  relationshipSummary: string;
+}
 
 interface ImageTaskState {
   status: AsyncStatus;
   image?: string;
   error: string | null;
+  retryCount: number;
   format?: UpscaleOutputFormat;
 }
 
-interface ProcessedImage {
-  clothing: string;
-  model: string;
+interface ImageGenerationTask {
+  id: string;
+  mode: GenerationMode;
+  clothingIndex: number;
+  clothingTotal: number;
+  modelIndex: number;
+  modelTotal: number;
+  clothingImage: string;
+  modelImage: string;
   garmentNote: string;
-  status: AsyncStatus;
-  result?: string;
-  error: string | null;
+  tryOn: ImageTaskState;
   whiteBackground: ImageTaskState;
   enhanced: ImageTaskState;
 }
@@ -70,33 +92,101 @@ interface PreviewTileProps {
   onPreview?: () => void;
 }
 
+const generationModeOrder: GenerationMode[] = [
+  "multi-clothing-single-model",
+  "single-clothing-multi-model",
+  "all-combinations",
+];
+
+const generationModeOptions: Record<GenerationMode, GenerationModeOption> = {
+  "multi-clothing-single-model": {
+    title: "多张服装图 -> 一个模特图",
+    shortTitle: "多服装单模特",
+    description: "适合固定一位模特，批量试穿多套服装。",
+    clothingMaxImages: 10,
+    modelMaxImages: 1,
+    clothingTitle: "服装图上传",
+    clothingDescription:
+      "上传多张服装图。每张图都可以填写独立服装备注，生成时会分别提交。",
+    modelTitle: "固定模特图",
+    modelDescription: "上传 1 张模特图，这一批所有服装都会复用这张模特图。",
+    relationshipSummary: "每张服装图都会和同一张模特图配对生成。",
+  },
+  "single-clothing-multi-model": {
+    title: "一张服装图 -> 多个模特图",
+    shortTitle: "单服装多模特",
+    description: "适合固定一套服装，快速测试不同模特表现。",
+    clothingMaxImages: 1,
+    modelMaxImages: 10,
+    clothingTitle: "固定服装图",
+    clothingDescription:
+      "上传 1 张服装图。这张服装会应用到当前批次的所有模特图上。",
+    modelTitle: "模特图上传",
+    modelDescription: "上传多张模特图，同一套服装会分别套到每位模特上。",
+    relationshipSummary: "同一张服装图会和每张模特图逐一配对生成。",
+  },
+  "all-combinations": {
+    title: "多张服装图 × 多个模特图 全组合生成",
+    shortTitle: "全组合",
+    description: "适合一次性跑完整组合矩阵，不漏任何服装和模特配对。",
+    clothingMaxImages: 10,
+    modelMaxImages: 10,
+    clothingTitle: "服装图上传",
+    clothingDescription:
+      "上传多张服装图。每张服装图都可以保留自己的服装备注。",
+    modelTitle: "模特图上传",
+    modelDescription:
+      "上传多张模特图。系统会让每张服装图与每张模特图全部组合生成。",
+    relationshipSummary: "每张服装图会和每张模特图全部交叉组合生成。",
+  },
+};
+
 const quickNotes = [
-  "服装图尽量平整、主体完整，能明显减少换装与换白底时的误判。",
-  "模特参考图建议只放一张稳定角度，本轮批量都会复用它。",
-  "服装备注适合补充长度、袖型、领口、露肤范围等不要改变的细节。",
-  "换装图、白底图、高清增强图会分别保留，可单独预览与下载。",
+  "生成前先选模式，上传区限制和任务数量会跟着变化。",
+  "服装备注仍然保留，适合补充领口、袖长、露肤范围等不要改动的细节。",
+  "结果卡片会固定记录当前模式、服装索引、模特索引，单张重试不会串组。",
+  "白底图与增强图仍然独立保存，可单张处理，也可对整批成功结果继续处理。",
 ];
 
 const formatOptions: UpscaleOutputFormat[] = ["jpg", "png", "webp"];
 
-function createTaskState(): ImageTaskState {
+let taskSequence = 0;
+
+function createTaskState(overrides: Partial<ImageTaskState> = {}): ImageTaskState {
   return {
     status: "idle",
     error: null,
+    retryCount: 0,
+    ...overrides,
   };
 }
 
-function createProcessedImage(
-  clothing: string,
-  model: string,
-  garmentNote: string
-): ProcessedImage {
+function createTaskId(mode: GenerationMode, clothingIndex: number, modelIndex: number) {
+  taskSequence += 1;
+  return `${mode}-${clothingIndex}-${modelIndex}-${taskSequence}`;
+}
+
+function createProcessedTask(input: {
+  mode: GenerationMode;
+  clothingIndex: number;
+  clothingTotal: number;
+  modelIndex: number;
+  modelTotal: number;
+  clothingImage: string;
+  modelImage: string;
+  garmentNote: string;
+}): ImageGenerationTask {
   return {
-    clothing,
-    model,
-    garmentNote,
-    status: "idle",
-    error: null,
+    id: createTaskId(input.mode, input.clothingIndex, input.modelIndex),
+    mode: input.mode,
+    clothingIndex: input.clothingIndex,
+    clothingTotal: input.clothingTotal,
+    modelIndex: input.modelIndex,
+    modelTotal: input.modelTotal,
+    clothingImage: input.clothingImage,
+    modelImage: input.modelImage,
+    garmentNote: input.garmentNote,
+    tryOn: createTaskState(),
     whiteBackground: createTaskState(),
     enhanced: createTaskState(),
   };
@@ -211,6 +301,155 @@ function getEnhanceButtonLabel(task: ImageTaskState, canEnhance: boolean) {
   return task.status === "success" ? "重新变清晰" : "一键变清晰";
 }
 
+function getGenerationModeLabel(mode: GenerationMode) {
+  return generationModeOptions[mode].title;
+}
+
+function getGenerationModeShortLabel(mode: GenerationMode) {
+  return generationModeOptions[mode].shortTitle;
+}
+
+function getPlannedTaskCount(
+  mode: GenerationMode,
+  clothingCount: number,
+  modelCount: number
+) {
+  if (mode === "multi-clothing-single-model") {
+    return clothingCount > 0 && modelCount > 0 ? clothingCount : 0;
+  }
+
+  if (mode === "single-clothing-multi-model") {
+    return clothingCount > 0 && modelCount > 0 ? modelCount : 0;
+  }
+
+  return clothingCount > 0 && modelCount > 0 ? clothingCount * modelCount : 0;
+}
+
+function getEstimateMessage(
+  mode: GenerationMode,
+  clothingCount: number,
+  modelCount: number
+) {
+  if (mode === "multi-clothing-single-model") {
+    if (clothingCount === 0 && modelCount === 0) {
+      return "先上传服装图和 1 张固定模特图。";
+    }
+    if (clothingCount === 0) {
+      return "当前模式还缺服装图。";
+    }
+    if (modelCount === 0) {
+      return "当前模式还缺固定模特图。";
+    }
+
+    return `当前会用 ${clothingCount} 张服装图匹配 1 张模特图，预计生成 ${clothingCount} 张结果。`;
+  }
+
+  if (mode === "single-clothing-multi-model") {
+    if (clothingCount === 0 && modelCount === 0) {
+      return "先上传 1 张固定服装图，再上传模特图。";
+    }
+    if (clothingCount === 0) {
+      return "当前模式还缺固定服装图。";
+    }
+    if (modelCount === 0) {
+      return "当前模式还缺模特图。";
+    }
+
+    return `当前会用 1 张服装图匹配 ${modelCount} 张模特图，预计生成 ${modelCount} 张结果。`;
+  }
+
+  if (clothingCount === 0 && modelCount === 0) {
+    return "先上传服装图和模特图，系统会做全组合生成。";
+  }
+  if (clothingCount === 0) {
+    return "当前模式还缺服装图。";
+  }
+  if (modelCount === 0) {
+    return "当前模式还缺模特图。";
+  }
+
+  return `当前会让 ${clothingCount} 张服装图和 ${modelCount} 张模特图全部组合，预计生成 ${
+    clothingCount * modelCount
+  } 张结果。`;
+}
+
+function buildGenerationTasks(
+  mode: GenerationMode,
+  clothingImages: string[],
+  modelImages: string[],
+  garmentNotes: string[]
+) {
+  const clothingTotal = clothingImages.length;
+  const modelTotal = modelImages.length;
+
+  if (mode === "multi-clothing-single-model") {
+    const fixedModel = modelImages[0];
+
+    if (!fixedModel) {
+      return [];
+    }
+
+    return clothingImages.map((clothingImage, clothingIndex) =>
+      createProcessedTask({
+        mode,
+        clothingIndex,
+        clothingTotal,
+        modelIndex: 0,
+        modelTotal,
+        clothingImage,
+        modelImage: fixedModel,
+        garmentNote: garmentNotes[clothingIndex] ?? "",
+      })
+    );
+  }
+
+  if (mode === "single-clothing-multi-model") {
+    const fixedClothing = clothingImages[0];
+
+    if (!fixedClothing) {
+      return [];
+    }
+
+    return modelImages.map((modelImage, modelIndex) =>
+      createProcessedTask({
+        mode,
+        clothingIndex: 0,
+        clothingTotal,
+        modelIndex,
+        modelTotal,
+        clothingImage: fixedClothing,
+        modelImage,
+        garmentNote: garmentNotes[0] ?? "",
+      })
+    );
+  }
+
+  return clothingImages.flatMap((clothingImage, clothingIndex) =>
+    modelImages.map((modelImage, modelIndex) =>
+      createProcessedTask({
+        mode,
+        clothingIndex,
+        clothingTotal,
+        modelIndex,
+        modelTotal,
+        clothingImage,
+        modelImage,
+        garmentNote: garmentNotes[clothingIndex] ?? "",
+      })
+    )
+  );
+}
+
+function buildTaskFilename(
+  task: ImageGenerationTask,
+  suffix: "try-on" | "white-background" | "enhanced",
+  extension: string
+) {
+  return `image-studio-${task.mode}-c${task.clothingIndex + 1}-m${
+    task.modelIndex + 1
+  }-${suffix}.${extension}`;
+}
+
 function PreviewTile({
   title,
   image,
@@ -278,6 +517,9 @@ function PreviewTile({
 }
 
 export default function ImageStudioPage() {
+  const [generationMode, setGenerationMode] = useState<GenerationMode>(
+    "multi-clothing-single-model"
+  );
   const [clothingImages, setClothingImages] = useState<string[]>([]);
   const [garmentNotes, setGarmentNotes] = useState<string[]>([]);
   const [modelImages, setModelImages] = useState<string[]>([]);
@@ -288,8 +530,7 @@ export default function ImageStudioPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isWhiteningAll, setIsWhiteningAll] = useState(false);
   const [isUpscalingAll, setIsUpscalingAll] = useState(false);
-  const [processedImages, setProcessedImages] = useState<ProcessedImage[]>([]);
-  const [processedCount, setProcessedCount] = useState(0);
+  const [processedTasks, setProcessedTasks] = useState<ImageGenerationTask[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<PreviewState | null>(null);
   const [isUpscaleConfigured, setIsUpscaleConfigured] = useState<boolean | null>(
@@ -307,6 +548,23 @@ export default function ImageStudioPage() {
     outputFormat: "jpg",
     outputQuality: 80,
   });
+  const processedTasksRef = useRef<ImageGenerationTask[]>([]);
+
+  const selectedModeOption = generationModeOptions[generationMode];
+  const plannedTaskCount = getPlannedTaskCount(
+    generationMode,
+    clothingImages.length,
+    modelImages.length
+  );
+  const estimateMessage = getEstimateMessage(
+    generationMode,
+    clothingImages.length,
+    modelImages.length
+  );
+
+  useEffect(() => {
+    processedTasksRef.current = processedTasks;
+  }, [processedTasks]);
 
   useEffect(() => {
     setGarmentNotes((current) =>
@@ -325,6 +583,20 @@ export default function ImageStudioPage() {
   }, [standaloneImages]);
 
   useEffect(() => {
+    setClothingImages((current) =>
+      current.length > selectedModeOption.clothingMaxImages
+        ? current.slice(0, selectedModeOption.clothingMaxImages)
+        : current
+    );
+    setModelImages((current) =>
+      current.length > selectedModeOption.modelMaxImages
+        ? current.slice(0, selectedModeOption.modelMaxImages)
+        : current
+    );
+    setError(null);
+  }, [selectedModeOption.clothingMaxImages, selectedModeOption.modelMaxImages]);
+
+  useEffect(() => {
     const controller = new AbortController();
 
     const loadUpscaleConfig = async () => {
@@ -333,9 +605,7 @@ export default function ImageStudioPage() {
           method: "GET",
           signal: controller.signal,
         });
-        const data = (await response.json()) as ImageApiResponse & {
-          configured?: boolean;
-        };
+        const data = (await response.json()) as ImageApiResponse;
 
         if (!response.ok || data.success !== true) {
           throw new Error("无法读取 Replicate 配置状态。");
@@ -364,67 +634,87 @@ export default function ImageStudioPage() {
     return () => controller.abort();
   }, []);
 
-  const hasUploads = clothingImages.length > 0 && modelImages.length > 0;
-  const hasResultCards = processedImages.length > 0;
+  const hasUploads = plannedTaskCount > 0;
+  const hasResultCards = processedTasks.length > 0;
   const canEnhance = isUpscaleConfigured === true;
-  const progress = clothingImages.length
-    ? Math.round((processedCount / clothingImages.length) * 100)
+  const processedCount = processedTasks.filter(
+    (item) => item.tryOn.status === "success" || item.tryOn.status === "error"
+  ).length;
+  const progress = processedTasks.length
+    ? Math.round((processedCount / processedTasks.length) * 100)
     : 0;
-  const successfulCount = processedImages.filter(
-    (item) => item.status === "success" && Boolean(item.result)
+  const successfulCount = processedTasks.filter(
+    (item) => item.tryOn.status === "success" && Boolean(item.tryOn.image)
   ).length;
-  const failedCount = processedImages.filter((item) => item.status === "error").length;
-  const whiteBackgroundCount = processedImages.filter(
-    (item) => item.whiteBackground.status === "success" && item.whiteBackground.image
+  const failedCount = processedTasks.filter(
+    (item) => item.tryOn.status === "error"
   ).length;
-  const enhancedCount = processedImages.filter(
-    (item) => item.enhanced.status === "success" && item.enhanced.image
-  ).length;
-  const pendingWhiteCount = processedImages.filter(
+  const whiteBackgroundCount = processedTasks.filter(
     (item) =>
-      item.status === "success" &&
-      item.result &&
+      item.whiteBackground.status === "success" && Boolean(item.whiteBackground.image)
+  ).length;
+  const enhancedCount = processedTasks.filter(
+    (item) => item.enhanced.status === "success" && Boolean(item.enhanced.image)
+  ).length;
+  const pendingWhiteCount = processedTasks.filter(
+    (item) =>
+      item.tryOn.status === "success" &&
+      item.tryOn.image &&
       item.whiteBackground.status !== "success"
   ).length;
-  const pendingEnhanceCount = processedImages.filter(
+  const pendingEnhanceCount = processedTasks.filter(
     (item) =>
-      item.status === "success" &&
-      item.result &&
+      item.tryOn.status === "success" &&
+      item.tryOn.image &&
       item.enhanced.status !== "success"
   ).length;
   const standaloneWhiteCount = standaloneItems.filter(
-    (item) => item.whiteBackground.status === "success" && item.whiteBackground.image
+    (item) =>
+      item.whiteBackground.status === "success" && Boolean(item.whiteBackground.image)
   ).length;
   const standaloneEnhancedCount = standaloneItems.filter(
-    (item) => item.enhanced.status === "success" && item.enhanced.image
+    (item) => item.enhanced.status === "success" && Boolean(item.enhanced.image)
   ).length;
   const enhancementSummary = describeUpscaleSettings(upscaleSettings);
+  const resultMode = processedTasks[0]?.mode;
+  const resultModeLabel = resultMode ? getGenerationModeLabel(resultMode) : null;
 
-  const updateUpscaleSettings = <Key extends keyof UpscaleSettings>(
+  function replaceProcessedTasks(nextTasks: ImageGenerationTask[]) {
+    processedTasksRef.current = nextTasks;
+    setProcessedTasks(nextTasks);
+  }
+
+  function updateUpscaleSettings<Key extends keyof UpscaleSettings>(
     key: Key,
     value: UpscaleSettings[Key]
-  ) => {
+  ) {
     setUpscaleSettings((current) => ({
       ...current,
       [key]: value,
     }));
-  };
+  }
 
-  const updateProcessedImage = (
+  function updateProcessedTask(
     index: number,
-    updater: (current: ProcessedImage) => ProcessedImage
-  ) => {
-    setProcessedImages((current) =>
-      current.map((item, itemIndex) =>
+    updater: (current: ImageGenerationTask) => ImageGenerationTask
+  ) {
+    const currentTasks = processedTasksRef.current;
+
+    if (!currentTasks[index]) {
+      return;
+    }
+
+    replaceProcessedTasks(
+      currentTasks.map((item, itemIndex) =>
         itemIndex === index ? updater(item) : item
       )
     );
-  };
+  }
 
-  const updateStandaloneItem = (
+  function updateStandaloneItem(
     index: number,
     updater: (current: StandaloneImageItem) => StandaloneImageItem
-  ) => {
+  ) {
     setStandaloneItems((current) => {
       const nextItems = [...current];
       const fallbackSource = standaloneImages[index] ?? "";
@@ -433,13 +723,13 @@ export default function ImageStudioPage() {
       nextItems[index] = updater(baseItem);
       return nextItems;
     });
-  };
+  }
 
-  const openPreview = (src: string, title: string) => {
+  function openPreview(src: string, title: string) {
     setPreviewImage({ src, title });
-  };
+  }
 
-  const handleDownload = async (imageData: string, filename: string) => {
+  async function handleDownload(imageData: string, filename: string) {
     try {
       let dataUrl = imageData;
 
@@ -471,9 +761,9 @@ export default function ImageStudioPage() {
     } catch (downloadError) {
       setError(normalizeClientError(downloadError, "下载失败，请稍后重试。"));
     }
-  };
+  }
 
-  const readImageResponse = async (response: Response, actionLabel: string) => {
+  async function readImageResponse(response: Response, actionLabel: string) {
     const responseText = await response.text();
     let data: ImageApiResponse | null = null;
 
@@ -500,13 +790,13 @@ export default function ImageStudioPage() {
     }
 
     return data.result;
-  };
+  }
 
-  const requestTryOnImage = async (
+  async function requestTryOnImage(
     clothingImage: string,
     modelImage: string,
     garmentNote: string
-  ) => {
+  ) {
     const response = await fetch("/api/gemini", {
       method: "POST",
       headers: {
@@ -522,9 +812,9 @@ export default function ImageStudioPage() {
     });
 
     return readImageResponse(response, "换装生成");
-  };
+  }
 
-  const requestWhiteBackgroundImage = async (image: string) => {
+  async function requestWhiteBackgroundImage(image: string) {
     const response = await fetch("/api/gemini", {
       method: "POST",
       headers: {
@@ -538,12 +828,9 @@ export default function ImageStudioPage() {
     });
 
     return readImageResponse(response, "换白底");
-  };
+  }
 
-  const requestUpscaledImage = async (
-    image: string,
-    settings: UpscaleSettings
-  ) => {
+  async function requestUpscaledImage(image: string, settings: UpscaleSettings) {
     const response = await fetch("/api/upscale", {
       method: "POST",
       headers: {
@@ -561,111 +848,154 @@ export default function ImageStudioPage() {
       result,
       format: settings.outputFormat,
     };
-  };
+  }
 
-  const runTryOn = async (
+  async function runTryOn(
     index: number,
-    clothingImage: string,
-    modelImage: string,
-    garmentNote: string
-  ) => {
-    updateProcessedImage(index, () => ({
-      ...createProcessedImage(clothingImage, modelImage, garmentNote),
-      status: "processing",
+    task: ImageGenerationTask,
+    isRetry: boolean
+  ) {
+    updateProcessedTask(index, (current) => ({
+      ...current,
+      tryOn: createTaskState({
+        status: "processing",
+        retryCount: isRetry ? current.tryOn.retryCount + 1 : current.tryOn.retryCount,
+      }),
+      whiteBackground: createTaskState(),
+      enhanced: createTaskState(),
     }));
 
     try {
-      const result = await requestTryOnImage(clothingImage, modelImage, garmentNote);
-
-      updateProcessedImage(index, (current) => ({
-        ...current,
-        status: "success",
-        result,
-        error: null,
-      }));
-    } catch (requestError) {
-      const message = normalizeClientError(
-        requestError,
-        "换装生成失败，请稍后重试。"
+      const result = await requestTryOnImage(
+        task.clothingImage,
+        task.modelImage,
+        task.garmentNote
       );
 
-      updateProcessedImage(index, (current) => ({
+      updateProcessedTask(index, (current) => ({
         ...current,
-        status: "error",
-        result: undefined,
-        error: message,
+        tryOn: {
+          ...current.tryOn,
+          status: "success",
+          image: result,
+          error: null,
+        },
+      }));
+    } catch (requestError) {
+      const message = normalizeClientError(requestError, "换装生成失败，请稍后重试。");
+
+      updateProcessedTask(index, (current) => ({
+        ...current,
+        tryOn: {
+          ...current.tryOn,
+          status: "error",
+          image: undefined,
+          error: message,
+        },
         whiteBackground: createTaskState(),
         enhanced: createTaskState(),
       }));
-      setError(`第 ${index + 1} 张换装失败：${message}`);
+      setError(
+        `服装 ${task.clothingIndex + 1} / 模特 ${task.modelIndex + 1} 换装失败：${message}`
+      );
     }
-  };
+  }
 
-  const handleStartProcessing = async () => {
-    if (clothingImages.length === 0) {
-      setError("请先上传至少一张服装图，再开始批量换装。");
+  async function handleStartProcessing() {
+    if (generationMode === "multi-clothing-single-model") {
+      if (clothingImages.length === 0) {
+        setError("请先上传至少一张服装图。");
+        return;
+      }
+      if (!modelImages[0]) {
+        setError("请先上传一张固定模特图。");
+        return;
+      }
+    }
+
+    if (generationMode === "single-clothing-multi-model") {
+      if (!clothingImages[0]) {
+        setError("请先上传一张固定服装图。");
+        return;
+      }
+      if (modelImages.length === 0) {
+        setError("请先上传至少一张模特图。");
+        return;
+      }
+    }
+
+    if (generationMode === "all-combinations") {
+      if (clothingImages.length === 0) {
+        setError("请先上传至少一张服装图。");
+        return;
+      }
+      if (modelImages.length === 0) {
+        setError("请先上传至少一张模特图。");
+        return;
+      }
+    }
+
+    const tasks = buildGenerationTasks(
+      generationMode,
+      clothingImages,
+      modelImages,
+      garmentNotes
+    );
+
+    if (tasks.length === 0) {
+      setError("当前上传内容还不足以生成任务，请先补齐当前模式需要的图片。");
       return;
     }
-
-    if (modelImages.length === 0 || !modelImages[0]) {
-      setError("请先上传一张模特参考图，再开始批量换装。");
-      return;
-    }
-
-    const activeModel = modelImages[0];
 
     setError(null);
     setIsProcessing(true);
-    setProcessedCount(0);
-    setProcessedImages(
-      clothingImages.map((clothingImage, index) =>
-        createProcessedImage(clothingImage, activeModel, garmentNotes[index] ?? "")
-      )
-    );
+    replaceProcessedTasks(tasks);
 
     try {
-      for (const [index, clothingImage] of clothingImages.entries()) {
-        await runTryOn(index, clothingImage, activeModel, garmentNotes[index] ?? "");
-        setProcessedCount(index + 1);
+      for (const [index, task] of tasks.entries()) {
+        await runTryOn(index, task, false);
       }
     } finally {
       setIsProcessing(false);
     }
-  };
+  }
 
-  const handleRetryResult = async (index: number) => {
-    const item = processedImages[index];
+  async function handleRetryResult(index: number) {
+    const item = processedTasksRef.current[index];
 
     if (!item) {
       return;
     }
 
     setError(null);
-    await runTryOn(index, item.clothing, item.model, item.garmentNote);
-  };
+    await runTryOn(index, item, true);
+  }
 
-  const handleWhiteBackgroundResult = async (index: number) => {
-    const item = processedImages[index];
+  async function handleWhiteBackgroundResult(index: number) {
+    const item = processedTasksRef.current[index];
 
-    if (!item?.result) {
+    if (!item?.tryOn.image) {
       setError("请先生成换装图，再执行换白底。");
       return;
     }
 
+    const shouldIncrementRetry = item.whiteBackground.status !== "idle";
+
     setError(null);
-    updateProcessedImage(index, (current) => ({
+    updateProcessedTask(index, (current) => ({
       ...current,
-      whiteBackground: {
-        ...current.whiteBackground,
+      whiteBackground: createTaskState({
         status: "processing",
-        error: null,
-      },
+        retryCount: shouldIncrementRetry
+          ? current.whiteBackground.retryCount + 1
+          : current.whiteBackground.retryCount,
+      }),
     }));
 
     try {
-      const result = await requestWhiteBackgroundImage(item.result);
+      const result = await requestWhiteBackgroundImage(item.tryOn.image);
 
-      updateProcessedImage(index, (current) => ({
+      updateProcessedTask(index, (current) => ({
         ...current,
         whiteBackground: {
           ...current.whiteBackground,
@@ -675,12 +1005,9 @@ export default function ImageStudioPage() {
         },
       }));
     } catch (requestError) {
-      const message = normalizeClientError(
-        requestError,
-        "换白底失败，请稍后重试。"
-      );
+      const message = normalizeClientError(requestError, "换白底失败，请稍后重试。");
 
-      updateProcessedImage(index, (current) => ({
+      updateProcessedTask(index, (current) => ({
         ...current,
         whiteBackground: {
           ...current.whiteBackground,
@@ -688,22 +1015,24 @@ export default function ImageStudioPage() {
           error: message,
         },
       }));
-      setError(`第 ${index + 1} 张换白底失败：${message}`);
+      setError(
+        `服装 ${item.clothingIndex + 1} / 模特 ${item.modelIndex + 1} 换白底失败：${message}`
+      );
     }
-  };
+  }
 
-  const handleWhiteBackgroundAll = async () => {
+  async function handleWhiteBackgroundAll() {
     if (successfulCount === 0) {
       setError("请先生成至少一张成功的换装图，再执行整批换白底。");
       return;
     }
 
-    const targetIndices = processedImages
+    const targetIndices = processedTasksRef.current
       .map((item, itemIndex) => ({ item, itemIndex }))
       .filter(
         ({ item }) =>
-          item.status === "success" &&
-          item.result &&
+          item.tryOn.status === "success" &&
+          item.tryOn.image &&
           item.whiteBackground.status !== "success"
       )
       .map(({ itemIndex }) => itemIndex);
@@ -723,38 +1052,40 @@ export default function ImageStudioPage() {
     } finally {
       setIsWhiteningAll(false);
     }
-  };
+  }
 
-  const handleUpscaleResult = async (index: number) => {
+  async function handleUpscaleResult(index: number) {
     if (!canEnhance) {
       setError("请先配置 REPLICATE_API_TOKEN，再使用变清晰功能。");
       return;
     }
 
-    const item = processedImages[index];
+    const item = processedTasksRef.current[index];
 
-    if (!item?.result) {
+    if (!item?.tryOn.image) {
       setError("请先生成换装图，再执行变清晰。");
       return;
     }
 
     const settingsPayload = { ...upscaleSettings };
+    const shouldIncrementRetry = item.enhanced.status !== "idle";
 
     setError(null);
-    updateProcessedImage(index, (current) => ({
+    updateProcessedTask(index, (current) => ({
       ...current,
-      enhanced: {
-        ...current.enhanced,
+      enhanced: createTaskState({
         status: "processing",
-        error: null,
+        retryCount: shouldIncrementRetry
+          ? current.enhanced.retryCount + 1
+          : current.enhanced.retryCount,
         format: settingsPayload.outputFormat,
-      },
+      }),
     }));
 
     try {
-      const data = await requestUpscaledImage(item.result, settingsPayload);
+      const data = await requestUpscaledImage(item.tryOn.image, settingsPayload);
 
-      updateProcessedImage(index, (current) => ({
+      updateProcessedTask(index, (current) => ({
         ...current,
         enhanced: {
           ...current.enhanced,
@@ -770,7 +1101,7 @@ export default function ImageStudioPage() {
         "图片增强失败，请稍后重试。"
       );
 
-      updateProcessedImage(index, (current) => ({
+      updateProcessedTask(index, (current) => ({
         ...current,
         enhanced: {
           ...current.enhanced,
@@ -779,11 +1110,13 @@ export default function ImageStudioPage() {
           format: settingsPayload.outputFormat,
         },
       }));
-      setError(`第 ${index + 1} 张变清晰失败：${message}`);
+      setError(
+        `服装 ${item.clothingIndex + 1} / 模特 ${item.modelIndex + 1} 变清晰失败：${message}`
+      );
     }
-  };
+  }
 
-  const handleUpscaleAll = async () => {
+  async function handleUpscaleAll() {
     if (!canEnhance) {
       setError("请先配置 REPLICATE_API_TOKEN，再执行整批变清晰。");
       return;
@@ -794,12 +1127,12 @@ export default function ImageStudioPage() {
       return;
     }
 
-    const targetIndices = processedImages
+    const targetIndices = processedTasksRef.current
       .map((item, itemIndex) => ({ item, itemIndex }))
       .filter(
         ({ item }) =>
-          item.status === "success" &&
-          item.result &&
+          item.tryOn.status === "success" &&
+          item.tryOn.image &&
           item.enhanced.status !== "success"
       )
       .map(({ itemIndex }) => itemIndex);
@@ -819,20 +1152,24 @@ export default function ImageStudioPage() {
     } finally {
       setIsUpscalingAll(false);
     }
-  };
+  }
 
-  const handleStandaloneWhiteBackground = async (
+  async function handleStandaloneWhiteBackground(
     index: number,
     sourceImage: string
-  ) => {
+  ) {
+    const currentItem = standaloneItems[index] ?? createStandaloneItem(sourceImage);
+    const shouldIncrementRetry = currentItem.whiteBackground.status !== "idle";
+
     setError(null);
     updateStandaloneItem(index, (current) => ({
       ...current,
-      whiteBackground: {
-        ...current.whiteBackground,
+      whiteBackground: createTaskState({
         status: "processing",
-        error: null,
-      },
+        retryCount: shouldIncrementRetry
+          ? current.whiteBackground.retryCount + 1
+          : current.whiteBackground.retryCount,
+      }),
     }));
 
     try {
@@ -863,25 +1200,28 @@ export default function ImageStudioPage() {
       }));
       setError(`独立图片 ${index + 1} 换白底失败：${message}`);
     }
-  };
+  }
 
-  const handleStandaloneUpscale = async (index: number, sourceImage: string) => {
+  async function handleStandaloneUpscale(index: number, sourceImage: string) {
     if (!canEnhance) {
       setError("请先配置 REPLICATE_API_TOKEN，再使用变清晰功能。");
       return;
     }
 
+    const currentItem = standaloneItems[index] ?? createStandaloneItem(sourceImage);
     const settingsPayload = { ...upscaleSettings };
+    const shouldIncrementRetry = currentItem.enhanced.status !== "idle";
 
     setError(null);
     updateStandaloneItem(index, (current) => ({
       ...current,
-      enhanced: {
-        ...current.enhanced,
+      enhanced: createTaskState({
         status: "processing",
-        error: null,
+        retryCount: shouldIncrementRetry
+          ? current.enhanced.retryCount + 1
+          : current.enhanced.retryCount,
         format: settingsPayload.outputFormat,
-      },
+      }),
     }));
 
     try {
@@ -914,14 +1254,14 @@ export default function ImageStudioPage() {
       }));
       setError(`独立图片 ${index + 1} 变清晰失败：${message}`);
     }
-  };
+  }
 
   return (
     <div className="min-h-screen pb-10">
       <StudioHeader
         eyebrow="图片工坊"
-        title="换装、换白底、变清晰，一页完成"
-        description="这里沿用现有换装能力、white-background 模式与 Replicate 增强接口，把换装结果、白底图和高清增强图收在同一个工作区里。"
+        title="三种换装模式、白底图、变清晰，一页完成"
+        description="在同一个工作区里完成模式选择、任务预估、换装生成、单张重试、整批换白底、整批变清晰和独立图片处理。"
         badge="图片处理工作台"
       />
 
@@ -932,14 +1272,19 @@ export default function ImageStudioPage() {
               <div className="max-w-3xl space-y-5">
                 <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/75">
                   <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                  批量换装 + 白底图 + 高清增强
+                  三种换装模式 + 白底图 + 高清增强
                 </div>
                 <div className="space-y-4">
                   <h1 className="font-serif text-4xl tracking-[-0.04em] text-balance sm:text-5xl">
-                    先做换装，再把满意的结果一键换白底、变清晰。
+                    先选生成模式，再批量出图，后处理继续接着做。
                   </h1>
                   <p className="max-w-2xl text-base leading-8 text-white/70 sm:text-lg">
-                    同一页里完成服装上传、模特参考、服装备注、批量换装、整批后处理和单张重试。白底图与增强图都会和原换装图分开保留。
+                    当前模式：
+                    <span className="font-semibold text-white">
+                      {" "}
+                      {selectedModeOption.title}
+                    </span>
+                    。{selectedModeOption.relationshipSummary}
                   </p>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -953,7 +1298,7 @@ export default function ImageStudioPage() {
                         : "bg-amber-300 text-slate-950 hover:bg-amber-200"
                     }`}
                   >
-                    {isProcessing ? "批量换装中..." : "开始批量换装"}
+                    {isProcessing ? "当前批次生成中..." : "开始当前模式生成"}
                   </button>
                   <Link
                     href="/"
@@ -979,15 +1324,15 @@ export default function ImageStudioPage() {
                 </div>
                 <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
                   <p className="text-xs uppercase tracking-[0.28em] text-white/40">
-                    白底图
+                    预计结果
                   </p>
-                  <p className="mt-3 text-3xl font-semibold">{whiteBackgroundCount}</p>
+                  <p className="mt-3 text-3xl font-semibold">{plannedTaskCount}</p>
                 </div>
                 <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-4">
                   <p className="text-xs uppercase tracking-[0.28em] text-white/40">
-                    增强图
+                    已成功
                   </p>
-                  <p className="mt-3 text-3xl font-semibold">{enhancedCount}</p>
+                  <p className="mt-3 text-3xl font-semibold">{successfulCount}</p>
                 </div>
               </div>
             </div>
@@ -996,12 +1341,73 @@ export default function ImageStudioPage() {
           <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
             <div className="space-y-6">
               <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      生成模式
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                      先明确本轮怎么组合任务
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      模式切换后，上传限制、提示文案和任务数量都会同步变化。
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
+                    预计 {plannedTaskCount} 张
+                  </span>
+                </div>
+
+                <div className="mt-6 grid gap-3 xl:grid-cols-3">
+                  {generationModeOrder.map((mode) => {
+                    const option = generationModeOptions[mode];
+                    const isActive = generationMode === mode;
+
+                    return (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => setGenerationMode(mode)}
+                        className={`rounded-[1.5rem] border px-5 py-5 text-left transition ${
+                          isActive
+                            ? "border-slate-950 bg-slate-950 text-white"
+                            : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-400 hover:bg-white"
+                        }`}
+                      >
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] opacity-70">
+                          {option.shortTitle}
+                        </p>
+                        <p className="mt-3 text-lg font-semibold">{option.title}</p>
+                        <p className="mt-3 text-sm leading-6 opacity-80">
+                          {option.description}
+                        </p>
+                        <p className="mt-4 text-xs leading-6 opacity-70">
+                          服装上限 {option.clothingMaxImages} 张 / 模特上限{" "}
+                          {option.modelMaxImages} 张
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600">
+                  {estimateMessage}
+                </div>
+
+                {plannedTaskCount >= 20 ? (
+                  <div className="mt-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-7 text-amber-800">
+                    当前任务量较大，将连续生成 {plannedTaskCount} 张结果。建议先确认服装图、模特图和备注都已准备好再开始。
+                  </div>
+                ) : null}
+              </article>
+
+              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <MultiImageUploader
                   images={clothingImages}
                   onImagesChange={setClothingImages}
-                  title="服装图上传"
-                  description="上传需要换装的服装图。每张图片都可以单独补充服装备注，批量换装时会一并提交。"
-                  maxImages={10}
+                  title={selectedModeOption.clothingTitle}
+                  description={selectedModeOption.clothingDescription}
+                  maxImages={selectedModeOption.clothingMaxImages}
                   renderImageFooter={({ index }) => (
                     <div className="space-y-3">
                       <label className="block">
@@ -1025,7 +1431,7 @@ export default function ImageStudioPage() {
                         />
                       </label>
                       <p className="text-xs leading-6 text-slate-500">
-                        这段备注会跟随当前服装图进入换装请求，适合补充你不希望模型改动的细节。
+                        这段备注会跟着当前服装图进入请求，在三种模式下都有效。
                       </p>
                     </div>
                   )}
@@ -1036,9 +1442,9 @@ export default function ImageStudioPage() {
                 <MultiImageUploader
                   images={modelImages}
                   onImagesChange={setModelImages}
-                  title="模特参考图"
-                  description="上传一张清晰、主体完整的模特参考图。当前批次默认复用第一张模特图。"
-                  maxImages={1}
+                  title={selectedModeOption.modelTitle}
+                  description={selectedModeOption.modelDescription}
+                  maxImages={selectedModeOption.modelMaxImages}
                 />
               </article>
 
@@ -1050,8 +1456,7 @@ export default function ImageStudioPage() {
                   description="不走换装流程，直接对现有图片单张一键换白底或变清晰。成功后会分别保留白底图和增强图。"
                   maxImages={10}
                   renderImageFooter={({ image, index }) => {
-                    const item =
-                      standaloneItems[index] ?? createStandaloneItem(image);
+                    const item = standaloneItems[index] ?? createStandaloneItem(image);
 
                     return (
                       <div className="space-y-3">
@@ -1089,12 +1494,8 @@ export default function ImageStudioPage() {
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              void handleStandaloneUpscale(index, image)
-                            }
-                            disabled={
-                              item.enhanced.status === "processing" || !canEnhance
-                            }
+                            onClick={() => void handleStandaloneUpscale(index, image)}
+                            disabled={item.enhanced.status === "processing" || !canEnhance}
                             className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
                               item.enhanced.status === "processing" || !canEnhance
                                 ? "cursor-not-allowed bg-slate-100 text-slate-400"
@@ -1104,72 +1505,6 @@ export default function ImageStudioPage() {
                             {getEnhanceButtonLabel(item.enhanced, canEnhance)}
                           </button>
                         </div>
-
-                        {item.whiteBackground.status === "success" ||
-                        item.enhanced.status === "success" ? (
-                          <div className="flex flex-wrap gap-2">
-                            {item.whiteBackground.image ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    openPreview(
-                                      item.whiteBackground.image!,
-                                      `独立图片 ${index + 1} 白底图`
-                                    )
-                                  }
-                                  className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-                                >
-                                  预览白底图
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    void handleDownload(
-                                      item.whiteBackground.image!,
-                                      `standalone-${index + 1}-white-background.png`
-                                    )
-                                  }
-                                  className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-                                >
-                                  下载白底图
-                                </button>
-                              </>
-                            ) : null}
-
-                            {item.enhanced.image ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    openPreview(
-                                      item.enhanced.image!,
-                                      `独立图片 ${index + 1} 增强图`
-                                    )
-                                  }
-                                  className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-                                >
-                                  预览增强图
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    void handleDownload(
-                                      item.enhanced.image!,
-                                      `standalone-${index + 1}-enhanced.${
-                                        item.enhanced.format ||
-                                        upscaleSettings.outputFormat
-                                      }`
-                                    )
-                                  }
-                                  className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-                                >
-                                  下载增强图
-                                </button>
-                              </>
-                            ) : null}
-                          </div>
-                        ) : null}
 
                         {item.whiteBackground.error ? (
                           <p className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-700">
@@ -1222,8 +1557,20 @@ export default function ImageStudioPage() {
 
                 <dl className="mt-6 space-y-3 text-sm text-slate-600">
                   <div className="flex items-center justify-between">
-                    <dt>总服装图</dt>
-                    <dd className="font-semibold text-slate-950">{clothingImages.length}</dd>
+                    <dt>当前模式</dt>
+                    <dd className="font-semibold text-slate-950">
+                      {selectedModeOption.shortTitle}
+                    </dd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <dt>当前预计任务</dt>
+                    <dd className="font-semibold text-slate-950">{plannedTaskCount}</dd>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <dt>最近批次任务</dt>
+                    <dd className="font-semibold text-slate-950">
+                      {processedTasks.length}
+                    </dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt>已处理</dt>
@@ -1257,7 +1604,7 @@ export default function ImageStudioPage() {
                         白底图与高清增强
                       </h2>
                       <p className="mt-2 text-sm leading-6 text-slate-600">
-                        换白底复用 `white-background`，变清晰复用 Replicate。生成成功后会在每张结果卡片中保留独立版本。
+                        换白底继续复用 `/api/gemini`，变清晰继续复用 `/api/upscale`。
                       </p>
                     </div>
 
@@ -1265,9 +1612,7 @@ export default function ImageStudioPage() {
                       <button
                         type="button"
                         onClick={() => void handleWhiteBackgroundAll()}
-                        disabled={
-                          successfulCount === 0 || isProcessing || isWhiteningAll
-                        }
+                        disabled={successfulCount === 0 || isProcessing || isWhiteningAll}
                         className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
                           successfulCount === 0 || isProcessing || isWhiteningAll
                             ? "cursor-not-allowed bg-amber-100 text-amber-700"
@@ -1311,7 +1656,7 @@ export default function ImageStudioPage() {
                         </span>
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-600">
-                        待处理 {pendingWhiteCount} 张。支持单张补做，也支持整批一键处理。
+                        待处理 {pendingWhiteCount} 张。
                       </p>
                     </div>
 
@@ -1326,7 +1671,7 @@ export default function ImageStudioPage() {
                         </span>
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-600">
-                        待处理 {pendingEnhanceCount} 张。增强结果会保留输出格式与下载按钮。
+                        待处理 {pendingEnhanceCount} 张。
                       </p>
                     </div>
                   </div>
@@ -1531,24 +1876,43 @@ export default function ImageStudioPage() {
                 </ul>
               </article>
 
-              {modelImages[0] ? (
+              {generationMode === "multi-clothing-single-model" && modelImages[0] ? (
                 <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                   <div className="aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-100">
                     <img
                       src={modelImages[0]}
-                      alt="模特参考图"
+                      alt="当前固定模特图"
                       className="h-full w-full object-cover"
-                      onClick={() =>
-                        openPreview(modelImages[0], "当前批次模特参考图")
-                      }
+                      onClick={() => openPreview(modelImages[0], "当前固定模特图")}
                     />
                   </div>
                   <div className="px-2 pb-2 pt-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                      当前模特参考图
+                      当前固定模特图
                     </p>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
-                      当前批次会复用这张图做换装。更换后重新批量运行即可更新结果。
+                      当前批次会让所有服装图都复用这张模特图。
+                    </p>
+                  </div>
+                </article>
+              ) : null}
+
+              {generationMode === "single-clothing-multi-model" && clothingImages[0] ? (
+                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+                  <div className="aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-100">
+                    <img
+                      src={clothingImages[0]}
+                      alt="当前固定服装图"
+                      className="h-full w-full object-cover"
+                      onClick={() => openPreview(clothingImages[0], "当前固定服装图")}
+                    />
+                  </div>
+                  <div className="px-2 pb-2 pt-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      当前固定服装图
+                    </p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      当前批次会让所有模特图都复用这张服装图。
                     </p>
                   </div>
                 </article>
@@ -1563,13 +1927,13 @@ export default function ImageStudioPage() {
                   换装结果
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                  原换装图、白底图、增强图
+                  服装图、模特图、原换装图、白底图、增强图
                 </h2>
               </div>
               <p className="text-sm text-slate-500">
                 {hasResultCards
-                  ? `共 ${processedImages.length} 张结果卡片，其中 ${successfulCount} 张换装成功，${whiteBackgroundCount} 张白底图，${enhancedCount} 张增强图。`
-                  : "批量换装后，结果会在这里展示，并支持单张换白底、单张变清晰和失败项重试。"}
+                  ? `最近批次模式：${resultModeLabel}。共 ${processedTasks.length} 张结果卡片，其中 ${successfulCount} 张换装成功，${whiteBackgroundCount} 张白底图，${enhancedCount} 张增强图。`
+                  : "开始生成后，这里会按当前任务组合展示每张结果对应的服装图、模特图、模式、原换装图、白底图和增强图。"}
               </p>
             </div>
 
@@ -1577,14 +1941,14 @@ export default function ImageStudioPage() {
               <div className="mt-6 rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50/80 px-6 py-12 text-center">
                 <p className="text-lg font-semibold text-slate-900">还没有结果</p>
                 <p className="mt-2 text-sm leading-7 text-slate-500">
-                  上传服装图和模特图后点击“开始批量换装”，这里会出现每张图片的原换装图、白底图和增强图状态。
+                  先选择模式，再上传服装图和模特图，点击“开始当前模式生成”后，这里会按组合关系显示每张卡片。
                 </p>
               </div>
             ) : (
               <div className="mt-6 grid gap-6 xl:grid-cols-2">
-                {processedImages.map((item, index) => (
+                {processedTasks.map((item, index) => (
                   <article
-                    key={`${item.clothing.slice(0, 40)}-${index}`}
+                    key={item.id}
                     className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_16px_44px_rgba(15,23,42,0.06)]"
                   >
                     <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4">
@@ -1594,12 +1958,15 @@ export default function ImageStudioPage() {
                             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
                               结果 {index + 1}
                             </p>
+                            <span className="inline-flex items-center rounded-full bg-slate-950 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
+                              {getGenerationModeShortLabel(item.mode)}
+                            </span>
                             <span
                               className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getStatusPillClass(
-                                item.status
+                                item.tryOn.status
                               )}`}
                             >
-                              换装：{getStatusLabel(item.status)}
+                              换装：{getStatusLabel(item.tryOn.status)}
                             </span>
                             <span
                               className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getStatusPillClass(
@@ -1618,7 +1985,11 @@ export default function ImageStudioPage() {
                           </div>
 
                           <p className="text-sm leading-6 text-slate-600">
-                            流程关系：服装参考图 → 原换装图 → 白底图 / 增强图
+                            当前模式：{getGenerationModeLabel(item.mode)}
+                          </p>
+                          <p className="text-sm leading-6 text-slate-600">
+                            对应组合：服装 {item.clothingIndex + 1} / {item.clothingTotal}
+                            ，模特 {item.modelIndex + 1} / {item.modelTotal}
                           </p>
                           <p className="text-sm leading-6 text-slate-600">
                             服装备注：
@@ -1627,16 +1998,21 @@ export default function ImageStudioPage() {
                               {item.garmentNote || "未填写，按默认逻辑生成。"}
                             </span>
                           </p>
+                          {item.tryOn.retryCount > 0 ? (
+                            <p className="text-sm leading-6 text-slate-500">
+                              本卡片已重试换装 {item.tryOn.retryCount} 次。
+                            </p>
+                          ) : null}
                         </div>
 
                         <div className="flex flex-wrap gap-2">
-                          {item.status === "error" ? (
+                          {item.tryOn.status === "error" ? (
                             <button
                               type="button"
                               onClick={() => void handleRetryResult(index)}
                               className="inline-flex items-center justify-center rounded-full bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
                             >
-                              重试本张换装
+                              重试当前组合
                             </button>
                           ) : null}
 
@@ -1644,14 +2020,14 @@ export default function ImageStudioPage() {
                             type="button"
                             onClick={() => void handleWhiteBackgroundResult(index)}
                             disabled={
-                              item.status !== "success" ||
-                              !item.result ||
+                              item.tryOn.status !== "success" ||
+                              !item.tryOn.image ||
                               item.whiteBackground.status === "processing" ||
                               isWhiteningAll
                             }
                             className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
-                              item.status !== "success" ||
-                              !item.result ||
+                              item.tryOn.status !== "success" ||
+                              !item.tryOn.image ||
                               item.whiteBackground.status === "processing" ||
                               isWhiteningAll
                                 ? "cursor-not-allowed bg-amber-100 text-amber-700"
@@ -1665,15 +2041,15 @@ export default function ImageStudioPage() {
                             type="button"
                             onClick={() => void handleUpscaleResult(index)}
                             disabled={
-                              item.status !== "success" ||
-                              !item.result ||
+                              item.tryOn.status !== "success" ||
+                              !item.tryOn.image ||
                               item.enhanced.status === "processing" ||
                               isUpscalingAll ||
                               !canEnhance
                             }
                             className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
-                              item.status !== "success" ||
-                              !item.result ||
+                              item.tryOn.status !== "success" ||
+                              !item.tryOn.image ||
                               item.enhanced.status === "processing" ||
                               isUpscalingAll ||
                               !canEnhance
@@ -1684,13 +2060,13 @@ export default function ImageStudioPage() {
                             {getEnhanceButtonLabel(item.enhanced, canEnhance)}
                           </button>
 
-                          {item.result ? (
+                          {item.tryOn.image ? (
                             <button
                               type="button"
                               onClick={() =>
                                 void handleDownload(
-                                  item.result!,
-                                  `try-on-result-${index + 1}.png`
+                                  item.tryOn.image!,
+                                  buildTaskFilename(item, "try-on", "png")
                                 )
                               }
                               className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
@@ -1705,7 +2081,7 @@ export default function ImageStudioPage() {
                               onClick={() =>
                                 void handleDownload(
                                   item.whiteBackground.image!,
-                                  `try-on-result-${index + 1}-white-background.png`
+                                  buildTaskFilename(item, "white-background", "png")
                                 )
                               }
                               className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
@@ -1720,10 +2096,11 @@ export default function ImageStudioPage() {
                               onClick={() =>
                                 void handleDownload(
                                   item.enhanced.image!,
-                                  `try-on-result-${index + 1}-enhanced.${
-                                    item.enhanced.format ||
-                                    upscaleSettings.outputFormat
-                                  }`
+                                  buildTaskFilename(
+                                    item,
+                                    "enhanced",
+                                    item.enhanced.format || upscaleSettings.outputFormat
+                                  )
                                 )
                               }
                               className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
@@ -1734,42 +2111,59 @@ export default function ImageStudioPage() {
                         </div>
                       </div>
 
-                      {item.error ? (
+                      {item.tryOn.error ? (
                         <div className="rounded-[1.5rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
-                          {item.error}
+                          {item.tryOn.error}
                         </div>
                       ) : null}
                     </div>
 
-                    <div className="grid gap-px bg-slate-200 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="grid gap-px bg-slate-200 md:grid-cols-2 xl:grid-cols-5">
                       <PreviewTile
-                        title="服装参考图"
-                        image={item.clothing}
-                        alt={`服装参考图 ${index + 1}`}
+                        title="服装图"
+                        image={item.clothingImage}
+                        alt={`服装图 ${index + 1}`}
                         status="success"
                         emptyTitle="暂无服装图"
-                        emptyDescription="当前卡片没有可展示的服装参考图。"
-                        description="用于换装参考的原始服装图。"
+                        emptyDescription="当前卡片没有可展示的服装图。"
+                        description={`服装 ${item.clothingIndex + 1} / ${item.clothingTotal}`}
                         backgroundClassName="bg-slate-50"
                         onPreview={() =>
-                          openPreview(item.clothing, `结果 ${index + 1} 服装参考图`)
+                          openPreview(item.clothingImage, `结果 ${index + 1} 服装图`)
+                        }
+                      />
+
+                      <PreviewTile
+                        title="模特图"
+                        image={item.modelImage}
+                        alt={`模特图 ${index + 1}`}
+                        status="success"
+                        emptyTitle="暂无模特图"
+                        emptyDescription="当前卡片没有可展示的模特图。"
+                        description={`模特 ${item.modelIndex + 1} / ${item.modelTotal}`}
+                        backgroundClassName="bg-white"
+                        onPreview={() =>
+                          openPreview(item.modelImage, `结果 ${index + 1} 模特图`)
                         }
                       />
 
                       <PreviewTile
                         title="原换装图"
-                        image={item.result}
+                        image={item.tryOn.image}
                         alt={`换装结果 ${index + 1}`}
-                        status={item.status}
+                        status={item.tryOn.status}
                         emptyTitle="还没有换装结果"
-                        emptyDescription="这张图片尚未生成成功，可点击上方按钮重试。"
-                        description="这是当前卡片的原始换装图，后续白底图和增强图都与它对应。"
-                        backgroundClassName="bg-white"
-                        error={item.status === "error" ? item.error : null}
+                        emptyDescription="这张图片尚未生成成功，可点击上方按钮重试当前组合。"
+                        description="这张图是后续白底图和增强图的原始来源。"
+                        backgroundClassName="bg-slate-50"
+                        error={item.tryOn.status === "error" ? item.tryOn.error : null}
                         onPreview={
-                          item.result
+                          item.tryOn.image
                             ? () =>
-                                openPreview(item.result!, `结果 ${index + 1} 原换装图`)
+                                openPreview(
+                                  item.tryOn.image!,
+                                  `结果 ${index + 1} 原换装图`
+                                )
                             : undefined
                         }
                       />
@@ -1781,8 +2175,12 @@ export default function ImageStudioPage() {
                         status={item.whiteBackground.status}
                         emptyTitle="还没有白底图"
                         emptyDescription="点击上方“一键换白底”后，这里会显示独立白底版本。"
-                        description="白底处理完成后，可预览并单独下载。"
-                        backgroundClassName="bg-slate-50"
+                        description={
+                          item.whiteBackground.retryCount > 0
+                            ? `已重试 ${item.whiteBackground.retryCount} 次`
+                            : "白底处理完成后，可预览并单独下载。"
+                        }
+                        backgroundClassName="bg-white"
                         error={item.whiteBackground.error}
                         onPreview={
                           item.whiteBackground.image
@@ -1805,12 +2203,13 @@ export default function ImageStudioPage() {
                         description={
                           item.enhanced.status === "success"
                             ? `输出格式：${
-                                item.enhanced.format ||
-                                upscaleSettings.outputFormat
+                                item.enhanced.format || upscaleSettings.outputFormat
                               }`
-                            : "增强成功后会保留独立输出格式与下载入口。"
+                            : item.enhanced.retryCount > 0
+                              ? `已重试 ${item.enhanced.retryCount} 次`
+                              : "增强成功后会保留独立输出格式与下载入口。"
                         }
-                        backgroundClassName="bg-white"
+                        backgroundClassName="bg-slate-50"
                         error={item.enhanced.error}
                         onPreview={
                           item.enhanced.image
