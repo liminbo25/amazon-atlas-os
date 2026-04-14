@@ -12,6 +12,7 @@ const DEFAULT_MODEL_BY_SERVICE = {
   imageAnalysis: "vision-model",
   vocAnalysis: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
   listingGeneration: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+  legacyCopyDiagnosis: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
 } as const;
 
 export async function POST(request: Request) {
@@ -56,12 +57,17 @@ function readServiceName(
   }
 
   const task = runtime.task;
-  if (task === "imageAnalysis" || task === "vocAnalysis" || task === "listingGeneration") {
+  if (
+    task === "imageAnalysis" ||
+    task === "vocAnalysis" ||
+    task === "listingGeneration" ||
+    task === "legacyCopyDiagnosis"
+  ) {
     return task;
   }
 
   throw new RouteError(
-    'runtime.task must be one of "imageAnalysis", "vocAnalysis", or "listingGeneration".',
+    'runtime.task must be one of "imageAnalysis", "vocAnalysis", "listingGeneration", or "legacyCopyDiagnosis".',
     {
       status: 400,
       code: "runtime_task_invalid",

@@ -9,6 +9,7 @@ import {
 import type {
   CompetitorListing,
   ReviewData,
+  SellerSpriteRuntimeConfig,
   TrafficKeyword,
 } from "./types";
 import {
@@ -57,7 +58,19 @@ interface AsinFamilyResolution {
     | "parent-asin-fallback";
 }
 
-const MCP_URL = "https://mcp.sellersprite.com/mcp";
+interface ResolvedSellerSpriteRuntimeConfig {
+  baseUrl: string;
+  secretKey: string;
+  requestTimeoutMs: number;
+  cacheKey: string;
+}
+
+interface SellerSpriteToolOptions {
+  asin?: string;
+  runtimeConfig?: SellerSpriteRuntimeConfig;
+}
+
+const DEFAULT_MCP_BASE_URL = "https://mcp.sellersprite.com/mcp";
 const DEFAULT_MARKETPLACE = "US";
 const DEFAULT_REQUEST_TIMEOUT_MS = 15_000;
 const DEFAULT_MAX_CONCURRENT_REQUESTS = 4;
@@ -66,7 +79,7 @@ const REVIEW_FETCH_LIMIT = 100;
 const MAX_REVIEW_PAGES = 5;
 const REVIEW_DEDUP_DATE_PRECISION = 10;
 
-let mcpClientPromise: Promise<Client> | null = null;
+const mcpClientPromiseCache = new Map<string, Promise<Client>>();
 let activeRequestCount = 0;
 const queuedRequestResolvers: Array<() => void> = [];
 
@@ -146,6 +159,84 @@ const maxConcurrentRequests = parsePositiveIntegerEnv(
   DEFAULT_MAX_CONCURRENT_REQUESTS
 );
 
+function normalizePositiveInteger(
+  value: unknown,
+  fallback: number
+): number {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number.parseInt(value, 10);
+    if (Number.isInteger(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+}
+
+function normalizeMcpBaseUrl(rawValue: string): string {
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(rawValue);
+  } catch {
+    throw new SellerSpriteClientError({
+      code: "configuration",
+      message: `Invalid SellerSprite MCP base URL: ${rawValue}.`,
+    });
+  }
+
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new SellerSpriteClientError({
+      code: "configuration",
+      message: "SellerSprite MCP base URL must start with http:// or https://.",
+    });
+  }
+
+  parsedUrl.hash = "";
+  parsedUrl.search = "";
+  parsedUrl.pathname = parsedUrl.pathname.replace(/\/+$/, "") || "/";
+
+  return parsedUrl.toString().replace(/\/+$/, "");
+}
+
+function resolveSellerSpriteRuntimeConfig(
+  runtimeConfig?: SellerSpriteRuntimeConfig
+): ResolvedSellerSpriteRuntimeConfig {
+  const secretKey =
+    runtimeConfig?.secretKey?.trim() ||
+    process.env.SELLERSPRITE_SECRET_KEY?.trim() ||
+    "";
+
+  if (!secretKey) {
+    throw new SellerSpriteClientError({
+      code: "configuration",
+      message:
+        "Missing SellerSprite secret key. Set SELLERSPRITE_SECRET_KEY or provide sellerSpriteConfig.secretKey.",
+    });
+  }
+
+  const baseUrl = normalizeMcpBaseUrl(
+    runtimeConfig?.baseUrl?.trim() ||
+      process.env.SELLERSPRITE_BASE_URL?.trim() ||
+      DEFAULT_MCP_BASE_URL
+  );
+  const timeout = normalizePositiveInteger(
+    runtimeConfig?.requestTimeoutMs,
+    requestTimeoutMs
+  );
+
+  return {
+    baseUrl,
+    secretKey,
+    requestTimeoutMs: timeout,
+    cacheKey: `${baseUrl}::${secretKey}`,
+  };
+}
+
 async function acquireRequestSlot(): Promise<void> {
   if (activeRequestCount < maxConcurrentRequests) {
     activeRequestCount += 1;
@@ -175,20 +266,15 @@ async function withRequestSlot<T>(task: () => Promise<T>): Promise<T> {
   }
 }
 
-async function getMCPClient(): Promise<Client> {
-  if (mcpClientPromise) {
-    return mcpClientPromise;
+async function getMCPClient(
+  config: ResolvedSellerSpriteRuntimeConfig
+): Promise<Client> {
+  const cachedClientPromise = mcpClientPromiseCache.get(config.cacheKey);
+  if (cachedClientPromise) {
+    return cachedClientPromise;
   }
 
-  const secretKey = process.env.SELLERSPRITE_SECRET_KEY?.trim();
-  if (!secretKey) {
-    throw new SellerSpriteClientError({
-      code: "configuration",
-      message: "Missing SELLERSPRITE_SECRET_KEY environment variable.",
-    });
-  }
-
-  mcpClientPromise = (async () => {
+  const clientPromise = (async () => {
     const client = new Client(
       {
         name: "listing-module",
@@ -199,10 +285,10 @@ async function getMCPClient(): Promise<Client> {
       }
     );
 
-    const transport = new StreamableHTTPClientTransport(new URL(MCP_URL), {
+    const transport = new StreamableHTTPClientTransport(new URL(config.baseUrl), {
       requestInit: {
         headers: {
-          "secret-key": secretKey,
+          "secret-key": config.secretKey,
         },
       },
     });
@@ -211,15 +297,17 @@ async function getMCPClient(): Promise<Client> {
       await client.connect(transport);
       return client;
     } catch (error) {
-      mcpClientPromise = null;
+      mcpClientPromiseCache.delete(config.cacheKey);
       throw toSellerSpriteError(error, {
         code: "upstream",
         message: "Failed to connect to SellerSprite MCP service.",
+        requestTimeoutMs: config.requestTimeoutMs,
       });
     }
   })();
 
-  return mcpClientPromise;
+  mcpClientPromiseCache.set(config.cacheKey, clientPromise);
+  return clientPromise;
 }
 
 function extractErrorMessage(error: unknown): string {
@@ -241,6 +329,7 @@ function toSellerSpriteError(
     message: string;
     toolName?: string;
     asin?: string;
+    requestTimeoutMs?: number;
   }
 ): SellerSpriteClientError {
   if (error instanceof SellerSpriteClientError) {
@@ -250,7 +339,9 @@ function toSellerSpriteError(
   if (error instanceof McpError && error.code === ErrorCode.RequestTimeout) {
     return new SellerSpriteClientError({
       code: "timeout",
-      message: `SellerSprite request timed out after ${requestTimeoutMs}ms${
+      message: `SellerSprite request timed out after ${
+        params.requestTimeoutMs ?? requestTimeoutMs
+      }ms${
         params.toolName ? ` while calling "${params.toolName}"` : ""
       }${params.asin ? ` for ASIN ${params.asin}` : ""}.`,
       toolName: params.toolName,
@@ -376,6 +467,21 @@ function getIsoDateString(value: unknown): string {
   return Number.isNaN(timestamp) ? "" : new Date(timestamp).toISOString();
 }
 
+function getIsoDateStringFromTimestamp(value: unknown): string {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return new Date(value).toISOString();
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return new Date(parsed).toISOString();
+    }
+  }
+
+  return "";
+}
+
 function expectRecord(
   value: unknown,
   toolName: string,
@@ -437,11 +543,14 @@ function getContentBlocks(
 async function callMCPTool(
   toolName: string,
   args: Record<string, unknown>,
-  asin?: string
+  options: SellerSpriteToolOptions = {}
 ): Promise<unknown> {
+  const resolvedConfig = resolveSellerSpriteRuntimeConfig(options.runtimeConfig);
+  const asin = options.asin;
+
   try {
     return await withRequestSlot(async () => {
-      const client = await getMCPClient();
+      const client = await getMCPClient(resolvedConfig);
       const result = await client.callTool(
         {
           name: toolName,
@@ -449,7 +558,7 @@ async function callMCPTool(
         },
         undefined,
         {
-          timeout: requestTimeoutMs,
+          timeout: resolvedConfig.requestTimeoutMs,
         }
       );
 
@@ -506,23 +615,9 @@ async function callMCPTool(
       }.`,
       toolName,
       asin,
+      requestTimeoutMs: resolvedConfig.requestTimeoutMs,
     });
   }
-}
-
-function createFallbackListing(asin: string): CompetitorListing {
-  return {
-    asin,
-    title: "",
-    bulletPoints: [],
-    attributes: {},
-    price: 0,
-    rating: 0,
-    reviews: 0,
-    monthlySales: 0,
-    bsr: 0,
-    mainImage: "",
-  };
 }
 
 function readFirstNumber(
@@ -582,7 +677,8 @@ function extractAsins(value: unknown): string[] {
 
 async function fetchAsinDetailRecord(
   asin: string,
-  marketplace: string
+  marketplace: string,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<Record<string, unknown>> {
   return expectRecord(
     await callMCPTool(
@@ -591,7 +687,10 @@ async function fetchAsinDetailRecord(
         marketplace,
         asin,
       },
-      asin
+      {
+        asin,
+        runtimeConfig,
+      }
     ),
     "asin_detail",
     asin
@@ -602,11 +701,44 @@ function buildListingFromDetail(
   asin: string,
   data: Record<string, unknown>
 ): CompetitorListing {
+  const badgeRecord =
+    isRecord(data.badge) ? (data.badge as Record<string, unknown>) : {};
+  const overviewRecord = parseOverviewRecord(data.overviews);
+  const primarySubcategory = Array.isArray(data.subcategories)
+    ? data.subcategories.find(isRecord)
+    : null;
+
   return {
     asin,
     title: getString(data.title),
     bulletPoints: getStringArray(data.features),
-    attributes: {},
+    attributes: {
+      brand: getString(data.brand),
+      bsrLabel: getString(data.bsrLabel),
+      subcategoryLabel: primarySubcategory ? getString(primarySubcategory.label) : "",
+      subcategoryRank: primarySubcategory
+        ? String(getInteger(primarySubcategory.rank))
+        : "",
+      nodeLabelPath: getString(data.nodeLabelPath),
+      nodeIdPath: getString(data.nodeIdPath),
+      parentAsin: getString(data.parent),
+      variationCount: String(getInteger(data.variations)),
+      availableDate: getIsoDateStringFromTimestamp(data.availableDate),
+      fulfillment: getString(data.fulfillment),
+      coupon: getString(data.coupon),
+      lqs: String(getInteger(data.lqs)),
+      dimensions: getString(data.dimensions),
+      weight: getString(data.weight),
+      fabricType: getString(overviewRecord["Fabric type"]),
+      careInstructions: getString(overviewRecord["Care instructions"]),
+      origin: getString(overviewRecord.Origin),
+      closureType: getString(overviewRecord["Closure type"]),
+      hasAPlus: getString(badgeRecord.ebc),
+      hasVideo: getString(badgeRecord.video),
+      amazonChoice: getString(badgeRecord.amazonChoice),
+      bestSeller: getString(badgeRecord.bestSeller),
+      newRelease: getString(badgeRecord.newRelease),
+    },
     price: getNumber(data.price),
     rating: getNumber(data.rating),
     reviews: getInteger(data.ratings),
@@ -621,6 +753,23 @@ function buildListingFromDetail(
     bsr: getInteger(data.bsrRank),
     mainImage: getString(data.imageUrl),
   };
+}
+
+function parseOverviewRecord(value: unknown): Record<string, unknown> {
+  if (isRecord(value)) {
+    return value;
+  }
+
+  if (typeof value !== "string" || !value.trim()) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
 }
 
 function isListingEmpty(listing: CompetitorListing): boolean {
@@ -665,9 +814,11 @@ function parseAsinFamilyFromDetail(data: Record<string, unknown>): {
 async function resolveAsinFamily(
   asin: string,
   marketplace: string,
-  primaryDetail?: Record<string, unknown>
+  primaryDetail?: Record<string, unknown>,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<AsinFamilyResolution> {
-  const detail = primaryDetail ?? (await fetchAsinDetailRecord(asin, marketplace));
+  const detail =
+    primaryDetail ?? (await fetchAsinDetailRecord(asin, marketplace, runtimeConfig));
   const primaryFamily = parseAsinFamilyFromDetail(detail);
 
   if (primaryFamily.variantAsins.length > 0) {
@@ -682,7 +833,8 @@ async function resolveAsinFamily(
     try {
       const parentDetail = await fetchAsinDetailRecord(
         primaryFamily.parentAsin,
-        marketplace
+        marketplace,
+        runtimeConfig
       );
       const parentFamily = parseAsinFamilyFromDetail(parentDetail);
 
@@ -738,7 +890,8 @@ function parseReviewItem(item: Record<string, unknown>): ReviewApiItem {
 async function fetchReviewPages(
   asin: string,
   limit: number,
-  marketplace: string
+  marketplace: string,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<ReviewData[]> {
   const collectedReviews: ReviewData[] = [];
   const totalPages = Math.min(
@@ -757,7 +910,10 @@ async function fetchReviewPages(
             page,
             size: REVIEW_PAGE_SIZE,
           },
-          asin
+          {
+            asin,
+            runtimeConfig,
+          }
         ),
         "review",
         asin
@@ -849,7 +1005,8 @@ function dedupeAndSortReviews(reviews: ReviewData[], limit: number): ReviewData[
 async function fetchFamilyReviews(
   asins: string[],
   limit: number,
-  marketplace: string
+  marketplace: string,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<ReviewData[]> {
   const uniqueVariantAsins = uniqueAsins(asins);
   const perAsinLimit = Math.max(
@@ -859,7 +1016,7 @@ async function fetchFamilyReviews(
 
   const allReviews = await Promise.all(
     uniqueVariantAsins.map((asin) =>
-      fetchReviewPages(asin, perAsinLimit, marketplace).catch((error) => {
+      fetchReviewPages(asin, perAsinLimit, marketplace, runtimeConfig).catch((error) => {
         console.warn(
           `[SellerSprite] Failed to fetch reviews for family ASIN ${asin}. ${extractErrorMessage(
             error
@@ -884,9 +1041,10 @@ function filterReviewsByType(
 
 export async function getCompetitorListing(
   asin: string,
-  marketplace: string = DEFAULT_MARKETPLACE
+  marketplace: string = DEFAULT_MARKETPLACE,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<CompetitorListing> {
-  const data = await fetchAsinDetailRecord(asin, marketplace);
+  const data = await fetchAsinDetailRecord(asin, marketplace, runtimeConfig);
   return buildListingFromDetail(asin, data);
 }
 
@@ -894,13 +1052,21 @@ export async function getCompetitorReviews(
   asin: string,
   type: "negative" | "positive",
   limit: number = REVIEW_FETCH_LIMIT,
-  marketplace: string = DEFAULT_MARKETPLACE
+  marketplace: string = DEFAULT_MARKETPLACE,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<ReviewData[]> {
-  const primaryDetail = await fetchAsinDetailRecord(asin, marketplace).catch(
-    () => null
-  );
+  const primaryDetail = await fetchAsinDetailRecord(
+    asin,
+    marketplace,
+    runtimeConfig
+  ).catch(() => null);
   const family = primaryDetail
-    ? await resolveAsinFamily(asin, marketplace, primaryDetail).catch(() => ({
+    ? await resolveAsinFamily(
+        asin,
+        marketplace,
+        primaryDetail,
+        runtimeConfig
+      ).catch(() => ({
         parentAsin: null,
         variantAsins: [asin],
         source: "single-asin" as const,
@@ -910,7 +1076,12 @@ export async function getCompetitorReviews(
         variantAsins: [asin],
         source: "single-asin" as const,
       };
-  const reviews = await fetchFamilyReviews(family.variantAsins, limit, marketplace);
+  const reviews = await fetchFamilyReviews(
+    family.variantAsins,
+    limit,
+    marketplace,
+    runtimeConfig
+  );
   return filterReviewsByType(reviews, type);
 }
 
@@ -940,7 +1111,8 @@ function parseTrafficKeywordItem(
 
 async function fetchTrafficKeywordCandidates(
   asin: string,
-  marketplace: string
+  marketplace: string,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<TrafficKeyword[]> {
   const data = expectRecord(
     await callMCPTool(
@@ -952,7 +1124,10 @@ async function fetchTrafficKeywordCandidates(
           size: 50,
         },
       },
-      asin
+      {
+        asin,
+        runtimeConfig,
+      }
     ),
     "traffic_keyword",
     asin
@@ -973,21 +1148,23 @@ async function fetchTrafficKeywordCandidates(
 
 export async function getTrafficKeywords(
   asin: string,
-  marketplace: string = DEFAULT_MARKETPLACE
+  marketplace: string = DEFAULT_MARKETPLACE,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<TrafficKeyword[]> {
   return selectTrafficKeywords(
-    await fetchTrafficKeywordCandidates(asin, marketplace),
+    await fetchTrafficKeywordCandidates(asin, marketplace, runtimeConfig),
     DEFAULT_MAX_SELECTED_KEYWORDS
   );
 }
 
 async function fetchFamilyTrafficKeywords(
   asins: string[],
-  marketplace: string
+  marketplace: string,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<TrafficKeyword[]> {
   const keywordGroups = await Promise.all(
     uniqueAsins(asins).map((asin) =>
-      fetchTrafficKeywordCandidates(asin, marketplace).catch((error) => {
+      fetchTrafficKeywordCandidates(asin, marketplace, runtimeConfig).catch((error) => {
         console.warn(
           `[SellerSprite] Failed to fetch traffic keywords for family ASIN ${asin}. ${extractErrorMessage(
             error
@@ -1006,7 +1183,8 @@ async function fetchFamilyTrafficKeywords(
 
 async function fetchSingleCompetitorData(
   asin: string,
-  marketplace: string
+  marketplace: string,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<{
   listing: CompetitorListing;
   negativeReviews: ReviewData[];
@@ -1014,7 +1192,7 @@ async function fetchSingleCompetitorData(
   keywords: TrafficKeyword[];
 }> {
   const detailResult = await Promise.allSettled([
-    fetchAsinDetailRecord(asin, marketplace),
+    fetchAsinDetailRecord(asin, marketplace, runtimeConfig),
   ]);
 
   const primaryDetail =
@@ -1026,7 +1204,12 @@ async function fetchSingleCompetitorData(
           variantAsins: [asin],
           source: "single-asin" as const,
         }
-      : await resolveAsinFamily(asin, marketplace, primaryDetail).catch((error) => {
+      : await resolveAsinFamily(
+          asin,
+          marketplace,
+          primaryDetail,
+          runtimeConfig
+        ).catch((error) => {
           console.warn(
             `[SellerSprite] Failed to resolve family for ASIN ${asin}. ${extractErrorMessage(
               error
@@ -1051,9 +1234,14 @@ async function fetchSingleCompetitorData(
   const [listingResult, reviewsResult, keywordsResult] = await Promise.allSettled([
     primaryDetail
       ? Promise.resolve(buildListingFromDetail(asin, primaryDetail))
-      : getCompetitorListing(asin, marketplace),
-    fetchFamilyReviews(family.variantAsins, REVIEW_FETCH_LIMIT, marketplace),
-    fetchFamilyTrafficKeywords(family.variantAsins, marketplace),
+      : getCompetitorListing(asin, marketplace, runtimeConfig),
+    fetchFamilyReviews(
+      family.variantAsins,
+      REVIEW_FETCH_LIMIT,
+      marketplace,
+      runtimeConfig
+    ),
+    fetchFamilyTrafficKeywords(family.variantAsins, marketplace, runtimeConfig),
   ]);
 
   let listing: CompetitorListing;
@@ -1102,7 +1290,8 @@ async function fetchSingleCompetitorData(
 
 export async function fetchCompetitorData(
   asins: string[],
-  marketplace: string = DEFAULT_MARKETPLACE
+  marketplace: string = DEFAULT_MARKETPLACE,
+  runtimeConfig?: SellerSpriteRuntimeConfig
 ): Promise<{
   listings: CompetitorListing[];
   reviews: Record<string, ReviewData[]>;
@@ -1115,7 +1304,9 @@ export async function fetchCompetitorData(
     .filter((asin) => asin.length > 0);
 
   const results = await Promise.all(
-    validAsins.map((asin) => fetchSingleCompetitorData(asin, marketplace))
+    validAsins.map((asin) =>
+      fetchSingleCompetitorData(asin, marketplace, runtimeConfig)
+    )
   );
 
   const listings: CompetitorListing[] = [];

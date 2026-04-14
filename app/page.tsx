@@ -2,6 +2,7 @@ import Link from "next/link";
 import {
   BadgeDollarSign,
   ArrowRight,
+  ClipboardList,
   ImagePlus,
   ListChecks,
   Radar,
@@ -30,6 +31,16 @@ const modules = [
     status: "Live",
     icon: ListChecks,
     accent: "from-sky-200 via-cyan-100 to-white",
+  },
+  {
+    href: "/legacy-copy-diagnosis",
+    title: "Legacy Copy Diagnosis",
+    subtitle: "Existing ASIN copy audit and rewrite priorities",
+    description:
+      "Turn a mature listing into a scored diagnosis across keyword coverage, category relevance, conversion evidence, asset coordination, and execution priority.",
+    status: "New",
+    icon: ClipboardList,
+    accent: "from-violet-200 via-fuchsia-100 to-white",
   },
   {
     href: "/ad-optimizer",
@@ -80,7 +91,7 @@ export default function Home() {
       />
 
       <section className="page-shell mt-8">
-        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
           {modules.map((module) => {
             const Icon = module.icon;
 
