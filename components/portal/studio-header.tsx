@@ -8,6 +8,7 @@ const navItems = [
   { href: "/", label: "Overview" },
   { href: "/image-studio", label: "Image Studio" },
   { href: "/listing-studio", label: "Listing Studio" },
+  { href: "/legacy-copy-diagnosis", label: "Legacy Copy" },
   { href: "/ad-optimizer", label: "Ad Optimizer" },
   { href: "/competitor-monitor", label: "Competitor Monitor" },
   { href: "/video-studio", label: "Video Studio" },

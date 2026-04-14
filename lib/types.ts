@@ -164,6 +164,12 @@ export interface AiRuntimeServiceConfig {
   apiKey: string;
 }
 
+export interface SellerSpriteRuntimeConfig {
+  baseUrl?: string;
+  secretKey?: string;
+  requestTimeoutMs?: number;
+}
+
 export interface AiRuntimeSettings {
   imageAnalysis: AiRuntimeServiceConfig;
   vocAnalysis: AiRuntimeServiceConfig;
