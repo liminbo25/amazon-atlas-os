@@ -24,7 +24,7 @@ const DOCX_MIME =
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const JSON_MIME = "application/json;charset=utf-8";
-const EXPORT_SCHEMA_VERSION = "listing-diagnostics.report.v2";
+const EXPORT_SCHEMA_VERSION = "listing-diagnostics.report.v3";
 
 type DocxModule = typeof import("docx");
 type SheetRow = Record<string, string | number>;
@@ -360,12 +360,17 @@ function buildOperatorQueueParagraphs(
             "Verified / Inferred",
             `${item.verifiedCount} / ${item.inferredCount}`
           ),
+          createLabelParagraph(docx, "Lead issue", item.leadFindingTitle),
+          createLabelParagraph(docx, "Lead verification", item.leadVerification),
           createLabelParagraph(docx, "Symptom", item.symptom),
+          createLabelParagraph(docx, "Root cause", item.rootCause),
+          createLabelParagraph(docx, "Next move", item.nextMove),
           createLabelParagraph(
             docx,
             "Recommended surface",
             item.recommendedSurface
           ),
+          createLabelParagraph(docx, "Expected impact", item.expectedImpact),
         ])
       : [new Paragraph("No root-cause queue is available.")];
   const impactParagraphs =
@@ -385,8 +390,16 @@ function buildOperatorQueueParagraphs(
             "Verified / Inferred",
             `${item.verifiedCount} / ${item.inferredCount}`
           ),
+          createLabelParagraph(docx, "Lead issue", item.leadFindingTitle),
+          createLabelParagraph(docx, "Lead verification", item.leadVerification),
           createLabelParagraph(docx, "Headline", item.headline),
           createLabelParagraph(docx, "Next move", item.nextMove),
+          createLabelParagraph(
+            docx,
+            "Recommended surface",
+            item.recommendedSurface
+          ),
+          createLabelParagraph(docx, "Expected impact", item.expectedImpact),
         ])
       : [new Paragraph("No impact queue is available.")];
 
@@ -671,8 +684,13 @@ function buildRootCauseSummaryRows(payload: ListingDiagnosticsExportPayload) {
       primaryImpactType: formatImpactType(item.primaryImpactType),
       verifiedCount: item.verifiedCount,
       inferredCount: item.inferredCount,
+      leadFindingTitle: item.leadFindingTitle,
+      leadVerification: item.leadVerification,
       symptom: item.symptom,
+      rootCause: item.rootCause,
+      nextMove: item.nextMove,
       recommendedSurface: item.recommendedSurface,
+      expectedImpact: item.expectedImpact,
       topFindingIds: item.topFindingIds.join(", "),
     })),
     {
@@ -682,8 +700,13 @@ function buildRootCauseSummaryRows(payload: ListingDiagnosticsExportPayload) {
       primaryImpactType: "",
       verifiedCount: "",
       inferredCount: "",
+      leadFindingTitle: "",
+      leadVerification: "",
       symptom: "",
+      rootCause: "",
+      nextMove: "",
       recommendedSurface: "",
+      expectedImpact: "",
       topFindingIds: "",
     }
   );
@@ -697,9 +720,13 @@ function buildImpactSummaryRows(payload: ListingDiagnosticsExportPayload) {
       topPriority: item.topPriority,
       verifiedCount: item.verifiedCount,
       inferredCount: item.inferredCount,
+      leadFindingTitle: item.leadFindingTitle,
+      leadVerification: item.leadVerification,
       topRootCauseCategory: formatRootCauseCategory(item.topRootCauseCategory),
       headline: item.headline,
       nextMove: item.nextMove,
+      recommendedSurface: item.recommendedSurface,
+      expectedImpact: item.expectedImpact,
       topFindingIds: item.topFindingIds.join(", "),
     })),
     {
@@ -708,9 +735,13 @@ function buildImpactSummaryRows(payload: ListingDiagnosticsExportPayload) {
       topPriority: "",
       verifiedCount: "",
       inferredCount: "",
+      leadFindingTitle: "",
+      leadVerification: "",
       topRootCauseCategory: "",
       headline: "",
       nextMove: "",
+      recommendedSurface: "",
+      expectedImpact: "",
       topFindingIds: "",
     }
   );

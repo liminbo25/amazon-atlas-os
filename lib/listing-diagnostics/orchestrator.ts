@@ -116,15 +116,13 @@ export async function runListingDiagnostics(
       ...(spApiEnhancement?.findings ?? []),
     ])
   );
-  const computedActions = sortActions(
+  const allComputedActions = sortActions(
     dedupeById([
       ...ruleResults.flatMap((result) => result.actions),
       ...(spApiEnhancement?.actions ?? []),
     ])
-  ).slice(0, 6);
+  );
   const dimensions = ruleResults.map((result) => result.dimension);
-  const rootCauseSummary = buildRootCauseSummary(findings);
-  const impactSummary = buildImpactSummary(findings);
 
   const computedOverallScore = Math.round(
     dimensions.reduce((total, dimension) => total + dimension.score * dimension.weight, 0) /
@@ -159,8 +157,8 @@ export async function runListingDiagnostics(
       : "success";
 
   const actionPlan =
-    computedActions.length > 0
-      ? computedActions
+    allComputedActions.length > 0
+      ? allComputedActions.slice(0, 6)
       : [
           {
             id: "monitor-win-state",
@@ -184,6 +182,9 @@ export async function runListingDiagnostics(
             linkedFindingIds: [],
           },
         ];
+  const summaryActions = allComputedActions.length > 0 ? allComputedActions : actionPlan;
+  const rootCauseSummary = buildRootCauseSummary(findings, summaryActions);
+  const impactSummary = buildImpactSummary(findings, summaryActions);
 
   const result: ListingDiagnosticsResult = {
     generatedAt: new Date().toISOString(),
@@ -549,9 +550,11 @@ function buildSummary(
 }
 
 function buildRootCauseSummary(
-  findings: ListingDiagnosticsFinding[]
+  findings: ListingDiagnosticsFinding[],
+  actions: ListingDiagnosticsResult["actionPlan"]
 ): ListingDiagnosticsRootCauseSummaryItem[] {
   const grouped = new Map<string, ListingDiagnosticsFinding[]>();
+  const actionByFindingId = buildActionIndex(actions);
 
   for (const finding of findings) {
     const key = finding.rootCauseCategory ?? "general";
@@ -564,6 +567,7 @@ function buildRootCauseSummary(
     .map(([key, group]) => {
       const sortedGroup = sortFindings(group);
       const leader = sortedGroup[0];
+      const leadAction = resolveLeadAction(leader.id, actionByFindingId);
 
       return {
         category: key === "general" ? null : leader.rootCauseCategory,
@@ -577,8 +581,13 @@ function buildRootCauseSummary(
           .length,
         topPriority: leader.priority,
         primaryImpactType: leader.impactType,
+        leadFindingTitle: leader.title,
+        leadVerification: leader.verification,
         symptom: leader.symptom,
-        recommendedSurface: leader.whereToChange,
+        rootCause: leader.rootCause,
+        nextMove: leadAction?.action ?? leader.whatToChange,
+        recommendedSurface: leadAction?.whereToChange ?? leader.whereToChange,
+        expectedImpact: leadAction?.expectedImpact ?? leader.expectedImpact,
         topFindingIds: sortedGroup.slice(0, 3).map((finding) => finding.id),
       };
     })
@@ -602,12 +611,14 @@ function buildRootCauseSummary(
 }
 
 function buildImpactSummary(
-  findings: ListingDiagnosticsFinding[]
+  findings: ListingDiagnosticsFinding[],
+  actions: ListingDiagnosticsResult["actionPlan"]
 ): ListingDiagnosticsImpactSummaryItem[] {
   const grouped = new Map<
     ListingDiagnosticsFinding["impactType"],
     ListingDiagnosticsFinding[]
   >();
+  const actionByFindingId = buildActionIndex(actions);
 
   for (const finding of findings) {
     const next = grouped.get(finding.impactType) ?? [];
@@ -619,6 +630,7 @@ function buildImpactSummary(
     .map(([impactType, group]) => {
       const sortedGroup = sortFindings(group);
       const leader = sortedGroup[0];
+      const leadAction = resolveLeadAction(leader.id, actionByFindingId);
       const verifiedCount = group.filter(
         (finding) => finding.verification === "verified"
       ).length;
@@ -640,8 +652,12 @@ function buildImpactSummary(
         inferredCount,
         topPriority: leader.priority,
         headline: `${group.length} finding(s) are pressing on ${formatImpactType(impactType).toLowerCase()}, led by ${verificationHeadline} signal(s).`,
+        leadFindingTitle: leader.title,
+        leadVerification: leader.verification,
         topRootCauseCategory: leader.rootCauseCategory,
-        nextMove: leader.whatToChange,
+        nextMove: leadAction?.action ?? leader.whatToChange,
+        recommendedSurface: leadAction?.whereToChange ?? leader.whereToChange,
+        expectedImpact: leadAction?.expectedImpact ?? leader.expectedImpact,
         topFindingIds: sortedGroup.slice(0, 3).map((finding) => finding.id),
       };
     })
@@ -667,6 +683,29 @@ function dedupeById<T extends { id: string }>(items: T[]): T[] {
   }
 
   return Array.from(seen.values());
+}
+
+function buildActionIndex(
+  actions: ListingDiagnosticsResult["actionPlan"]
+): Map<string, ListingDiagnosticsResult["actionPlan"][number]> {
+  const byFindingId = new Map<string, ListingDiagnosticsResult["actionPlan"][number]>();
+
+  for (const action of actions) {
+    for (const findingId of action.linkedFindingIds) {
+      if (!byFindingId.has(findingId)) {
+        byFindingId.set(findingId, action);
+      }
+    }
+  }
+
+  return byFindingId;
+}
+
+function resolveLeadAction(
+  findingId: string,
+  actionByFindingId: Map<string, ListingDiagnosticsResult["actionPlan"][number]>
+): ListingDiagnosticsResult["actionPlan"][number] | null {
+  return actionByFindingId.get(findingId) ?? null;
 }
 
 function sortFindings(findings: ListingDiagnosticsFinding[]): ListingDiagnosticsFinding[] {

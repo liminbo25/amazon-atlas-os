@@ -781,6 +781,11 @@ function RootCauseQueueCard({
                 <Badge variant="outline">{item.label}</Badge>
                 <Badge variant="outline">{formatImpactType(item.primaryImpactType)}</Badge>
                 <Badge variant="outline">{item.findingCount} findings</Badge>
+                <Badge
+                  variant={item.leadVerification === "verified" ? "secondary" : "outline"}
+                >
+                  {item.leadVerification}
+                </Badge>
                 {item.verifiedCount > 0 ? (
                   <Badge variant="secondary">{item.verifiedCount} verified</Badge>
                 ) : null}
@@ -788,13 +793,23 @@ function RootCauseQueueCard({
                   <Badge variant="outline">{item.inferredCount} inferred</Badge>
                 ) : null}
               </div>
-              <p className="mt-3 text-sm leading-7 text-slate-700">{item.symptom}</p>
-              <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
-                Recommended surface
+              <p className="mt-3 text-sm font-semibold text-slate-900">
+                Lead issue: {item.leadFindingTitle}
               </p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                {item.recommendedSurface}
-              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <DetailPanel label="Symptom" value={item.symptom} />
+                <DetailPanel label="Root Cause" value={item.rootCause} />
+                <DetailPanel label="Next Move" value={item.nextMove} />
+                <DetailPanel label="Where To Change" value={item.recommendedSurface} />
+              </div>
+              <div className="mt-3 rounded-[1.2rem] border border-emerald-200 bg-emerald-50/80 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
+                  Expected impact
+                </p>
+                <p className="mt-2 text-sm leading-7 text-emerald-800">
+                  {item.expectedImpact}
+                </p>
+              </div>
             </div>
           ))
         ) : (
@@ -830,6 +845,11 @@ function ImpactQueueCard({
                 </Badge>
                 <Badge variant="outline">{item.label}</Badge>
                 <Badge variant="outline">{item.findingCount} findings</Badge>
+                <Badge
+                  variant={item.leadVerification === "verified" ? "secondary" : "outline"}
+                >
+                  {item.leadVerification}
+                </Badge>
                 {item.verifiedCount > 0 ? (
                   <Badge variant="secondary">{item.verifiedCount} verified</Badge>
                 ) : null}
@@ -837,17 +857,19 @@ function ImpactQueueCard({
                   <Badge variant="outline">{item.inferredCount} inferred</Badge>
                 ) : null}
               </div>
+              <p className="mt-3 text-sm font-semibold text-slate-900">
+                Lead issue: {item.leadFindingTitle}
+              </p>
               <p className="mt-3 text-sm leading-7 text-slate-700">{item.headline}</p>
-              <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
-                Root-cause lead
-              </p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
-                {formatRootCauseCategory(item.topRootCauseCategory)}
-              </p>
-              <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
-                Next move
-              </p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">{item.nextMove}</p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                <DetailPanel
+                  label="Root-Cause Lead"
+                  value={formatRootCauseCategory(item.topRootCauseCategory)}
+                />
+                <DetailPanel label="Next Move" value={item.nextMove} />
+                <DetailPanel label="Where To Change" value={item.recommendedSurface} />
+                <DetailPanel label="Expected Impact" value={item.expectedImpact} />
+              </div>
             </div>
           ))
         ) : (

@@ -194,8 +194,13 @@ export interface ListingDiagnosticsRootCauseSummaryItem {
   inferredCount: number;
   topPriority: ListingDiagnosticsPriority;
   primaryImpactType: ListingDiagnosticsImpactType;
+  leadFindingTitle: string;
+  leadVerification: ListingDiagnosticsVerification;
   symptom: string;
+  rootCause: string;
+  nextMove: string;
   recommendedSurface: string;
+  expectedImpact: string;
   topFindingIds: string[];
 }
 
@@ -207,8 +212,12 @@ export interface ListingDiagnosticsImpactSummaryItem {
   inferredCount: number;
   topPriority: ListingDiagnosticsPriority;
   headline: string;
+  leadFindingTitle: string;
+  leadVerification: ListingDiagnosticsVerification;
   topRootCauseCategory: ListingDiagnosticsRootCauseCategory | null;
   nextMove: string;
+  recommendedSurface: string;
+  expectedImpact: string;
   topFindingIds: string[];
 }
 
