@@ -6,6 +6,7 @@ import {
   ImagePlus,
   ListChecks,
   Radar,
+  Search,
   Sparkles,
   Video,
 } from "lucide-react";
@@ -31,6 +32,16 @@ const modules = [
     status: "Live",
     icon: ListChecks,
     accent: "from-sky-200 via-cyan-100 to-white",
+  },
+  {
+    href: "/listing-diagnostics",
+    title: "Listing Diagnostics",
+    subtitle: "Root cause drilldown and operator-grade action plans",
+    description:
+      "Diagnose BUYABLE and DISCOVERABLE blockers with deterministic findings, verified vs inferred evidence, and ranked next actions for operators.",
+    status: "Live",
+    icon: Search,
+    accent: "from-rose-200 via-orange-100 to-white",
   },
   {
     href: "/legacy-copy-diagnosis",
@@ -96,10 +107,7 @@ export default function Home() {
             const Icon = module.icon;
 
             return (
-              <article
-                key={module.href}
-                className="glass-panel overflow-hidden"
-              >
+              <article key={module.href} className="glass-panel overflow-hidden">
                 <div className={`bg-gradient-to-br ${module.accent} p-6`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="inline-flex h-14 w-14 items-center justify-center rounded-[1.4rem] bg-slate-950 text-white">
@@ -119,7 +127,7 @@ export default function Home() {
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between px-6 py-5">
+                <div className="flex items-center justify-between gap-4 px-6 py-5">
                   <div>
                     <p className="text-sm font-medium text-slate-900">
                       Designed to merge back into the main portal cleanly
