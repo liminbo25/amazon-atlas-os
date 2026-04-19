@@ -13,14 +13,18 @@ import {
   type ListingDiagnosticsActionPlanSection,
   type ListingDiagnosticsEvidenceRow,
 } from "@/lib/listing-diagnostics/reporting";
-import { formatRootCauseCategory } from "@/lib/listing-diagnostics/rules/shared";
+import {
+  formatDimensionLabel,
+  formatImpactType,
+  formatRootCauseCategory,
+} from "@/lib/listing-diagnostics/rules/shared";
 
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const JSON_MIME = "application/json;charset=utf-8";
-const EXPORT_SCHEMA_VERSION = "listing-diagnostics.report.v1";
+const EXPORT_SCHEMA_VERSION = "listing-diagnostics.report.v2";
 
 type DocxModule = typeof import("docx");
 type SheetRow = Record<string, string | number>;
@@ -38,6 +42,8 @@ export interface ListingDiagnosticsExportPayload {
   overallScore: number;
   confidence: number;
   scoreBreakdown: ListingDiagnosticsResult["dimensions"];
+  rootCauseSummary: ListingDiagnosticsResult["rootCauseSummary"];
+  impactSummary: ListingDiagnosticsResult["impactSummary"];
   sourceCoverage: ListingDiagnosticsSourceCoverageItem[];
   findings: ListingDiagnosticsFinding[];
   actionPlan: ListingDiagnosticsActionPlanItem[];
@@ -67,6 +73,8 @@ export function buildListingDiagnosticsExportPayload(
     overallScore: result.overallScore,
     confidence: result.confidence,
     scoreBreakdown: result.dimensions,
+    rootCauseSummary: result.rootCauseSummary,
+    impactSummary: result.impactSummary,
     sourceCoverage: result.sourceCoverage,
     findings: result.findings,
     actionPlan,
@@ -149,6 +157,11 @@ export async function exportListingDiagnosticsReportDocx(
         ]
       : []),
     new Paragraph({
+      text: "Operator Queue",
+      heading: HeadingLevel.HEADING_1,
+    }),
+    ...buildOperatorQueueParagraphs(docx, payload),
+    new Paragraph({
       text: "Score Breakdown",
       heading: HeadingLevel.HEADING_1,
     }),
@@ -217,6 +230,16 @@ export async function exportListingDiagnosticsWorkbookXlsx(
     workbook,
     XLSX.utils.json_to_sheet(buildScoreBreakdownRows(payload)),
     "ScoreBreakdown"
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(buildRootCauseSummaryRows(payload)),
+    "RootCauseQueue"
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(buildImpactSummaryRows(payload)),
+    "ImpactQueue"
   );
   XLSX.utils.book_append_sheet(
     workbook,
@@ -315,6 +338,72 @@ function buildScoreBreakdownParagraphs(
   ]);
 }
 
+function buildOperatorQueueParagraphs(
+  docx: DocxModule,
+  payload: ListingDiagnosticsExportPayload
+) {
+  const { HeadingLevel, Paragraph } = docx;
+  const rootCauseParagraphs =
+    payload.rootCauseSummary.length > 0
+      ? payload.rootCauseSummary.flatMap((item) => [
+          new Paragraph({
+            text: `${item.label} (${item.findingCount})`,
+            heading: HeadingLevel.HEADING_2,
+          }),
+          createLabelParagraph(
+            docx,
+            "Priority / Impact",
+            `${item.topPriority} / ${formatImpactType(item.primaryImpactType)}`
+          ),
+          createLabelParagraph(
+            docx,
+            "Verified / Inferred",
+            `${item.verifiedCount} / ${item.inferredCount}`
+          ),
+          createLabelParagraph(docx, "Symptom", item.symptom),
+          createLabelParagraph(
+            docx,
+            "Recommended surface",
+            item.recommendedSurface
+          ),
+        ])
+      : [new Paragraph("No root-cause queue is available.")];
+  const impactParagraphs =
+    payload.impactSummary.length > 0
+      ? payload.impactSummary.flatMap((item) => [
+          new Paragraph({
+            text: item.label,
+            heading: HeadingLevel.HEADING_2,
+          }),
+          createLabelParagraph(
+            docx,
+            "Priority / Findings",
+            `${item.topPriority} / ${item.findingCount}`
+          ),
+          createLabelParagraph(
+            docx,
+            "Verified / Inferred",
+            `${item.verifiedCount} / ${item.inferredCount}`
+          ),
+          createLabelParagraph(docx, "Headline", item.headline),
+          createLabelParagraph(docx, "Next move", item.nextMove),
+        ])
+      : [new Paragraph("No impact queue is available.")];
+
+  return [
+    new Paragraph({
+      text: "Root-cause queue",
+      heading: HeadingLevel.HEADING_2,
+    }),
+    ...rootCauseParagraphs,
+    new Paragraph({
+      text: "Business impact queue",
+      heading: HeadingLevel.HEADING_2,
+    }),
+    ...impactParagraphs,
+  ];
+}
+
 function buildSourceCoverageParagraphs(
   docx: DocxModule,
   payload: ListingDiagnosticsExportPayload
@@ -363,11 +452,15 @@ function buildFindingParagraphs(
       text: finding.title,
       heading: HeadingLevel.HEADING_2,
     }),
-    createLabelParagraph(docx, "Priority / Impact", `${finding.priority} / ${finding.impactType}`),
+    createLabelParagraph(
+      docx,
+      "Priority / Impact",
+      `${finding.priority} / ${formatImpactType(finding.impactType)}`
+    ),
     createLabelParagraph(
       docx,
       "Severity / Dimension / Verification",
-      `${finding.severity} / ${finding.dimensionId} / ${finding.verification}`
+      `${finding.severity} / ${formatDimensionLabel(finding.dimensionId)} / ${finding.verification}`
     ),
     createLabelParagraph(
       docx,
@@ -526,6 +619,8 @@ function buildEvidenceParagraphs(
 function buildSummaryRows(payload: ListingDiagnosticsExportPayload) {
   const p0Count = payload.findings.filter((finding) => finding.priority === "P0").length;
   const p1Count = payload.findings.filter((finding) => finding.priority === "P1").length;
+  const topRootCause = payload.rootCauseSummary[0];
+  const topImpact = payload.impactSummary[0];
 
   return [
     { item: "schemaVersion", value: payload.schemaVersion },
@@ -549,6 +644,8 @@ function buildSummaryRows(payload: ListingDiagnosticsExportPayload) {
     { item: "actionPlanCount", value: payload.actionPlan.length },
     { item: "p0FindingCount", value: p0Count },
     { item: "p1FindingCount", value: p1Count },
+    { item: "topRootCause", value: topRootCause?.label ?? "" },
+    { item: "topImpact", value: topImpact?.label ?? "" },
   ];
 }
 
@@ -563,6 +660,60 @@ function buildScoreBreakdownRows(payload: ListingDiagnosticsExportPayload) {
     inferred: dimension.inferred ? "Yes" : "No",
     summary: dimension.summary,
   }));
+}
+
+function buildRootCauseSummaryRows(payload: ListingDiagnosticsExportPayload) {
+  return ensureRows(
+    payload.rootCauseSummary.map((item) => ({
+      category: item.label,
+      findingCount: item.findingCount,
+      topPriority: item.topPriority,
+      primaryImpactType: formatImpactType(item.primaryImpactType),
+      verifiedCount: item.verifiedCount,
+      inferredCount: item.inferredCount,
+      symptom: item.symptom,
+      recommendedSurface: item.recommendedSurface,
+      topFindingIds: item.topFindingIds.join(", "),
+    })),
+    {
+      category: "No root-cause queue",
+      findingCount: "",
+      topPriority: "",
+      primaryImpactType: "",
+      verifiedCount: "",
+      inferredCount: "",
+      symptom: "",
+      recommendedSurface: "",
+      topFindingIds: "",
+    }
+  );
+}
+
+function buildImpactSummaryRows(payload: ListingDiagnosticsExportPayload) {
+  return ensureRows(
+    payload.impactSummary.map((item) => ({
+      impactType: item.label,
+      findingCount: item.findingCount,
+      topPriority: item.topPriority,
+      verifiedCount: item.verifiedCount,
+      inferredCount: item.inferredCount,
+      topRootCauseCategory: formatRootCauseCategory(item.topRootCauseCategory),
+      headline: item.headline,
+      nextMove: item.nextMove,
+      topFindingIds: item.topFindingIds.join(", "),
+    })),
+    {
+      impactType: "No impact queue",
+      findingCount: "",
+      topPriority: "",
+      verifiedCount: "",
+      inferredCount: "",
+      topRootCauseCategory: "",
+      headline: "",
+      nextMove: "",
+      topFindingIds: "",
+    }
+  );
 }
 
 function buildSourceCoverageRows(payload: ListingDiagnosticsExportPayload) {
@@ -590,7 +741,7 @@ function buildFindingsRows(payload: ListingDiagnosticsExportPayload) {
       id: finding.id,
       title: finding.title,
       priority: finding.priority,
-      impactType: finding.impactType,
+      impactType: formatImpactType(finding.impactType),
       severity: finding.severity,
       tone: finding.tone,
       dimensionId: finding.dimensionId,

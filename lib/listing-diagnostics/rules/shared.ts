@@ -373,6 +373,40 @@ export function getVerificationRank(
   }
 }
 
+export function formatImpactType(
+  impactType: ListingDiagnosticsImpactType
+): string {
+  switch (impactType) {
+    case "visibility":
+      return "Visibility";
+    case "click":
+      return "Click";
+    case "conversion":
+      return "Conversion";
+    case "buyability":
+      return "Buyability";
+    case "compliance":
+      return "Compliance";
+  }
+}
+
+export function formatDimensionLabel(dimensionId: string): string {
+  switch (dimensionId) {
+    case "content-coverage":
+      return "Content coverage";
+    case "keyword-opportunity":
+      return "Keyword opportunity";
+    case "review-signal":
+      return "Review signal";
+    case "listing-health":
+      return "Buyability & discoverability";
+    case "market-position":
+      return "Market position";
+    default:
+      return dimensionId.replace(/-/g, " ");
+  }
+}
+
 export function formatRootCauseCategory(
   category: ListingDiagnosticsRootCauseCategory | null
 ): string {

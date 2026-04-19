@@ -186,6 +186,32 @@ export interface ListingDiagnosticsActionPlanItem {
   linkedFindingIds: string[];
 }
 
+export interface ListingDiagnosticsRootCauseSummaryItem {
+  category: ListingDiagnosticsRootCauseCategory | null;
+  label: string;
+  findingCount: number;
+  verifiedCount: number;
+  inferredCount: number;
+  topPriority: ListingDiagnosticsPriority;
+  primaryImpactType: ListingDiagnosticsImpactType;
+  symptom: string;
+  recommendedSurface: string;
+  topFindingIds: string[];
+}
+
+export interface ListingDiagnosticsImpactSummaryItem {
+  impactType: ListingDiagnosticsImpactType;
+  label: string;
+  findingCount: number;
+  verifiedCount: number;
+  inferredCount: number;
+  topPriority: ListingDiagnosticsPriority;
+  headline: string;
+  topRootCauseCategory: ListingDiagnosticsRootCauseCategory | null;
+  nextMove: string;
+  topFindingIds: string[];
+}
+
 export interface ListingDiagnosticsResult {
   generatedAt: string;
   request: ListingDiagnosticsRequest;
@@ -197,6 +223,8 @@ export interface ListingDiagnosticsResult {
   dimensions: ListingDiagnosticsDimensionScore[];
   findings: ListingDiagnosticsFinding[];
   actionPlan: ListingDiagnosticsActionPlanItem[];
+  rootCauseSummary: ListingDiagnosticsRootCauseSummaryItem[];
+  impactSummary: ListingDiagnosticsImpactSummaryItem[];
   sourceCoverage: ListingDiagnosticsSourceCoverageItem[];
   warnings: string[];
   target: ListingDiagnosticsEntitySnapshot;

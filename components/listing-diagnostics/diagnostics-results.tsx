@@ -29,11 +29,17 @@ import {
   type ListingDiagnosticsActionPlanSection,
   type ListingDiagnosticsEvidenceRow,
 } from "@/lib/listing-diagnostics/reporting";
-import { formatRootCauseCategory } from "@/lib/listing-diagnostics/rules/shared";
+import {
+  formatDimensionLabel,
+  formatImpactType,
+  formatRootCauseCategory,
+} from "@/lib/listing-diagnostics/rules/shared";
 import type {
   ListingDiagnosticsActionPlanItem,
   ListingDiagnosticsFinding,
+  ListingDiagnosticsImpactSummaryItem,
   ListingDiagnosticsResult,
+  ListingDiagnosticsRootCauseSummaryItem,
   ListingDiagnosticsSourceCoverageItem,
   ListingDiagnosticsStatus,
 } from "@/lib/listing-diagnostics/types";
@@ -262,6 +268,11 @@ export function DiagnosticsResults({
                 value={`P0 ${priorityCounts.P0} / P1 ${priorityCounts.P1}`}
                 icon={<AlertTriangle className="h-4 w-4" />}
               />
+            </div>
+
+            <div className="grid gap-4 xl:grid-cols-2">
+              <RootCauseQueueCard items={visibleResult.rootCauseSummary} />
+              <ImpactQueueCard items={visibleResult.impactSummary} />
             </div>
 
             {visibleResult.spApiVerification?.enabled ? (
@@ -528,8 +539,8 @@ function FindingCard({
             {finding.priority}
           </Badge>
           <Badge variant="outline">{finding.severity}</Badge>
-          <Badge variant="outline">{finding.impactType}</Badge>
-          <Badge variant="outline">{finding.dimensionId}</Badge>
+          <Badge variant="outline">{formatImpactType(finding.impactType)}</Badge>
+          <Badge variant="outline">{formatDimensionLabel(finding.dimensionId)}</Badge>
           <Badge variant="outline">
             {formatRootCauseCategory(finding.rootCauseCategory)}
           </Badge>
@@ -743,6 +754,109 @@ function EvidenceTableRow({ row }: { row: ListingDiagnosticsEvidenceRow }) {
         {row.evidence}
       </TableCell>
     </TableRow>
+  );
+}
+
+function RootCauseQueueCard({
+  items,
+}: {
+  items: ListingDiagnosticsRootCauseSummaryItem[];
+}) {
+  return (
+    <Card className="border-slate-200/80 bg-white/90">
+      <CardHeader className="border-b border-slate-200/80">
+        <CardTitle className="text-xl text-slate-950">Root-cause queue</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-6">
+        {items.length > 0 ? (
+          items.slice(0, 4).map((item) => (
+            <div
+              key={item.label}
+              className="rounded-[1.4rem] border border-slate-200 bg-slate-50/70 p-4"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={item.topPriority === "P0" ? "destructive" : "outline"}>
+                  {item.topPriority}
+                </Badge>
+                <Badge variant="outline">{item.label}</Badge>
+                <Badge variant="outline">{formatImpactType(item.primaryImpactType)}</Badge>
+                <Badge variant="outline">{item.findingCount} findings</Badge>
+                {item.verifiedCount > 0 ? (
+                  <Badge variant="secondary">{item.verifiedCount} verified</Badge>
+                ) : null}
+                {item.inferredCount > 0 ? (
+                  <Badge variant="outline">{item.inferredCount} inferred</Badge>
+                ) : null}
+              </div>
+              <p className="mt-3 text-sm leading-7 text-slate-700">{item.symptom}</p>
+              <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
+                Recommended surface
+              </p>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                {item.recommendedSurface}
+              </p>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm leading-7 text-slate-500">
+            No root-cause queue is available for this run.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ImpactQueueCard({
+  items,
+}: {
+  items: ListingDiagnosticsImpactSummaryItem[];
+}) {
+  return (
+    <Card className="border-slate-200/80 bg-white/90">
+      <CardHeader className="border-b border-slate-200/80">
+        <CardTitle className="text-xl text-slate-950">Business impact queue</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4 pt-6">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <div
+              key={item.impactType}
+              className="rounded-[1.4rem] border border-slate-200 bg-slate-50/70 p-4"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant={item.topPriority === "P0" ? "destructive" : "outline"}>
+                  {item.topPriority}
+                </Badge>
+                <Badge variant="outline">{item.label}</Badge>
+                <Badge variant="outline">{item.findingCount} findings</Badge>
+                {item.verifiedCount > 0 ? (
+                  <Badge variant="secondary">{item.verifiedCount} verified</Badge>
+                ) : null}
+                {item.inferredCount > 0 ? (
+                  <Badge variant="outline">{item.inferredCount} inferred</Badge>
+                ) : null}
+              </div>
+              <p className="mt-3 text-sm leading-7 text-slate-700">{item.headline}</p>
+              <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
+                Root-cause lead
+              </p>
+              <p className="mt-2 text-sm leading-7 text-slate-600">
+                {formatRootCauseCategory(item.topRootCauseCategory)}
+              </p>
+              <p className="mt-2 text-xs uppercase tracking-[0.22em] text-slate-400">
+                Next move
+              </p>
+              <p className="mt-2 text-sm leading-7 text-slate-600">{item.nextMove}</p>
+            </div>
+          ))
+        ) : (
+          <p className="text-sm leading-7 text-slate-500">
+            No business impact queue is available for this run.
+          </p>
+        )}
+      </CardContent>
+    </Card>
   );
 }
 

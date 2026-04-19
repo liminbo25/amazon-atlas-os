@@ -5,6 +5,7 @@ import type {
   ListingDiagnosticsResult,
   ListingDiagnosticsSourceCoverageItem,
 } from "@/lib/listing-diagnostics/types";
+import { getVerificationRank } from "@/lib/listing-diagnostics/rules/shared";
 
 export interface ListingDiagnosticsActionPlanSection {
   id: ListingDiagnosticsActionPriority;
@@ -71,6 +72,16 @@ export function sortActionPlanByPriority(
   return [...items].sort((left, right) => {
     if (priorityRank[left.priority] !== priorityRank[right.priority]) {
       return priorityRank[left.priority] - priorityRank[right.priority];
+    }
+
+    if (
+      getVerificationRank(left.verification) !==
+      getVerificationRank(right.verification)
+    ) {
+      return (
+        getVerificationRank(left.verification) -
+        getVerificationRank(right.verification)
+      );
     }
 
     return right.confidence - left.confidence;
@@ -246,17 +257,4 @@ function resolveEvidenceSourceLabel(
   }
 
   return finding.inferred ? "Derived benchmark" : "SellerSprite MCP";
-}
-
-function getVerificationRank(
-  verification: ListingDiagnosticsEvidenceRow["verification"]
-): number {
-  switch (verification) {
-    case "verified":
-      return 0;
-    case "direct":
-      return 1;
-    case "inferred":
-      return 2;
-  }
 }

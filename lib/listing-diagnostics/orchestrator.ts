@@ -12,6 +12,8 @@ import {
   getVerificationRank,
   hasAnyEntitySignal,
   hasMeaningfulListingSnapshot,
+  formatImpactType,
+  formatRootCauseCategory,
   safeDivide,
   uniqueKeywords,
 } from "@/lib/listing-diagnostics/rules/shared";
@@ -20,9 +22,11 @@ import type {
   ListingDiagnosticsBenchmark,
   ListingDiagnosticsEntitySnapshot,
   ListingDiagnosticsFinding,
+  ListingDiagnosticsImpactSummaryItem,
   ListingDiagnosticsRequest,
   ListingDiagnosticsResult,
   ListingDiagnosticsRuleResult,
+  ListingDiagnosticsRootCauseSummaryItem,
   ListingDiagnosticsSourceCoverageItem,
   ListingDiagnosticsStatus,
 } from "@/lib/listing-diagnostics/types";
@@ -119,6 +123,8 @@ export async function runListingDiagnostics(
     ])
   ).slice(0, 6);
   const dimensions = ruleResults.map((result) => result.dimension);
+  const rootCauseSummary = buildRootCauseSummary(findings);
+  const impactSummary = buildImpactSummary(findings);
 
   const computedOverallScore = Math.round(
     dimensions.reduce((total, dimension) => total + dimension.score * dimension.weight, 0) /
@@ -191,11 +197,14 @@ export async function runListingDiagnostics(
       dimensions,
       findings,
       status,
-      spApiEnhancement?.summary.verifiedFindingIds.length ?? 0
+      spApiEnhancement?.summary.verifiedFindingIds.length ?? 0,
+      rootCauseSummary[0]?.label ?? null
     ),
     dimensions,
     findings,
     actionPlan,
+    rootCauseSummary,
+    impactSummary,
     sourceCoverage: combinedSourceCoverage,
     warnings: Array.from(new Set(warnings)),
     target,
@@ -516,7 +525,8 @@ function buildSummary(
   dimensions: ListingDiagnosticsResult["dimensions"],
   findings: ListingDiagnosticsFinding[],
   status: ListingDiagnosticsStatus,
-  verifiedFindingCount = 0
+  verifiedFindingCount = 0,
+  leadingRootCauseLabel: string | null = null
 ): string {
   const strongest = [...dimensions].sort((left, right) => right.score - left.score)[0];
   const weakest = [...dimensions].sort((left, right) => left.score - right.score)[0];
@@ -531,8 +541,121 @@ function buildSummary(
       : "";
   const p0Count = findings.filter((finding) => finding.priority === "P0").length;
   const p1Count = findings.filter((finding) => finding.priority === "P1").length;
+  const rootCauseSentence = leadingRootCauseLabel
+    ? ` The current root-cause queue is led by ${leadingRootCauseLabel}.`
+    : "";
 
-  return `${strongest.label} is currently the strongest dimension, while ${weakest.label} needs the most attention. ${findings.length} findings were generated in this ${status} run, including ${p0Count} P0 and ${p1Count} P1 priorities.${verificationSentence}`;
+  return `${strongest.label} is currently the strongest dimension, while ${weakest.label} needs the most attention. ${findings.length} findings were generated in this ${status} run, including ${p0Count} P0 and ${p1Count} P1 priorities.${rootCauseSentence}${verificationSentence}`;
+}
+
+function buildRootCauseSummary(
+  findings: ListingDiagnosticsFinding[]
+): ListingDiagnosticsRootCauseSummaryItem[] {
+  const grouped = new Map<string, ListingDiagnosticsFinding[]>();
+
+  for (const finding of findings) {
+    const key = finding.rootCauseCategory ?? "general";
+    const next = grouped.get(key) ?? [];
+    next.push(finding);
+    grouped.set(key, next);
+  }
+
+  return Array.from(grouped.entries())
+    .map(([key, group]) => {
+      const sortedGroup = sortFindings(group);
+      const leader = sortedGroup[0];
+
+      return {
+        category: key === "general" ? null : leader.rootCauseCategory,
+        label: formatRootCauseCategory(
+          key === "general" ? null : leader.rootCauseCategory
+        ),
+        findingCount: group.length,
+        verifiedCount: group.filter((finding) => finding.verification === "verified")
+          .length,
+        inferredCount: group.filter((finding) => finding.verification === "inferred")
+          .length,
+        topPriority: leader.priority,
+        primaryImpactType: leader.impactType,
+        symptom: leader.symptom,
+        recommendedSurface: leader.whereToChange,
+        topFindingIds: sortedGroup.slice(0, 3).map((finding) => finding.id),
+      };
+    })
+    .sort((left, right) => {
+      if (getPriorityRank(left.topPriority) !== getPriorityRank(right.topPriority)) {
+        return getPriorityRank(left.topPriority) - getPriorityRank(right.topPriority);
+      }
+
+      if (
+        getImpactRank(left.primaryImpactType) !==
+        getImpactRank(right.primaryImpactType)
+      ) {
+        return (
+          getImpactRank(left.primaryImpactType) -
+          getImpactRank(right.primaryImpactType)
+        );
+      }
+
+      return right.findingCount - left.findingCount;
+    });
+}
+
+function buildImpactSummary(
+  findings: ListingDiagnosticsFinding[]
+): ListingDiagnosticsImpactSummaryItem[] {
+  const grouped = new Map<
+    ListingDiagnosticsFinding["impactType"],
+    ListingDiagnosticsFinding[]
+  >();
+
+  for (const finding of findings) {
+    const next = grouped.get(finding.impactType) ?? [];
+    next.push(finding);
+    grouped.set(finding.impactType, next);
+  }
+
+  return Array.from(grouped.entries())
+    .map(([impactType, group]) => {
+      const sortedGroup = sortFindings(group);
+      const leader = sortedGroup[0];
+      const verifiedCount = group.filter(
+        (finding) => finding.verification === "verified"
+      ).length;
+      const inferredCount = group.filter(
+        (finding) => finding.verification === "inferred"
+      ).length;
+      const verificationHeadline =
+        verifiedCount > 0
+          ? `${verifiedCount} verified`
+          : inferredCount > 0
+            ? `${inferredCount} inferred`
+            : "direct";
+
+      return {
+        impactType,
+        label: formatImpactType(impactType),
+        findingCount: group.length,
+        verifiedCount,
+        inferredCount,
+        topPriority: leader.priority,
+        headline: `${group.length} finding(s) are pressing on ${formatImpactType(impactType).toLowerCase()}, led by ${verificationHeadline} signal(s).`,
+        topRootCauseCategory: leader.rootCauseCategory,
+        nextMove: leader.whatToChange,
+        topFindingIds: sortedGroup.slice(0, 3).map((finding) => finding.id),
+      };
+    })
+    .sort((left, right) => {
+      if (getPriorityRank(left.topPriority) !== getPriorityRank(right.topPriority)) {
+        return getPriorityRank(left.topPriority) - getPriorityRank(right.topPriority);
+      }
+
+      if (getImpactRank(left.impactType) !== getImpactRank(right.impactType)) {
+        return getImpactRank(left.impactType) - getImpactRank(right.impactType);
+      }
+
+      return right.findingCount - left.findingCount;
+    });
 }
 
 function dedupeById<T extends { id: string }>(items: T[]): T[] {
