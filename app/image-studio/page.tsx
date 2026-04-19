@@ -8,6 +8,13 @@ import MultiImageUploader from "@/components/image-studio/MultiImageUploader";
 import { StudioHeader } from "@/components/portal/studio-header";
 
 type AsyncStatus = "idle" | "processing" | "success" | "error";
+type TryOnProvider = "gemini" | "fashn";
+type TryOnProviderStatus =
+  | "starting"
+  | "in_queue"
+  | "processing"
+  | "completed"
+  | "failed";
 type GenerationMode =
   | "multi-clothing-single-model"
   | "single-clothing-multi-model"
@@ -33,7 +40,8 @@ interface ImageTaskState {
   image?: string;
   error: string | null;
   retryCount: number;
-  format?: UpscaleOutputFormat;
+  format?: string;
+  detail?: string | null;
 }
 
 interface ImageGenerationTask {
@@ -62,6 +70,14 @@ interface ImageApiResponse {
   result?: string;
   error?: string;
   configured?: boolean;
+  provider?: string;
+  fallbackProvider?: string;
+  jobId?: string;
+  status?: string;
+  model?: string;
+  generationMode?: string;
+  resolution?: string;
+  outputFormat?: string;
 }
 
 interface UpscaleSettings {
@@ -151,12 +167,15 @@ const quickNotes = [
 const formatOptions: UpscaleOutputFormat[] = ["jpg", "png", "webp"];
 
 let taskSequence = 0;
+const FASHN_POLL_INTERVAL_MS = 2500;
+const FASHN_MAX_POLL_ATTEMPTS = 90;
 
 function createTaskState(overrides: Partial<ImageTaskState> = {}): ImageTaskState {
   return {
     status: "idle",
     error: null,
     retryCount: 0,
+    detail: null,
     ...overrides,
   };
 }
@@ -231,6 +250,68 @@ function describeUpscaleSettings(settings: UpscaleSettings) {
   return `${scaleLabel} / ${settings.outputFormat.toUpperCase()} / 质量 ${
     settings.outputQuality
   }${enhancements ? ` / ${enhancements}` : ""}`;
+}
+
+function sleep(delayMs: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, delayMs));
+}
+
+function inferImageFormatFromSource(source?: string) {
+  if (!source) {
+    return undefined;
+  }
+
+  const normalized = source.toLowerCase();
+
+  if (normalized.startsWith("data:image/")) {
+    const mediaType = normalized.slice("data:image/".length).split(/[;,]/)[0];
+    return mediaType || undefined;
+  }
+
+  const withoutQuery = normalized.split("?")[0]?.split("#")[0] || normalized;
+
+  if (withoutQuery.endsWith(".png")) {
+    return "png";
+  }
+
+  if (withoutQuery.endsWith(".webp")) {
+    return "webp";
+  }
+
+  if (withoutQuery.endsWith(".jpeg")) {
+    return "jpeg";
+  }
+
+  if (withoutQuery.endsWith(".jpg")) {
+    return "jpg";
+  }
+
+  return undefined;
+}
+
+function normalizeDownloadExtension(format?: string) {
+  if (!format) {
+    return "png";
+  }
+
+  return format === "jpeg" ? "jpg" : format;
+}
+
+function describeTryOnProviderStatus(status?: string) {
+  switch (status as TryOnProviderStatus) {
+    case "starting":
+      return "FASHN 已接收任务，正在准备排队。";
+    case "in_queue":
+      return "FASHN 队列中，正在等待开始生成。";
+    case "processing":
+      return "FASHN 正在生成换装结果，请稍候。";
+    case "completed":
+      return "FASHN 已完成，正在同步结果。";
+    case "failed":
+      return "FASHN 任务失败。";
+    default:
+      return "正在处理换装任务。";
+  }
 }
 
 function normalizeClientError(error: unknown, fallback: string) {
@@ -533,6 +614,10 @@ export default function ImageStudioPage() {
   const [processedTasks, setProcessedTasks] = useState<ImageGenerationTask[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<PreviewState | null>(null);
+  const [isTryOnConfigured, setIsTryOnConfigured] = useState<boolean | null>(null);
+  const [tryOnProvider, setTryOnProvider] = useState<TryOnProvider>("gemini");
+  const [tryOnConfigMessage, setTryOnConfigMessage] = useState<string | null>(null);
+  const [tryOnConfigSummary, setTryOnConfigSummary] = useState<string | null>(null);
   const [isUpscaleConfigured, setIsUpscaleConfigured] = useState<boolean | null>(
     null
   );
@@ -595,6 +680,56 @@ export default function ImageStudioPage() {
     );
     setError(null);
   }, [selectedModeOption.clothingMaxImages, selectedModeOption.modelMaxImages]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadTryOnConfig = async () => {
+      try {
+        const response = await fetch("/api/fashn/tryon", {
+          method: "GET",
+          signal: controller.signal,
+        });
+        const data = (await response.json()) as ImageApiResponse;
+
+        if (!response.ok || data.success !== true) {
+          throw new Error("无法读取 FASHN 配置状态。");
+        }
+
+        const configured = Boolean(data.configured);
+        setIsTryOnConfigured(configured);
+        setTryOnProvider(configured ? "fashn" : "gemini");
+        setTryOnConfigSummary(
+          data.model && data.generationMode && data.resolution && data.outputFormat
+            ? `${data.model} / ${data.generationMode} / ${data.resolution} / ${data.outputFormat}`
+            : null
+        );
+        setTryOnConfigMessage(
+          configured
+            ? "FASHN Try-On Max 已就绪，换装会改走异步任务轮询。"
+            : "FASHN 还没配置，当前换装会继续使用 Gemini。"
+        );
+      } catch (configError) {
+        if (controller.signal.aborted) {
+          return;
+        }
+
+        setIsTryOnConfigured(false);
+        setTryOnProvider("gemini");
+        setTryOnConfigSummary(null);
+        setTryOnConfigMessage(
+          normalizeClientError(
+            configError,
+            "暂时无法验证 FASHN 配置，当前先继续使用 Gemini。"
+          )
+        );
+      }
+    };
+
+    void loadTryOnConfig();
+
+    return () => controller.abort();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -678,6 +813,12 @@ export default function ImageStudioPage() {
   const enhancementSummary = describeUpscaleSettings(upscaleSettings);
   const resultMode = processedTasks[0]?.mode;
   const resultModeLabel = resultMode ? getGenerationModeLabel(resultMode) : null;
+  const tryOnBackendReady = isTryOnConfigured === true;
+  const tryOnBackendLabel =
+    tryOnProvider === "fashn" ? "FASHN Try-On Max" : "Gemini";
+  const tryOnBackendSummary =
+    tryOnConfigSummary ||
+    (tryOnBackendReady ? "tryon-max / quality / 2k / png" : "当前仍走旧换装链路");
 
   function replaceProcessedTasks(nextTasks: ImageGenerationTask[]) {
     processedTasksRef.current = nextTasks;
@@ -792,11 +933,115 @@ export default function ImageStudioPage() {
     return data.result;
   }
 
-  async function requestTryOnImage(
+  async function createFashnTryOnJob(
     clothingImage: string,
     modelImage: string,
     garmentNote: string
   ) {
+    const response = await fetch("/api/fashn/tryon", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        clothingImage,
+        modelImage,
+        garmentNote,
+      }),
+    });
+
+    const responseText = await response.text();
+    let data: ImageApiResponse | null = null;
+
+    if (responseText) {
+      try {
+        data = JSON.parse(responseText) as ImageApiResponse;
+      } catch {
+        data = null;
+      }
+    }
+
+    if (!response.ok || data?.success !== true || !data.jobId) {
+      throw new Error(
+        data?.error || responseText || "FASHN 鎹㈣浠诲姟鍒涘缓澶辫触銆?"
+      );
+    }
+
+    return data;
+  }
+
+  async function pollFashnTryOnJob(
+    jobId: string,
+    onProgress?: (detail: string) => void
+  ) {
+    for (let attempt = 0; attempt < FASHN_MAX_POLL_ATTEMPTS; attempt += 1) {
+      if (attempt > 0) {
+        await sleep(FASHN_POLL_INTERVAL_MS);
+      }
+
+      const response = await fetch(`/api/fashn/tryon/${encodeURIComponent(jobId)}`, {
+        method: "GET",
+      });
+      const responseText = await response.text();
+      let data: ImageApiResponse | null = null;
+
+      if (responseText) {
+        try {
+          data = JSON.parse(responseText) as ImageApiResponse;
+        } catch {
+          data = null;
+        }
+      }
+
+      if (!response.ok || data?.success !== true) {
+        throw new Error(
+          data?.error || responseText || "FASHN 鎹㈣鐘舵€佽疆璇㈠け璐ャ€?"
+        );
+      }
+
+      const providerStatus = data.status as TryOnProviderStatus | undefined;
+      onProgress?.(describeTryOnProviderStatus(providerStatus));
+
+      if (providerStatus === "completed") {
+        if (!data.result) {
+          throw new Error("FASHN 宸插畬鎴愶紝浣嗘病鏈夎繑鍥炲浘鐗囩粨鏋溿€?");
+        }
+
+        return {
+          result: data.result,
+          format:
+            data.outputFormat ||
+            inferImageFormatFromSource(data.result) ||
+            "png",
+        };
+      }
+
+      if (providerStatus === "failed") {
+        throw new Error(data.error || "FASHN 鎹㈣浠诲姟澶辫触銆?");
+      }
+    }
+
+    throw new Error("FASHN 鎹㈣瓒呮椂锛岃绋嶅悗鍐嶆煡鐪嬨€?");
+  }
+
+  async function requestTryOnImage(
+    clothingImage: string,
+    modelImage: string,
+    garmentNote: string,
+    onProgress?: (detail: string) => void
+  ) {
+    if (isTryOnConfigured === true) {
+      onProgress?.("正在提交 FASHN Try-On Max 任务...");
+      const job = await createFashnTryOnJob(clothingImage, modelImage, garmentNote);
+      onProgress?.(
+        describeTryOnProviderStatus(
+          (job.status as TryOnProviderStatus | undefined) || "starting"
+        )
+      );
+      return pollFashnTryOnJob(job.jobId!, onProgress);
+    }
+
+    onProgress?.("FASHN 未配置，当前继续使用 Gemini 换装。");
     const response = await fetch("/api/gemini", {
       method: "POST",
       headers: {
@@ -812,6 +1057,29 @@ export default function ImageStudioPage() {
     });
 
     return readImageResponse(response, "换装生成");
+  }
+
+  async function requestConfiguredTryOnImage(
+    clothingImage: string,
+    modelImage: string,
+    garmentNote: string,
+    onProgress?: (detail: string) => void
+  ) {
+    const result = await requestTryOnImage(
+      clothingImage,
+      modelImage,
+      garmentNote,
+      onProgress
+    );
+
+    if (typeof result === "string") {
+      return {
+        result,
+        format: inferImageFormatFromSource(result) || "png",
+      };
+    }
+
+    return result;
   }
 
   async function requestWhiteBackgroundImage(image: string) {
@@ -860,16 +1128,29 @@ export default function ImageStudioPage() {
       tryOn: createTaskState({
         status: "processing",
         retryCount: isRetry ? current.tryOn.retryCount + 1 : current.tryOn.retryCount,
+        detail:
+          isTryOnConfigured === true
+            ? "正在提交 FASHN Try-On Max 任务..."
+            : "正在提交 Gemini 换装请求...",
       }),
       whiteBackground: createTaskState(),
       enhanced: createTaskState(),
     }));
 
     try {
-      const result = await requestTryOnImage(
+      const data = await requestConfiguredTryOnImage(
         task.clothingImage,
         task.modelImage,
-        task.garmentNote
+        task.garmentNote,
+        (detail) => {
+          updateProcessedTask(index, (current) => ({
+            ...current,
+            tryOn: {
+              ...current.tryOn,
+              detail,
+            },
+          }));
+        }
       );
 
       updateProcessedTask(index, (current) => ({
@@ -877,8 +1158,10 @@ export default function ImageStudioPage() {
         tryOn: {
           ...current.tryOn,
           status: "success",
-          image: result,
+          image: data.result,
           error: null,
+          format: data.format,
+          detail: null,
         },
       }));
     } catch (requestError) {
@@ -891,6 +1174,7 @@ export default function ImageStudioPage() {
           status: "error",
           image: undefined,
           error: message,
+          detail: null,
         },
         whiteBackground: createTaskState(),
         enhanced: createTaskState(),
@@ -1408,6 +1692,7 @@ export default function ImageStudioPage() {
                   title={selectedModeOption.clothingTitle}
                   description={selectedModeOption.clothingDescription}
                   maxImages={selectedModeOption.clothingMaxImages}
+                  uploadFolder="clothing"
                   renderImageFooter={({ index }) => (
                     <div className="space-y-3">
                       <label className="block">
@@ -1445,6 +1730,7 @@ export default function ImageStudioPage() {
                   title={selectedModeOption.modelTitle}
                   description={selectedModeOption.modelDescription}
                   maxImages={selectedModeOption.modelMaxImages}
+                  uploadFolder="model"
                 />
               </article>
 
@@ -1455,6 +1741,7 @@ export default function ImageStudioPage() {
                   title="单独处理图片区"
                   description="不走换装流程，直接对现有图片单张一键换白底或变清晰。成功后会分别保留白底图和增强图。"
                   maxImages={10}
+                  uploadFolder="standalone"
                   renderImageFooter={({ image, index }) => {
                     const item = standaloneItems[index] ?? createStandaloneItem(image);
 
@@ -1591,6 +1878,50 @@ export default function ImageStudioPage() {
                     {error}
                   </div>
                 ) : null}
+              </article>
+
+              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+                <div className="flex flex-col gap-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        换装后端
+                      </p>
+                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                        {tryOnBackendLabel}
+                      </h2>
+                    </div>
+                    <span
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
+                        isTryOnConfigured === null
+                          ? "bg-slate-100 text-slate-500"
+                          : tryOnBackendReady
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-amber-100 text-amber-700"
+                      }`}
+                    >
+                      {isTryOnConfigured === null
+                        ? "检查中"
+                        : tryOnBackendReady
+                          ? "FASHN 已启用"
+                          : "Gemini 回退"}
+                    </span>
+                  </div>
+
+                  <p className="text-sm leading-6 text-slate-600">
+                    {tryOnConfigMessage || "正在检查换装后端配置。"}
+                  </p>
+
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                    当前配置：{tryOnBackendSummary}
+                  </div>
+
+                  {!tryOnBackendReady ? (
+                    <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+                      明天拿到 `FASHN_API_KEY` 后，只要填进 `.env.local` 或 Vercel 环境变量并重启，换装会自动切到 FASHN Try-On Max。
+                    </div>
+                  ) : null}
+                </div>
               </article>
 
               <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
@@ -2003,6 +2334,11 @@ export default function ImageStudioPage() {
                               本卡片已重试换装 {item.tryOn.retryCount} 次。
                             </p>
                           ) : null}
+                          {item.tryOn.status === "processing" && item.tryOn.detail ? (
+                            <p className="text-sm leading-6 text-slate-500">
+                              {item.tryOn.detail}
+                            </p>
+                          ) : null}
                         </div>
 
                         <div className="flex flex-wrap gap-2">
@@ -2066,7 +2402,11 @@ export default function ImageStudioPage() {
                               onClick={() =>
                                 void handleDownload(
                                   item.tryOn.image!,
-                                  buildTaskFilename(item, "try-on", "png")
+                                  buildTaskFilename(
+                                    item,
+                                    "try-on",
+                                    normalizeDownloadExtension(item.tryOn.format)
+                                  )
                                 )
                               }
                               className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"

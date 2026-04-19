@@ -17,13 +17,24 @@ Framework Preset 保持 `Next.js`。常用环境变量：
 - `SELLERSPRITE_SECRET_KEY`
 - `GEMINI_API_KEY`
 - `GEMINI_API_BASE_URL`
+- `FASHN_API_KEY`
+- `FASHN_API_BASE_URL`
+- `FASHN_MODEL`
+- `FASHN_GENERATION_MODE`
+- `FASHN_RESOLUTION`
+- `FASHN_OUTPUT_FORMAT`
 - `REPLICATE_API_TOKEN`
+- `BLOB_READ_WRITE_TOKEN`
 - `OPENAI_API_KEY`
 - `OPENAI_BASE_URL`
 - `OPENAI_MODEL`
 - `OPENAI_TRANSCRIBE_MODEL`
 - `VIDEO_OUTPUT_ROOT`
 - `VIDEO_MAX_UPLOAD_MB`
+
+Image Studio now uploads original images to Vercel Blob and writes generated outputs back to Blob URLs, so `BLOB_READ_WRITE_TOKEN` is required for the image module in production.
+
+If `FASHN_API_KEY` is configured, the try-on flow will switch to FASHN Try-On Max with the configured `generation mode / resolution / output format` and the frontend will poll the async task status automatically. If it is not configured yet, the page will keep falling back to the existing Gemini try-on route.
 
 `NEXT_PUBLIC_VIDEO_API_BASE_URL` 不再是默认必需项。只有临时切回旧 `video-backend/` FastAPI 服务时才设置它。
 

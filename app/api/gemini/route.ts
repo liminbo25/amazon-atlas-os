@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
+import { uploadImageSourceToBlob } from "@/lib/image-blob";
+
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type GeminiRequestType = "virtual-tryon" | "white-background" | "model-swap";
 
@@ -21,10 +25,38 @@ export interface GeminiResponse {
 const DEFAULT_API_BASE_URL = "https://ai.yijiarj.cn/v1";
 const DEFAULT_MODEL = "nano_banana_pro";
 
+function resolveApiBaseUrl(rawBaseUrl?: string) {
+  const trimmed = rawBaseUrl?.trim();
+
+  if (!trimmed) {
+    return DEFAULT_API_BASE_URL;
+  }
+
+  const normalized = trimmed.replace(/\/+$/, "");
+
+  if (/\/v\d+$/i.test(normalized)) {
+    return normalized;
+  }
+
+  return `${normalized}/v1`;
+}
+
+function resolveImageModel() {
+  return (
+    process.env.GEMINI_IMAGE_MODEL?.trim() ||
+    process.env.GEMINI_MODEL?.trim() ||
+    DEFAULT_MODEL
+  );
+}
+
 function normalizeImageForProvider(image: string) {
   const trimmed = image.trim();
 
-  if (trimmed.startsWith("data:image/")) {
+  if (
+    trimmed.startsWith("data:image/") ||
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://")
+  ) {
     return trimmed;
   }
 
@@ -98,12 +130,19 @@ async function runImageGeneration(options: {
   geminiApiKey: string;
   payload: Record<string, unknown>;
   fallbackSize?: string;
+  outputFolder: string;
 }) {
-  const { apiBaseUrl, geminiApiKey, payload, fallbackSize } = options;
+  const { apiBaseUrl, geminiApiKey, payload, fallbackSize, outputFolder } =
+    options;
 
   let apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, payload);
 
-  if (!apiResult.ok && fallbackSize && payload.size !== fallbackSize) {
+  if (
+    !apiResult.ok &&
+    fallbackSize &&
+    payload.size !== fallbackSize &&
+    shouldRetryWithFallbackSize(apiResult.responseText, apiResult.status)
+  ) {
     apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, {
       ...payload,
       size: fallbackSize,
@@ -120,7 +159,8 @@ async function runImageGeneration(options: {
   const result = extractImageFromResponse(data);
 
   if (result) {
-    return result;
+    const uploadedResult = await uploadImageSourceToBlob(result, outputFolder);
+    return uploadedResult.url;
   }
 
   if (data.error?.message) {
@@ -130,18 +170,48 @@ async function runImageGeneration(options: {
   throw new Error("接口返回中没有找到图片结果。");
 }
 
+function shouldRetryWithFallbackSize(
+  responseText: string,
+  status: number
+) {
+  if (status !== 400 && status !== 413 && status !== 422) {
+    return false;
+  }
+
+  const normalized = responseText.toLowerCase();
+  const sizeSignals = [
+    "size",
+    "resolution",
+    "dimension",
+    "dimensions",
+    "aspect ratio",
+    "unsupported_size",
+    "invalid_size",
+    "invalid size",
+    "unsupported size",
+    "image size",
+    "1024x1536",
+    "1536",
+  ];
+
+  return sizeSignals.some((signal) => normalized.includes(signal));
+}
+
 function buildVirtualTryOnPrompt(garmentNote?: string) {
   const noteText = garmentNote?.trim()
-    ? `5. ADDITIONAL GARMENT NOTE: ${garmentNote.trim()}`
+    ? `8. ADDITIONAL GARMENT NOTE: ${garmentNote.trim()}`
     : "";
 
   return `Virtual try-on task: transfer the exact clothing from image 1 onto the person in image 2.
 
 CRITICAL REQUIREMENTS:
-1. Preserve the exact garment from image 1: pattern, color, texture, logo, trim, seams, and fabric appearance must remain unchanged.
-2. Only replace the clothing area. Keep the person's face, body, pose, and scene from image 2 natural and coherent.
-3. Fit the garment realistically to the person's pose and body shape, keeping the drape, wrinkles, and proportions believable.
-4. Maintain sharp details and clean edges suitable for e-commerce usage.
+1. Preserve the exact garment from image 1 without redesigning it: pattern, color, texture, logo, trim, stitching, seams, lace motifs, mesh density, embroidery, beading, edges, and fabric appearance must remain unchanged.
+2. If the garment contains mesh, lace, tulle, sheer panels, translucent fabric, crochet, openwork, cutwork, burnout texture, or layered transparency, keep those structures exactly. Do not simplify them into plain opaque fabric.
+3. Preserve transparency and layer relationships exactly. If there is an outer sheer layer and an inner opaque lining, keep both layers visible and separate. Do not merge double-layer construction into a single flat fabric.
+4. Preserve garment geometry exactly: neckline, straps, sleeve shape, hemline, length, fit silhouette, cut lines, panel placement, and openings must stay faithful to image 1.
+5. Only replace the clothing area. Keep the person's face, body, pose, hands, legs, hair, skin tone, and scene from image 2 natural and coherent.
+6. Fit the garment realistically to the person's pose and body shape while keeping the original drape, wrinkles, tension, and material behavior. If there is any conflict, prioritize preserving garment details over inventing smoother fabric.
+7. Maintain crisp e-commerce-level detail. Do not blur, smooth out, over-beautify, overpaint, or erase fine textile detail. Do not convert lace, mesh, or net texture into chiffon, satin, silk, plastic, or generic soft fabric.
 ${noteText}
 
 OUTPUT: one high-quality realistic image.`;
@@ -180,8 +250,8 @@ export async function POST(request: NextRequest) {
     } = body;
 
     const geminiApiKey = process.env.GEMINI_API_KEY;
-    const apiBaseUrl =
-      process.env.GEMINI_API_BASE_URL || DEFAULT_API_BASE_URL;
+    const apiBaseUrl = resolveApiBaseUrl(process.env.GEMINI_API_BASE_URL);
+    const imageModel = resolveImageModel();
 
     if (!geminiApiKey) {
       return NextResponse.json(
@@ -202,7 +272,7 @@ export async function POST(request: NextRequest) {
         apiBaseUrl,
         geminiApiKey,
         payload: {
-          model: DEFAULT_MODEL,
+          model: imageModel,
           prompt: buildVirtualTryOnPrompt(garmentNote),
           image: [
             normalizeImageForProvider(clothingImage),
@@ -214,6 +284,7 @@ export async function POST(request: NextRequest) {
           style: "natural",
         },
         fallbackSize: "1024x1024",
+        outputFolder: "image-studio/generated/try-on",
       });
 
       return NextResponse.json({
@@ -234,7 +305,7 @@ export async function POST(request: NextRequest) {
         apiBaseUrl,
         geminiApiKey,
         payload: {
-          model: DEFAULT_MODEL,
+          model: imageModel,
           prompt: buildWhiteBackgroundPrompt(),
           image: [normalizeImageForProvider(image)],
           n: 1,
@@ -243,6 +314,7 @@ export async function POST(request: NextRequest) {
           style: "natural",
         },
         fallbackSize: "1024x1024",
+        outputFolder: "image-studio/generated/white-background",
       });
 
       return NextResponse.json({
@@ -262,7 +334,7 @@ export async function POST(request: NextRequest) {
       apiBaseUrl,
       geminiApiKey,
       payload: {
-        model: DEFAULT_MODEL,
+        model: imageModel,
         prompt: buildModelSwapPrompt(prompt),
         image: [normalizeImageForProvider(image)],
         n: 1,
@@ -271,6 +343,7 @@ export async function POST(request: NextRequest) {
         style: "natural",
       },
       fallbackSize: "1024x1024",
+      outputFolder: "image-studio/generated/model-swap",
     });
 
     return NextResponse.json({

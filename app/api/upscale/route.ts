@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import Replicate, { type FileOutput } from "replicate";
+import { uploadImageSourceToBlob } from "@/lib/image-blob";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 type UpscaleMode = "target" | "factor";
 type OutputFormat = "jpg" | "png" | "webp";
@@ -175,9 +177,14 @@ export async function POST(request: NextRequest) {
       throw new Error("Replicate 没有返回可用的增强图片。");
     }
 
+    const uploadedResult = await uploadImageSourceToBlob(
+      result,
+      "image-studio/generated/upscale"
+    );
+
     return NextResponse.json({
       success: true,
-      result,
+      result: uploadedResult.url,
       model: REPLICATE_MODEL,
       settings,
     });
