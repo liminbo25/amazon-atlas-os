@@ -531,6 +531,14 @@ function buildTaskFilename(
   }-${suffix}.${extension}`;
 }
 
+function buildStandaloneFilename(
+  index: number,
+  suffix: "white-background" | "enhanced",
+  extension: string
+) {
+  return `image-studio-standalone-${index + 1}-${suffix}.${extension}`;
+}
+
 function PreviewTile({
   title,
   image,
@@ -810,6 +818,10 @@ export default function ImageStudioPage() {
   const standaloneEnhancedCount = standaloneItems.filter(
     (item) => item.enhanced.status === "success" && Boolean(item.enhanced.image)
   ).length;
+  const hasStandaloneOutputCards = standaloneItems.some(
+    (item) =>
+      item.whiteBackground.status !== "idle" || item.enhanced.status !== "idle"
+  );
   const enhancementSummary = describeUpscaleSettings(upscaleSettings);
   const resultMode = processedTasks[0]?.mode;
   const resultModeLabel = resultMode ? getGenerationModeLabel(resultMode) : null;
@@ -1817,6 +1829,172 @@ export default function ImageStudioPage() {
                   </span>
                 </div>
               </article>
+
+              {hasStandaloneOutputCards ? (
+                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        独立处理结果
+                      </p>
+                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                        白底图和增强图现在单独展示
+                      </h2>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        不走换装流程的结果会固定保留在这里，处理完成后可以直接预览和下载。
+                      </p>
+                    </div>
+
+                    <div className="flex flex-wrap gap-3 text-sm text-slate-600">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+                        独立白底图 {standaloneWhiteCount}
+                      </span>
+                      <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+                        独立增强图 {standaloneEnhancedCount}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-4 xl:grid-cols-2">
+                    {standaloneImages.map((image, index) => {
+                      const item = standaloneItems[index] ?? createStandaloneItem(image);
+
+                      return (
+                        <article
+                          key={`standalone-result-${index}-${image.slice(0, 24)}`}
+                          className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50"
+                        >
+                          <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                                图片 {index + 1}
+                              </p>
+                              <span
+                                className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getStatusPillClass(
+                                  item.whiteBackground.status
+                                )}`}
+                              >
+                                白底：{getStatusLabel(item.whiteBackground.status)}
+                              </span>
+                              <span
+                                className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getStatusPillClass(
+                                  item.enhanced.status
+                                )}`}
+                              >
+                                增强：{getStatusLabel(item.enhanced.status)}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                              {item.whiteBackground.image ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleDownload(
+                                      item.whiteBackground.image!,
+                                      buildStandaloneFilename(index, "white-background", "png")
+                                    )
+                                  }
+                                  className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                                >
+                                  下载白底图
+                                </button>
+                              ) : null}
+
+                              {item.enhanced.image ? (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    void handleDownload(
+                                      item.enhanced.image!,
+                                      buildStandaloneFilename(
+                                        index,
+                                        "enhanced",
+                                        item.enhanced.format || upscaleSettings.outputFormat
+                                      )
+                                    )
+                                  }
+                                  className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                                >
+                                  下载增强图
+                                </button>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-px bg-slate-200 md:grid-cols-3">
+                            <PreviewTile
+                              title="原图"
+                              image={image}
+                              alt={`独立处理原图 ${index + 1}`}
+                              status="success"
+                              emptyTitle="暂无原图"
+                              emptyDescription="当前卡片没有可展示的原图。"
+                              description="这张图是独立白底图和增强图的来源。"
+                              backgroundClassName="bg-white"
+                              onPreview={() => openPreview(image, `独立处理 ${index + 1} 原图`)}
+                            />
+
+                            <PreviewTile
+                              title="白底图"
+                              image={item.whiteBackground.image}
+                              alt={`独立白底图 ${index + 1}`}
+                              status={item.whiteBackground.status}
+                              emptyTitle="还没有白底图"
+                              emptyDescription="点击上方“换白底”后，这里会显示对应的独立白底版本。"
+                              description={
+                                item.whiteBackground.retryCount > 0
+                                  ? `已重试 ${item.whiteBackground.retryCount} 次`
+                                  : "白底完成后会保留在这里，方便继续预览和下载。"
+                              }
+                              backgroundClassName="bg-slate-50"
+                              error={item.whiteBackground.error}
+                              onPreview={
+                                item.whiteBackground.image
+                                  ? () =>
+                                      openPreview(
+                                        item.whiteBackground.image!,
+                                        `独立处理 ${index + 1} 白底图`
+                                      )
+                                  : undefined
+                              }
+                            />
+
+                            <PreviewTile
+                              title="增强图"
+                              image={item.enhanced.image}
+                              alt={`独立增强图 ${index + 1}`}
+                              status={item.enhanced.status}
+                              emptyTitle="还没有增强图"
+                              emptyDescription="点击上方“变清晰”后，这里会显示对应的高清增强版本。"
+                              description={
+                                item.enhanced.status === "success"
+                                  ? `输出格式：${
+                                      item.enhanced.format || upscaleSettings.outputFormat
+                                    }`
+                                  : item.enhanced.retryCount > 0
+                                    ? `已重试 ${item.enhanced.retryCount} 次`
+                                    : "增强完成后会保留在这里，方便继续预览和下载。"
+                              }
+                              backgroundClassName="bg-white"
+                              error={item.enhanced.error}
+                              onPreview={
+                                item.enhanced.image
+                                  ? () =>
+                                      openPreview(
+                                        item.enhanced.image!,
+                                        `独立处理 ${index + 1} 增强图`
+                                      )
+                                  : undefined
+                              }
+                            />
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </article>
+              ) : null}
             </div>
 
             <aside className="space-y-6">
