@@ -148,6 +148,8 @@ export function Step1Analysis() {
     setPainPoints,
     setValuePoints,
     setCompetitorAnalysis,
+    setVocActionPlan,
+    setSupportFaqs,
     setListingVersions,
     setComplianceResults,
     setCurrentStep,
@@ -204,6 +206,8 @@ export function Step1Analysis() {
     setPainPoints([]);
     setValuePoints([]);
     setCompetitorAnalysis([]);
+    setVocActionPlan(null);
+    setSupportFaqs([]);
     clearStep4Output();
   };
 

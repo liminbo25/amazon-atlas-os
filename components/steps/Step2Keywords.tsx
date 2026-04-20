@@ -3,43 +3,37 @@
 import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useListingStore } from "@/lib/store";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  ArrowRight,
   ArrowLeft,
+  ArrowRight,
   Bot,
   Database,
   FileSpreadsheet,
   Loader2,
+  Megaphone,
+  Radar,
   RefreshCw,
   ScanSearch,
+  SearchCode,
+  ShieldAlert,
+  Sparkles,
+  Target,
 } from "lucide-react";
-import type { AiRuntimeRequestConfig, DataAnalysisResult } from "@/lib/types";
+import type {
+  AiRuntimeRequestConfig,
+  DataAnalysisResult,
+  KeywordAllocationItem,
+  KeywordCampaignPlan,
+  OpportunityAssessment,
+  RufusIntentItem,
+} from "@/lib/types";
 
-function SummaryCard({
-  label,
-  value,
-}: {
-  label: string;
-  value: string | number;
-}) {
+function SummaryCard({ label, value }: { label: string; value: string | number }) {
   return (
     <Card>
       <CardContent className="pt-6 text-center">
@@ -85,6 +79,232 @@ function InsightBlock({
   );
 }
 
+function OpportunityPanel({ assessment }: { assessment: OpportunityAssessment }) {
+  const scoreTone =
+    assessment.score >= 75
+      ? "text-emerald-600"
+      : assessment.score >= 55
+        ? "text-amber-600"
+        : "text-rose-600";
+
+  const verdictLabel =
+    assessment.verdict === "priority"
+      ? "优先打"
+      : assessment.verdict === "test"
+        ? "先测试"
+        : "先观察";
+
+  return (
+    <Card className="border-[#FF9900]/30 bg-orange-50/30">
+      <CardHeader>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-[#FF9900]" />
+              <CardTitle className="text-base">机会评分层</CardTitle>
+              <Badge
+                className={
+                  assessment.verdict === "priority"
+                    ? "bg-emerald-600"
+                    : assessment.verdict === "test"
+                      ? "bg-amber-500"
+                      : "bg-slate-700"
+                }
+              >
+                {verdictLabel}
+              </Badge>
+            </div>
+            <CardDescription>{assessment.summary}</CardDescription>
+          </div>
+
+          <div className="rounded-2xl border bg-white px-5 py-4 text-center shadow-sm">
+            <p className={`text-4xl font-bold ${scoreTone}`}>{assessment.score}</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-muted-foreground">
+              opportunity score
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-5">
+        <div className="grid gap-4 xl:grid-cols-4">
+          {assessment.breakdown.map((item) => (
+            <div key={item.key} className="rounded-2xl border bg-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-semibold">{item.label}</p>
+                <Badge variant="outline">{item.score}</Badge>
+              </div>
+              <p className="mt-2 text-sm text-muted-foreground">{item.rationale}</p>
+              <div className="mt-3 space-y-2 text-xs text-muted-foreground">
+                {item.evidence.map((evidence) => (
+                  <p key={evidence} className="rounded-lg bg-muted/40 px-2 py-1">
+                    {evidence}
+                  </p>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-2 rounded-2xl border bg-white p-4">
+            <p className="text-sm font-semibold text-emerald-700">可打优势</p>
+            {assessment.strengths.length > 0 ? (
+              assessment.strengths.map((item) => (
+                <p key={item} className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900">
+                  {item}
+                </p>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">暂无额外优势总结。</p>
+            )}
+          </div>
+          <div className="space-y-2 rounded-2xl border bg-white p-4">
+            <p className="text-sm font-semibold text-rose-700">主要风险</p>
+            {assessment.risks.length > 0 ? (
+              assessment.risks.map((item) => (
+                <p key={item} className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-900">
+                  {item}
+                </p>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">暂无额外风险总结。</p>
+            )}
+          </div>
+          <div className="space-y-2 rounded-2xl border bg-white p-4">
+            <p className="text-sm font-semibold text-sky-700">下一步动作</p>
+            {assessment.nextActions.length > 0 ? (
+              assessment.nextActions.map((item) => (
+                <p key={item} className="rounded-lg bg-sky-50 px-3 py-2 text-sm text-sky-900">
+                  {item}
+                </p>
+              ))
+            ) : (
+              <p className="text-sm text-muted-foreground">暂无额外建议。</p>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function KeywordBucketCard({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description: string;
+  items: KeywordAllocationItem[];
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {items.length > 0 ? (
+          items.map((item) => (
+            <div key={item.keyword} className="rounded-2xl border p-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-medium">{item.keyword}</p>
+                  <p className="mt-1 text-sm text-muted-foreground">{item.reason}</p>
+                </div>
+                <Badge variant="outline">{item.priority}</Badge>
+              </div>
+              {item.evidence ? (
+                <p className="mt-2 rounded-lg bg-muted/40 px-2 py-1 text-xs text-muted-foreground">
+                  {item.evidence}
+                </p>
+              ) : null}
+            </div>
+          ))
+        ) : (
+          <SectionEmpty description="当前没有可展示的关键词。" />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CampaignPlanCard({ plan }: { plan: KeywordCampaignPlan }) {
+  return (
+    <div className="rounded-2xl border p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="space-y-1">
+          <p className="text-sm font-semibold">{plan.name}</p>
+          <p className="text-sm text-muted-foreground">{plan.goal}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="outline">{plan.matchType}</Badge>
+          <Badge>{plan.budgetPriority} budget</Badge>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-2">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            主攻词
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {plan.keywords.map((keyword) => (
+              <Badge key={keyword}>{keyword}</Badge>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+            否定词
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {plan.negativeKeywords.length > 0 ? (
+              plan.negativeKeywords.map((keyword) => (
+                <Badge key={keyword} variant="destructive">
+                  {keyword}
+                </Badge>
+              ))
+            ) : (
+              <Badge variant="outline">待补充</Badge>
+            )}
+          </div>
+        </div>
+      </div>
+      <div className="mt-3 rounded-lg bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
+        {plan.launchPlan}
+      </div>
+    </div>
+  );
+}
+
+function IntentColumn({ title, items }: { title: string; items: RufusIntentItem[] }) {
+  return (
+    <div className="space-y-3 rounded-2xl border p-4">
+      <h4 className="text-sm font-semibold">{title}</h4>
+      {items.length > 0 ? (
+        items.map((item) => (
+          <div key={`${title}-${item.question}`} className="rounded-2xl bg-muted/30 p-3">
+            <p className="font-medium">{item.question}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{item.responseAngle}</p>
+            {item.listingHooks.length > 0 ? (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {item.listingHooks.map((hook) => (
+                  <Badge key={`${item.question}-${hook}`} variant="outline">
+                    {hook}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))
+      ) : (
+        <SectionEmpty description="当前没有可展示的意图条目。" />
+      )}
+    </div>
+  );
+}
+
 export function Step2Keywords() {
   const {
     productProfile,
@@ -106,6 +326,8 @@ export function Step2Keywords() {
     setPainPoints,
     setValuePoints,
     setCompetitorAnalysis,
+    setVocActionPlan,
+    setSupportFaqs,
     setListingVersions,
     setComplianceResults,
     setCurrentStep,
@@ -144,6 +366,7 @@ export function Step2Keywords() {
   );
   const abaRowCount = supportAssets.abaReport?.rows.length ?? 0;
   const rufusCount = supportAssets.rufusScreenshots.length;
+  const opportunityScore = dataAnalysis?.opportunityAssessment?.score ?? "--";
   const insightKey = [
     fetchKey,
     competitorListings.length,
@@ -206,9 +429,7 @@ export function Step2Keywords() {
           }),
         });
 
-        const json = (await response.json()) as DataAnalysisResult & {
-          error?: string;
-        };
+        const json = (await response.json()) as DataAnalysisResult & { error?: string };
 
         if (!response.ok) {
           throw new Error(json.error || "AI 数据分析失败");
@@ -216,9 +437,7 @@ export function Step2Keywords() {
 
         setDataAnalysis(json);
       } catch (error) {
-        setAnalysisError(
-          error instanceof Error ? error.message : "AI 数据分析失败"
-        );
+        setAnalysisError(error instanceof Error ? error.message : "AI 数据分析失败");
       } finally {
         analysisInFlightRef.current = false;
         setAnalysisLoading(false);
@@ -274,6 +493,8 @@ export function Step2Keywords() {
       setPainPoints([]);
       setValuePoints([]);
       setCompetitorAnalysis([]);
+      setVocActionPlan(null);
+      setSupportFaqs([]);
       setListingVersions([]);
       setComplianceResults({});
       setHasFetchedOnce(true);
@@ -303,8 +524,10 @@ export function Step2Keywords() {
     setListingVersions,
     setPainPoints,
     setPositiveReviews,
+    setSupportFaqs,
     setTrafficKeywords,
     setValuePoints,
+    setVocActionPlan,
     targetMarket,
   ]);
 
@@ -340,13 +563,7 @@ export function Step2Keywords() {
 
     lastAutoInsightKeyRef.current = insightKey;
     void runInsightAnalysis();
-  }, [
-    analysisLoading,
-    dataAnalysis,
-    hasListingData,
-    insightKey,
-    runInsightAnalysis,
-  ]);
+  }, [analysisLoading, dataAnalysis, hasListingData, insightKey, runInsightAnalysis]);
 
   if (!hasRequiredInput) {
     return (
@@ -373,7 +590,7 @@ export function Step2Keywords() {
       <div className="flex flex-col items-center justify-center gap-3 py-20">
         <Loader2 className="h-8 w-8 animate-spin text-[#FF9900]" />
         <p className="text-sm text-muted-foreground">
-          正在拉取卖家精灵真实数据，并联动 AI 生成多源分析...
+          正在拉取卖家精灵真实数据，并联动 AI 生成机会评分与关键词执行层...
         </p>
       </div>
     );
@@ -422,14 +639,17 @@ export function Step2Keywords() {
     );
   }
 
+  const keywordStrategy = dataAnalysis?.keywordStrategy;
+  const rufusIntentLayer = dataAnalysis?.rufusIntentLayer;
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <CardTitle>Step 2: 数据分析流程</CardTitle>
+            <CardTitle>Step 2: 机会判断与词路由</CardTitle>
             <CardDescription>
-              卖家精灵真实数据 + ABA + Rufus + AI 智能分析，统一沉淀为后续 VOC 和文案生成输入。
+              卖家精灵真实数据 + ABA + Rufus + AI 智能分析，统一沉淀为“值不值得打、词怎么打、流量怎么接”的操盘输入。
             </CardDescription>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -445,11 +665,13 @@ export function Step2Keywords() {
         </CardHeader>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-6">
         <SummaryCard label="卖家精灵竞品" value={competitorListings.length} />
         <SummaryCard label="关键词样本" value={totalKeywords} />
         <SummaryCard label="ABA 预览行数" value={abaRowCount} />
         <SummaryCard label="Rufus 截图" value={rufusCount} />
+        <SummaryCard label="差评样本" value={totalNegativeReviews} />
+        <SummaryCard label="机会分" value={opportunityScore} />
       </div>
 
       <Card>
@@ -457,15 +679,9 @@ export function Step2Keywords() {
           <CardTitle className="text-base">数据源状态</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <Badge variant="outline">
-            卖家精灵 {competitorListings.length > 0 ? "已接入" : "待采集"}
-          </Badge>
-          <Badge variant="outline">
-            ABA {supportAssets.abaReport ? "已上传" : "未上传"}
-          </Badge>
-          <Badge variant="outline">
-            Rufus {rufusCount > 0 ? `已上传 ${rufusCount} 张` : "未上传"}
-          </Badge>
+          <Badge variant="outline">卖家精灵 {competitorListings.length > 0 ? "已接入" : "待采集"}</Badge>
+          <Badge variant="outline">ABA {supportAssets.abaReport ? "已上传" : "未上传"}</Badge>
+          <Badge variant="outline">Rufus {rufusCount > 0 ? `已上传 ${rufusCount} 张` : "未上传"}</Badge>
           <Badge variant="outline">
             AI 智能分析 {dataAnalysis ? "已生成" : analysisLoading ? "分析中" : "待生成"}
           </Badge>
@@ -476,7 +692,7 @@ export function Step2Keywords() {
         <Card className="border-dashed">
           <CardContent className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin text-[#FF9900]" />
-            AI 正在融合卖家精灵、ABA 和 Rufus 数据，生成可执行洞察...
+            AI 正在融合卖家精灵、ABA 和 Rufus 数据，生成机会评分、关键词路由和 Rufus 意图层...
           </CardContent>
         </Card>
       ) : null}
@@ -487,53 +703,92 @@ export function Step2Keywords() {
         </div>
       ) : null}
 
+      {dataAnalysis?.opportunityAssessment ? (
+        <OpportunityPanel assessment={dataAnalysis.opportunityAssessment} />
+      ) : null}
+
+      {keywordStrategy ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <SearchCode className="h-5 w-5 text-sky-600" />
+              <CardTitle className="text-base">关键词分工图</CardTitle>
+            </div>
+            <CardDescription>
+              不再把关键词当成一个词桶，而是拆成标题词、Bullet 词、Search Terms、PPC 主攻词、探索词和否定词。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 xl:grid-cols-3">
+            <KeywordBucketCard title="标题词" description="承担相关性与点击入口。" items={keywordStrategy.titleKeywords} />
+            <KeywordBucketCard title="Bullet 词" description="配合卖点和场景承接。" items={keywordStrategy.bulletKeywords} />
+            <KeywordBucketCard title="Search Terms" description="补长尾和后台索引空间。" items={keywordStrategy.searchTermKeywords} />
+            <KeywordBucketCard title="PPC 主攻词" description="优先放 Exact / Phrase。" items={keywordStrategy.ppcCoreKeywords} />
+            <KeywordBucketCard title="PPC 探索词" description="适合 Broad / Phrase 探索。" items={keywordStrategy.ppcExploratoryKeywords} />
+            <KeywordBucketCard title="否定词建议" description="先挡掉明显低意图或错配词。" items={keywordStrategy.negativeKeywords} />
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {keywordStrategy?.campaignPlans.length ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5 text-emerald-600" />
+              <CardTitle className="text-base">PPC 执行单</CardTitle>
+            </div>
+            <CardDescription>
+              直接给出 campaign 结构、匹配方式、预算优先级和否定词建议。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {keywordStrategy.campaignPlans.map((plan) => (
+              <CampaignPlanCard key={plan.name} plan={plan} />
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {rufusIntentLayer ? (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Radar className="h-5 w-5 text-violet-600" />
+              <CardTitle className="text-base">Rufus 意图层</CardTitle>
+            </div>
+            <CardDescription>
+              按场景、人群、顾虑、对比分组，方便后续写标题、FAQ、A+ 和客服话术。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-4 xl:grid-cols-4">
+            <IntentColumn title="场景" items={rufusIntentLayer.scene} />
+            <IntentColumn title="人群" items={rufusIntentLayer.audience} />
+            <IntentColumn title="顾虑" items={rufusIntentLayer.objections} />
+            <IntentColumn title="对比" items={rufusIntentLayer.comparisons} />
+          </CardContent>
+        </Card>
+      ) : null}
+
       {dataAnalysis ? (
         <Card className="border-[#FF9900]/20 bg-orange-50/40">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
-              <Bot className="h-5 w-5 text-[#FF9900]" />
-              AI 多源智能分析
+              <Sparkles className="h-5 w-5 text-[#FF9900]" />
+              AI 多源策略洞察
             </CardTitle>
-            <CardDescription>
-              为后续的 VOC 诊断与 COSMO 导向文案生成准备策略输入。
-            </CardDescription>
+            <CardDescription>补充操盘视角的卖家精灵、ABA、Rufus 和 COSMO 导向总结。</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-2xl border bg-white/80 p-4">
               <h4 className="text-sm font-semibold">多源市场总结</h4>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {dataAnalysis.marketOverview}
-              </p>
+              <p className="mt-2 text-sm text-muted-foreground">{dataAnalysis.marketOverview}</p>
             </div>
-
             <div className="grid gap-4 xl:grid-cols-2">
-              <InsightBlock
-                title="卖家精灵洞察"
-                items={dataAnalysis.sellerSpriteInsights}
-                emptyText="当前没有额外的卖家精灵洞察。"
-              />
-              <InsightBlock
-                title="ABA 洞察"
-                items={dataAnalysis.abaInsights}
-                emptyText="尚未上传 ABA 数据，未生成额外洞察。"
-              />
-              <InsightBlock
-                title="Rufus 洞察"
-                items={dataAnalysis.rufusInsights}
-                emptyText="尚未上传 Rufus 截图，未生成额外洞察。"
-              />
-              <InsightBlock
-                title="AI 策略建议"
-                items={dataAnalysis.aiRecommendations}
-                emptyText="当前没有额外的策略建议。"
-              />
+              <InsightBlock title="卖家精灵洞察" items={dataAnalysis.sellerSpriteInsights} emptyText="当前没有额外的卖家精灵洞察。" />
+              <InsightBlock title="ABA 洞察" items={dataAnalysis.abaInsights} emptyText="尚未上传 ABA 数据，未生成额外洞察。" />
+              <InsightBlock title="Rufus 洞察" items={dataAnalysis.rufusInsights} emptyText="尚未上传 Rufus 截图，未生成额外洞察。" />
+              <InsightBlock title="AI 操盘建议" items={dataAnalysis.aiRecommendations} emptyText="当前没有额外的策略建议。" />
             </div>
-
-            <InsightBlock
-              title="COSMO 导向"
-              items={dataAnalysis.cosmoFocus}
-              emptyText="当前没有额外的 COSMO 导向建议。"
-            />
+            <InsightBlock title="COSMO 导向" items={dataAnalysis.cosmoFocus} emptyText="当前没有额外的 COSMO 导向建议。" />
           </CardContent>
         </Card>
       ) : null}
@@ -604,7 +859,7 @@ export function Step2Keywords() {
         <CardHeader>
           <CardTitle className="text-base">竞品 Listing 对比</CardTitle>
           <CardDescription>
-            卖家精灵真实数据仍然保留完整的竞品标题、评分、月销和关键词样本。
+            底层仍然保留完整竞品标题、评分、月销和关键词样本，方便继续追根溯源。
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -674,9 +929,7 @@ export function Step2Keywords() {
                   {listing?.bulletPoints.length ? (
                     listing.bulletPoints.map((bulletPoint, index) => (
                       <div key={index} className="rounded-lg bg-muted/50 p-3 text-sm">
-                        <span className="mr-2 font-semibold text-[#FF9900]">
-                          {index + 1}.
-                        </span>
+                        <span className="mr-2 font-semibold text-[#FF9900]">{index + 1}.</span>
                         {bulletPoint}
                       </div>
                     ))
@@ -701,16 +954,10 @@ export function Step2Keywords() {
                       {negativeReviews.slice(0, 12).map((review) => (
                         <div key={review.id} className="space-y-1 rounded-lg border p-3">
                           <div className="flex items-center gap-2">
-                            <Badge
-                              variant={
-                                review.rating <= 2 ? "destructive" : "secondary"
-                              }
-                            >
+                            <Badge variant={review.rating <= 2 ? "destructive" : "secondary"}>
                               {review.rating} star
                             </Badge>
-                            <span className="ml-auto text-xs text-muted-foreground">
-                              {review.date}
-                            </span>
+                            <span className="ml-auto text-xs text-muted-foreground">{review.date}</span>
                           </div>
                           <p className="text-sm font-medium">{review.title}</p>
                           <p className="text-sm text-muted-foreground">{review.content}</p>
@@ -734,15 +981,10 @@ export function Step2Keywords() {
                   {positive.length > 0 ? (
                     <div className="max-h-[360px] space-y-3 overflow-y-auto">
                       {positive.slice(0, 12).map((review) => (
-                        <div
-                          key={review.id}
-                          className="space-y-1 rounded-lg border border-green-200 p-3"
-                        >
+                        <div key={review.id} className="space-y-1 rounded-lg border border-green-200 p-3">
                           <div className="flex items-center gap-2">
                             <Badge className="bg-green-500">{review.rating} star</Badge>
-                            <span className="ml-auto text-xs text-muted-foreground">
-                              {review.date}
-                            </span>
+                            <span className="ml-auto text-xs text-muted-foreground">{review.date}</span>
                           </div>
                           <p className="text-sm font-medium">{review.title}</p>
                           <p className="text-sm text-muted-foreground">{review.content}</p>
@@ -757,7 +999,10 @@ export function Step2Keywords() {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">关键词样本</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="h-4 w-4 text-slate-500" />
+                    <CardTitle className="text-base">关键词样本</CardTitle>
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {keywords.length > 0 ? (
@@ -775,22 +1020,12 @@ export function Step2Keywords() {
                         <TableBody>
                           {keywords.map((keyword, index) => (
                             <TableRow key={index}>
-                              <TableCell className="font-medium">
-                                {keyword.keyword}
-                              </TableCell>
-                              <TableCell>
-                                {keyword.searchVolume.toLocaleString()}
-                              </TableCell>
+                              <TableCell className="font-medium">{keyword.keyword}</TableCell>
+                              <TableCell>{keyword.searchVolume.toLocaleString()}</TableCell>
                               <TableCell>#{keyword.organicRank}</TableCell>
+                              <TableCell>{keyword.sponsoredRank ? `#${keyword.sponsoredRank}` : "-"}</TableCell>
                               <TableCell>
-                                {keyword.sponsoredRank
-                                  ? `#${keyword.sponsoredRank}`
-                                  : "-"}
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant="outline">
-                                  {(keyword.conversionShare * 100).toFixed(1)}%
-                                </Badge>
+                                <Badge variant="outline">{formatConversionShare(keyword.conversionShare)}</Badge>
                               </TableCell>
                             </TableRow>
                           ))}
@@ -812,14 +1047,16 @@ export function Step2Keywords() {
           <ArrowLeft className="mr-2 h-4 w-4" />
           上一步
         </Button>
-        <Button
-          onClick={() => setCurrentStep(3)}
-          className="bg-[#FF9900] hover:bg-[#FF9900]/90"
-        >
-          下一步：VOC 诊断
+        <Button onClick={() => setCurrentStep(3)} className="bg-[#FF9900] hover:bg-[#FF9900]/90">
+          下一步：VOC 行动层
           <ArrowRight className="ml-2 h-4 w-4" />
         </Button>
       </div>
     </div>
   );
+}
+
+function formatConversionShare(value: number): string {
+  const normalized = value <= 1 && value > 0 ? value * 100 : value;
+  return `${normalized.toFixed(1)}%`;
 }

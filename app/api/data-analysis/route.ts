@@ -13,21 +13,30 @@ import {
   resolveAiConfig,
   toErrorResponse,
 } from "@/lib/ai-route-helpers";
+import { getListingDefaultModel } from "@/lib/listing-ai-runtime";
+import {
+  enrichDataAnalysisResult,
+} from "@/lib/listing-opportunity";
 import { selectTrafficKeywords } from "@/lib/traffic-keyword-helpers";
 import type {
   AbaReportFile,
-  CompetitorListing,
   DataAnalysisResult,
+  KeywordAllocationItem,
+  KeywordCampaignPlan,
+  KeywordStrategy,
+  OpportunityAssessment,
+  OpportunityBreakdownItem,
   ProductProfile,
+  RufusIntentItem,
+  RufusIntentLayer,
   RufusScreenshot,
   ScreenshotMediaType,
   TrafficKeyword,
+  CompetitorListing,
 } from "@/lib/types";
 
-const DEFAULT_MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B";
-
 const DATA_ANALYSIS_SYSTEM_PROMPT = [
-  "You analyze Amazon listing inputs for an internal workflow.",
+  "You analyze Amazon listing inputs for an internal operator workflow.",
   "Return exactly one valid JSON object.",
   "Do not use markdown code fences.",
   "Do not add explanations before or after the JSON.",
@@ -51,10 +60,10 @@ export async function POST(request: Request) {
     const payload = validateRequest(body);
     const config = resolveAiConfig({
       runtimeConfig,
-      defaultModel: DEFAULT_MODEL,
+      defaultModel: getListingDefaultModel("vocAnalysis"),
     });
 
-    const result = await requestStructuredJson<DataAnalysisResult>({
+    const partialResult = await requestStructuredJson<DataAnalysisResult>({
       operationName: "multi-source data analysis",
       requestText: (attempt) => {
         const prompt = buildPrompt(payload, attempt);
@@ -69,7 +78,7 @@ export async function POST(request: Request) {
               data: item.preview.replace(/^data:image\/[a-z0-9.+-]+;base64,/i, ""),
               mediaType: item.mediaType,
             })),
-            maxTokens: 3200,
+            maxTokens: 4000,
             temperature: 0,
           });
         }
@@ -79,11 +88,19 @@ export async function POST(request: Request) {
           operationName: "multi-source data analysis",
           systemPrompt: DATA_ANALYSIS_SYSTEM_PROMPT,
           userPrompt: prompt,
-          maxTokens: 2800,
+          maxTokens: 3600,
           temperature: 0,
         });
       },
       parseResult: parseDataAnalysisResult,
+    });
+
+    const result = enrichDataAnalysisResult(partialResult, {
+      productProfile: payload.productProfile,
+      listings: payload.listings,
+      trafficKeywords: payload.trafficKeywords,
+      abaReport: payload.abaReport,
+      rufusScreenshotCount: payload.rufusScreenshots.length,
     });
 
     return Response.json(result);
@@ -96,9 +113,7 @@ export async function POST(request: Request) {
   }
 }
 
-function validateRequest(
-  body: Record<string, unknown>
-): DataAnalysisRequestPayload {
+function validateRequest(body: Record<string, unknown>): DataAnalysisRequestPayload {
   const targetMarket =
     normalizeStringValue(body.targetMarket, { allowEmpty: true }) || "US";
   const productProfile = normalizeProductProfile(body.productProfile);
@@ -122,7 +137,7 @@ function validateRequest(
     !abaReport &&
     rufusScreenshots.length === 0
   ) {
-    throw new RouteError("请先提供卖家精灵、ABA 或 Rufus 数据源。", {
+    throw new RouteError("请先提供卖家精灵、ABA 或 Rufus 相关数据。", {
       status: 400,
       code: "data_sources_required",
     });
@@ -154,7 +169,9 @@ function normalizeProductProfile(value: unknown): ProductProfile {
   return {
     brandName: normalizeStringValue(value.brandName, { allowEmpty: true }),
     productName: normalizeStringValue(value.productName, { allowEmpty: true }),
-    productCategory: normalizeStringValue(value.productCategory, { allowEmpty: true }),
+    productCategory: normalizeStringValue(value.productCategory, {
+      allowEmpty: true,
+    }),
     productDescription: normalizeStringValue(value.productDescription, {
       allowEmpty: true,
     }),
@@ -179,9 +196,7 @@ function normalizeListing(value: unknown): CompetitorListing | null {
 
   const asin = normalizeStringValue(value.asin, { allowEmpty: true });
   const title = normalizeStringValue(value.title, { allowEmpty: true });
-  const bulletPoints = normalizeTextList(value.bulletPoints, {
-    maxItems: 8,
-  });
+  const bulletPoints = normalizeTextList(value.bulletPoints, { maxItems: 8 });
 
   if (!asin || !title) {
     return null;
@@ -191,7 +206,7 @@ function normalizeListing(value: unknown): CompetitorListing | null {
     asin,
     title,
     bulletPoints,
-    attributes: {},
+    attributes: normalizeAttributes(value.attributes),
     price: typeof value.price === "number" ? value.price : 0,
     rating: typeof value.rating === "number" ? value.rating : 0,
     reviews: typeof value.reviews === "number" ? value.reviews : 0,
@@ -199,6 +214,21 @@ function normalizeListing(value: unknown): CompetitorListing | null {
     bsr: typeof value.bsr === "number" ? value.bsr : 0,
     mainImage: normalizeStringValue(value.mainImage, { allowEmpty: true }),
   };
+}
+
+function normalizeAttributes(value: unknown): Record<string, string> {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .map(([key, entryValue]) => [
+        key,
+        normalizeStringValue(entryValue, { allowEmpty: true }),
+      ])
+      .filter(([, entryValue]) => Boolean(entryValue))
+  );
 }
 
 function normalizeTrafficKeywordGroups(
@@ -255,9 +285,7 @@ function normalizeAbaReport(value: unknown): AbaReportFile | null {
 
   const fileName = normalizeStringValue(value.fileName, { allowEmpty: true });
   const content = normalizeStringValue(value.content, { allowEmpty: true });
-  const headers = normalizeTextList(value.headers, {
-    maxItems: 20,
-  });
+  const headers = normalizeTextList(value.headers, { maxItems: 20 });
   const rows = Array.isArray(value.rows)
     ? value.rows
         .filter((item): item is unknown[] => Array.isArray(item))
@@ -335,7 +363,6 @@ function normalizeMediaType(value: unknown): ScreenshotMediaType {
   if (value === "image/png" || value === "image/webp") {
     return value;
   }
-
   return "image/jpeg";
 }
 
@@ -370,6 +397,9 @@ function parseDataAnalysisResult(value: unknown): DataAnalysisResult {
       maxItems: 6,
       unique: true,
     }),
+    opportunityAssessment: normalizeOpportunityAssessment(value.opportunityAssessment),
+    keywordStrategy: normalizeKeywordStrategy(value.keywordStrategy),
+    rufusIntentLayer: normalizeRufusIntentLayer(value.rufusIntentLayer),
   };
 
   const hasUsefulContent =
@@ -378,7 +408,10 @@ function parseDataAnalysisResult(value: unknown): DataAnalysisResult {
     result.abaInsights.length > 0 ||
     result.rufusInsights.length > 0 ||
     result.aiRecommendations.length > 0 ||
-    result.cosmoFocus.length > 0;
+    result.cosmoFocus.length > 0 ||
+    result.opportunityAssessment !== null ||
+    result.keywordStrategy !== null ||
+    result.rufusIntentLayer !== null;
 
   if (!hasUsefulContent) {
     throw new RouteError("数据分析结果为空。", {
@@ -391,10 +424,254 @@ function parseDataAnalysisResult(value: unknown): DataAnalysisResult {
   return result;
 }
 
-function buildPrompt(
-  payload: DataAnalysisRequestPayload,
-  attempt: number
-): string {
+function normalizeOpportunityAssessment(value: unknown): OpportunityAssessment | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const breakdown = Array.isArray(value.breakdown)
+    ? value.breakdown
+        .map((item) => normalizeOpportunityBreakdown(item))
+        .filter((item): item is OpportunityBreakdownItem => item !== null)
+    : [];
+
+  const summary = normalizeStringValue(value.summary, { allowEmpty: true });
+
+  if (!summary && breakdown.length === 0) {
+    return null;
+  }
+
+  const verdictRaw = normalizeStringValue(value.verdict, { allowEmpty: true }).toLowerCase();
+
+  return {
+    score: normalizeScore(value.score),
+    verdict:
+      verdictRaw === "priority" || verdictRaw === "test" || verdictRaw === "watch"
+        ? verdictRaw
+        : "test",
+    summary,
+    strengths: normalizeTextList(value.strengths, { maxItems: 4, unique: true }),
+    risks: normalizeTextList(value.risks, { maxItems: 4, unique: true }),
+    nextActions: normalizeTextList(value.nextActions, {
+      maxItems: 4,
+      unique: true,
+    }),
+    breakdown,
+  };
+}
+
+function normalizeOpportunityBreakdown(
+  value: unknown
+): OpportunityBreakdownItem | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const key = normalizeStringValue(value.key, { allowEmpty: true });
+  const label = normalizeStringValue(value.label, { allowEmpty: true });
+  const rationale = normalizeStringValue(value.rationale, { allowEmpty: true });
+
+  if (!key && !label && !rationale) {
+    return null;
+  }
+
+  const normalizedKey =
+    key === "demand" || key === "competition" || key === "conversion" || key === "intent"
+      ? key
+      : "demand";
+
+  return {
+    key: normalizedKey,
+    label: label || normalizedKey,
+    score: normalizeScore(value.score),
+    rationale,
+    evidence: normalizeTextList(value.evidence, { maxItems: 4, unique: true }),
+  };
+}
+
+function normalizeKeywordStrategy(value: unknown): KeywordStrategy | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const titleKeywords = normalizeKeywordItems(value.titleKeywords);
+  const bulletKeywords = normalizeKeywordItems(value.bulletKeywords);
+  const searchTermKeywords = normalizeKeywordItems(value.searchTermKeywords);
+  const ppcCoreKeywords = normalizeKeywordItems(value.ppcCoreKeywords);
+  const ppcExploratoryKeywords = normalizeKeywordItems(value.ppcExploratoryKeywords);
+  const negativeKeywords = normalizeKeywordItems(value.negativeKeywords);
+  const campaignPlans = Array.isArray(value.campaignPlans)
+    ? value.campaignPlans
+        .map((item) => normalizeCampaignPlan(item))
+        .filter((item): item is KeywordCampaignPlan => item !== null)
+    : [];
+
+  const hasUsefulContent =
+    titleKeywords.length > 0 ||
+    bulletKeywords.length > 0 ||
+    searchTermKeywords.length > 0 ||
+    ppcCoreKeywords.length > 0 ||
+    ppcExploratoryKeywords.length > 0 ||
+    negativeKeywords.length > 0 ||
+    campaignPlans.length > 0;
+
+  if (!hasUsefulContent) {
+    return null;
+  }
+
+  return {
+    titleKeywords,
+    bulletKeywords,
+    searchTermKeywords,
+    ppcCoreKeywords,
+    ppcExploratoryKeywords,
+    negativeKeywords,
+    campaignPlans,
+  };
+}
+
+function normalizeKeywordItems(value: unknown): KeywordAllocationItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => normalizeKeywordItem(item))
+    .filter((item): item is KeywordAllocationItem => item !== null)
+    .slice(0, 10);
+}
+
+function normalizeKeywordItem(value: unknown): KeywordAllocationItem | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const keyword = normalizeStringValue(value.keyword, { allowEmpty: true });
+  if (!keyword) {
+    return null;
+  }
+
+  const priority = normalizePriority(value.priority);
+
+  return {
+    keyword,
+    priority,
+    reason: normalizeStringValue(value.reason, { allowEmpty: true }),
+    evidence: normalizeStringValue(value.evidence, { allowEmpty: true }),
+  };
+}
+
+function normalizeCampaignPlan(value: unknown): KeywordCampaignPlan | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const name = normalizeStringValue(value.name, { allowEmpty: true });
+  const goal = normalizeStringValue(value.goal, { allowEmpty: true });
+
+  if (!name && !goal) {
+    return null;
+  }
+
+  const matchTypeRaw = normalizeStringValue(value.matchType, { allowEmpty: true });
+  const matchType =
+    matchTypeRaw === "exact" ||
+    matchTypeRaw === "phrase" ||
+    matchTypeRaw === "broad" ||
+    matchTypeRaw === "auto"
+      ? matchTypeRaw
+      : "exact";
+
+  return {
+    name: name || "Campaign",
+    goal,
+    matchType,
+    budgetPriority: normalizePriority(value.budgetPriority),
+    keywords: normalizeTextList(value.keywords, { maxItems: 8, unique: true }),
+    negativeKeywords: normalizeTextList(value.negativeKeywords, {
+      maxItems: 8,
+      unique: true,
+    }),
+    launchPlan: normalizeStringValue(value.launchPlan, { allowEmpty: true }),
+  };
+}
+
+function normalizeRufusIntentLayer(value: unknown): RufusIntentLayer | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const scene = normalizeIntentItems(value.scene);
+  const audience = normalizeIntentItems(value.audience);
+  const objections = normalizeIntentItems(value.objections);
+  const comparisons = normalizeIntentItems(value.comparisons);
+
+  if (
+    scene.length === 0 &&
+    audience.length === 0 &&
+    objections.length === 0 &&
+    comparisons.length === 0
+  ) {
+    return null;
+  }
+
+  return {
+    scene,
+    audience,
+    objections,
+    comparisons,
+  };
+}
+
+function normalizeIntentItems(value: unknown): RufusIntentItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => normalizeIntentItem(item))
+    .filter((item): item is RufusIntentItem => item !== null)
+    .slice(0, 4);
+}
+
+function normalizeIntentItem(value: unknown): RufusIntentItem | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const question = normalizeStringValue(value.question, { allowEmpty: true });
+  const intent = normalizeStringValue(value.intent, { allowEmpty: true });
+
+  if (!question && !intent) {
+    return null;
+  }
+
+  return {
+    intent,
+    question,
+    responseAngle: normalizeStringValue(value.responseAngle, { allowEmpty: true }),
+    listingHooks: normalizeTextList(value.listingHooks, {
+      maxItems: 4,
+      unique: true,
+    }),
+  };
+}
+
+function normalizePriority(value: unknown): "high" | "medium" | "low" {
+  const normalized = normalizeStringValue(value, { allowEmpty: true }).toLowerCase();
+  if (normalized === "high" || normalized === "medium" || normalized === "low") {
+    return normalized;
+  }
+  return "medium";
+}
+
+function normalizeScore(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value)
+    ? Math.max(0, Math.min(100, Math.round(value)))
+    : 0;
+}
+
+function buildPrompt(payload: DataAnalysisRequestPayload, attempt: number): string {
   const productSummary = [
     `品牌名称: ${payload.productProfile.brandName || "未填写"}`,
     `产品名称: ${payload.productProfile.productName || "未填写"}`,
@@ -425,7 +702,11 @@ function buildPrompt(
   )
     .map(
       (keyword) =>
-        `${keyword.keyword} (搜索量 ${keyword.searchVolume}, 转化份额 ${keyword.conversionShare}, 自然位 ${keyword.organicRank || "n/a"})`
+        `${keyword.keyword} (搜索量 ${keyword.searchVolume}, 转化份额 ${normalizeConversionShare(
+          keyword.conversionShare
+        ).toFixed(1)}%, 自然位 ${keyword.organicRank || "n/a"}, 广告位 ${
+          keyword.sponsoredRank ?? "n/a"
+        })`
     )
     .join("\n");
 
@@ -449,44 +730,109 @@ function buildPrompt(
     : "未上传 ABA 数据";
 
   return `
-请基于多源输入，生成亚马逊 Listing 前置数据分析结果。所有输出必须使用简体中文。
+请基于输入，产出一份面向“亚马逊专业操盘手”的前置分析。
+所有分析文字都使用简体中文，只返回一个 JSON 对象。
 
-产品信息：
+产品信息:
 ${productSummary}
 
-竞品 ASIN：
+竞品 ASIN:
 ${payload.competitorAsins.join(", ") || "未填写"}
 
-卖家精灵真实数据：
+卖家精灵与竞品数据:
 ${listingSummary || "无"}
 
-关键词数据：
+关键词数据:
 ${selectedKeywords || "无"}
 
-ABA 搜索词报告：
+ABA 搜索词报告:
 ${abaSummary}
 
-Rufus 问答截图说明：
-${payload.rufusScreenshots.length > 0 ? "已附带截图，请识别截图中的问题、用户意图、关切点和回答方向。" : "未提供截图"}
+Rufus 截图说明:
+${payload.rufusScreenshots.length > 0 ? "已附截图，请识别截图中的意图、顾虑、比较和场景问题。" : "未提供截图"}
 
-返回且只返回一个 JSON 对象，格式如下：
+请返回如下 JSON 结构:
 {
-  "marketOverview": "1 段多源市场总结",
-  "sellerSpriteInsights": ["卖家精灵洞察1", "卖家精灵洞察2"],
-  "abaInsights": ["ABA洞察1", "ABA洞察2"],
-  "rufusInsights": ["Rufus洞察1", "Rufus洞察2"],
-  "aiRecommendations": ["AI策略建议1", "AI策略建议2"],
-  "cosmoFocus": ["COSMO导向1", "COSMO导向2"]
+  "marketOverview": "1 段市场概览",
+  "sellerSpriteInsights": ["洞察 1", "洞察 2"],
+  "abaInsights": ["ABA 洞察 1", "ABA 洞察 2"],
+  "rufusInsights": ["Rufus 洞察 1", "Rufus 洞察 2"],
+  "aiRecommendations": ["操盘建议 1", "操盘建议 2"],
+  "cosmoFocus": ["COSMO 文案焦点 1", "COSMO 文案焦点 2"],
+  "opportunityAssessment": {
+    "score": 78,
+    "verdict": "priority",
+    "summary": "一句机会总结",
+    "strengths": ["优势 1"],
+    "risks": ["风险 1"],
+    "nextActions": ["下一步 1"],
+    "breakdown": [
+      {
+        "key": "demand",
+        "label": "需求强度",
+        "score": 80,
+        "rationale": "原因",
+        "evidence": ["证据 1", "证据 2"]
+      }
+    ]
+  },
+  "keywordStrategy": {
+    "titleKeywords": [
+      {
+        "keyword": "keyword",
+        "priority": "high",
+        "reason": "为什么放标题",
+        "evidence": "信号"
+      }
+    ],
+    "bulletKeywords": [],
+    "searchTermKeywords": [],
+    "ppcCoreKeywords": [],
+    "ppcExploratoryKeywords": [],
+    "negativeKeywords": [],
+    "campaignPlans": [
+      {
+        "name": "campaign name",
+        "goal": "目标",
+        "matchType": "exact",
+        "budgetPriority": "high",
+        "keywords": ["kw1"],
+        "negativeKeywords": ["kw2"],
+        "launchPlan": "启动建议"
+      }
+    ]
+  },
+  "rufusIntentLayer": {
+    "scene": [
+      {
+        "intent": "场景意图",
+        "question": "用户会怎么问",
+        "responseAngle": "应该怎么答",
+        "listingHooks": ["文案钩子"]
+      }
+    ],
+    "audience": [],
+    "objections": [],
+    "comparisons": []
+  }
 }
 
-规则：
-- sellerSpriteInsights 只能基于卖家精灵真实数据和关键词数据。
-- abaInsights 只能基于 ABA 数据；如果没有 ABA 数据，返回空数组。
-- rufusInsights 需要基于截图可见内容；不确定时可标注为“推测”。
-- aiRecommendations 需要整合多源证据，输出可执行的 Listing 策略建议。
-- cosmoFocus 要聚焦标题相关性、场景覆盖、转化动机、关键词组织和语义一致性等文案方向。
-- 每个数组返回 3 到 6 条短句，避免空话。
+规则:
+- sellerSpriteInsights 只基于竞品与关键词数据。
+- abaInsights 只基于 ABA 数据，没有就返回空数组。
+- rufusInsights 只基于截图能看到的内容；不确定时可写“推测”。
+- opportunityAssessment 要回答“值不值得打”，不要停留在泛泛摘要。
+- keywordStrategy 要明确标题词、Bullet 词、Search Terms、PPC 主攻词、PPC 探索词、否定词和 campaign plan。
+- rufusIntentLayer 要覆盖 场景 / 人群 / 顾虑 / 对比 四类问题。
+- 每个数组控制在 3-6 条，避免空话。
 - 只返回 JSON。
 ${getRetryPromptSuffix(attempt)}
   `.trim();
+}
+
+function normalizeConversionShare(value: number): number {
+  if (value <= 1 && value > 0) {
+    return value * 100;
+  }
+  return value;
 }

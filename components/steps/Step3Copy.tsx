@@ -29,7 +29,9 @@ import type {
   AiRuntimeRequestConfig,
   CompetitorCopyAnalysis,
   PainPoint,
+  SupportFaqItem,
   ValuePoint,
+  VocActionPlan,
 } from "@/lib/types";
 import {
   ArrowLeft,
@@ -49,18 +51,79 @@ function SectionEmpty({ description }: { description: string }) {
   );
 }
 
+function ActionLane({
+  title,
+  description,
+  items,
+}: {
+  title: string;
+  description: string;
+  items: VocActionPlan["product"];
+}) {
+  return (
+    <div className="space-y-3 rounded-2xl border p-4">
+      <div className="space-y-1">
+        <p className="text-sm font-semibold">{title}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+
+      {items.length > 0 ? (
+        items.map((item) => (
+          <div key={`${title}-${item.title}`} className="rounded-xl bg-muted/30 p-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-medium">{item.title}</p>
+              <Badge variant="outline">{item.owner}</Badge>
+              <Badge
+                className={
+                  item.priority === "high"
+                    ? "bg-rose-600"
+                    : item.priority === "medium"
+                      ? "bg-amber-500"
+                      : "bg-slate-700"
+                }
+              >
+                {item.priority}
+              </Badge>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">{item.action}</p>
+            {item.evidence.length > 0 ? (
+              <div className="mt-2 space-y-1">
+                {item.evidence.map((evidence) => (
+                  <p
+                    key={`${item.title}-${evidence}`}
+                    className="rounded-lg bg-white px-2 py-1 text-xs text-muted-foreground"
+                  >
+                    {evidence}
+                  </p>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ))
+      ) : (
+        <SectionEmpty description="当前没有可展示的动作项。" />
+      )}
+    </div>
+  );
+}
+
 export function Step3Copy() {
   const {
     competitorListings,
     competitorReviews,
     positiveReviews,
+    productProfile,
     painPoints,
     valuePoints,
     competitorAnalysis,
+    vocActionPlan,
+    supportFaqs,
     aiRuntimeSettings,
     setPainPoints,
     setValuePoints,
     setCompetitorAnalysis,
+    setVocActionPlan,
+    setSupportFaqs,
     setListingVersions,
     setComplianceResults,
     setCurrentStep,
@@ -69,7 +132,11 @@ export function Step3Copy() {
   const [isLoading, setIsLoading] = useState(false);
   const [fetchError, setFetchError] = useState<ApiRequestError | null>(null);
   const [hasFetchedOnce, setHasFetchedOnce] = useState(
-    painPoints.length > 0 || valuePoints.length > 0 || competitorAnalysis.length > 0
+    painPoints.length > 0 ||
+      valuePoints.length > 0 ||
+      competitorAnalysis.length > 0 ||
+      Boolean(vocActionPlan) ||
+      supportFaqs.length > 0
   );
   const inFlightRef = useRef(false);
   const lastAutoFetchKeyRef = useRef<string | null>(null);
@@ -85,7 +152,11 @@ export function Step3Copy() {
   const hasRequiredInput =
     competitorListings.length > 0 && (reviewCount > 0 || positiveReviewCount > 0);
   const hasAnalysisData =
-    painPoints.length > 0 || valuePoints.length > 0 || competitorAnalysis.length > 0;
+    painPoints.length > 0 ||
+    valuePoints.length > 0 ||
+    competitorAnalysis.length > 0 ||
+    Boolean(vocActionPlan) ||
+    supportFaqs.length > 0;
   const requestKey = [
     competitorListings.map((listing) => listing.asin).join("|"),
     reviewCount,
@@ -121,6 +192,7 @@ export function Step3Copy() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          productProfile,
           reviews: competitorReviews,
           positiveReviews,
           listings: competitorListings,
@@ -137,11 +209,15 @@ export function Step3Copy() {
         painPoints?: PainPoint[];
         valuePoints?: ValuePoint[];
         competitorAnalysis?: CompetitorCopyAnalysis[];
+        vocActionPlan?: VocActionPlan | null;
+        supportFaqs?: SupportFaqItem[];
       };
 
       setPainPoints(data.painPoints ?? []);
       setValuePoints(data.valuePoints ?? []);
       setCompetitorAnalysis(data.competitorAnalysis ?? []);
+      setVocActionPlan(data.vocActionPlan ?? null);
+      setSupportFaqs(data.supportFaqs ?? []);
       setListingVersions([]);
       setComplianceResults({});
       setHasFetchedOnce(true);
@@ -157,12 +233,15 @@ export function Step3Copy() {
     competitorListings,
     competitorReviews,
     hasRequiredInput,
+    productProfile,
     positiveReviews,
     setCompetitorAnalysis,
     setComplianceResults,
     setListingVersions,
     setPainPoints,
+    setSupportFaqs,
     setValuePoints,
+    setVocActionPlan,
   ]);
 
   useEffect(() => {
@@ -387,6 +466,62 @@ export function Step3Copy() {
             </div>
           ) : (
             <SectionEmpty description="本次分析没有提炼出明确的好评价值点，可补充更多正向评论后重试。" />
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">VOC 行动层</CardTitle>
+          <CardDescription>
+            把评论证据拆成产品、文案、A+ 和客服四条执行线，而不是停留在“知道问题是什么”。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 xl:grid-cols-2">
+          <ActionLane
+            title="产品问题"
+            description="优先回看来料、结构、耐久、包装和说明。"
+            items={vocActionPlan?.product ?? []}
+          />
+          <ActionLane
+            title="文案问题"
+            description="哪些卖点要前置、哪些边界必须说清楚。"
+            items={vocActionPlan?.copy ?? []}
+          />
+          <ActionLane
+            title="A+ 补充点"
+            description="哪些内容必须用结构图、对比图、场景图来证明。"
+            items={vocActionPlan?.aPlus ?? []}
+          />
+          <ActionLane
+            title="客服应对点"
+            description="把高频顾虑做成标准 SOP，而不是等差评再补。"
+            items={vocActionPlan?.support ?? []}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">售前 / 售后 FAQ</CardTitle>
+          <CardDescription>
+            面向真实购买顾虑整理客服口径，也方便后续同步到 Rufus / Q&A / 素材脚本。
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4 lg:grid-cols-2">
+          {supportFaqs.length > 0 ? (
+            supportFaqs.map((faq) => (
+              <div key={faq.question} className="rounded-2xl border p-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">{faq.scenario || "FAQ"}</Badge>
+                  <p className="font-medium">{faq.question}</p>
+                </div>
+                <p className="mt-3 text-sm text-slate-900">{faq.shortAnswer}</p>
+                <p className="mt-2 text-sm text-muted-foreground">{faq.supportGuidance}</p>
+              </div>
+            ))
+          ) : (
+            <SectionEmpty description="当前没有可展示的 FAQ 建议。" />
           )}
         </CardContent>
       </Card>

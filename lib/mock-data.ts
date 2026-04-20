@@ -300,6 +300,9 @@ export function generateThreeListingVersions(): ListingVersion[] {
       ],
       description: "Experience premium wireless audio with our advanced Bluetooth 5.3 earbuds. Engineered for audiophiles and active lifestyles, these earbuds combine cutting-edge technology with superior comfort. The 13mm dynamic drivers deliver exceptional sound quality with deep, punchy bass and crisp highs. With 40 hours total playtime and fast charging, you'll never miss a beat. IPX7 waterproof rating means you can push your limits in any weather. Perfect for workouts, commuting, gaming, and everyday use.",
       searchTerms: "wireless earbuds bluetooth 5.3 headphones earphones in ear buds noise cancelling waterproof sports running workout gym bass sound quality long battery life fast charging touch control microphone calls iphone android compatible",
+      experiments: [],
+      rufusQa: [],
+      creativeBrief: null,
     },
     {
       versionName: "情感版",
@@ -314,6 +317,9 @@ export function generateThreeListingVersions(): ListingVersion[] {
       ],
       description: "Life sounds better with the right soundtrack. These wireless earbuds are designed to be your constant companion - from your morning run to your evening wind-down. We've obsessed over every detail to create earbuds that sound amazing, feel comfortable, and just work. No complicated setup, no frustrating dropouts, no compromises. Just pure, immersive audio that enhances every moment of your day. Because you deserve audio gear that keeps up with your life.",
       searchTerms: "wireless earbuds comfortable all day bluetooth headphones everyday use lifestyle music lovers workout earphones travel portable long battery waterproof reliable quality sound bass calls microphone easy pairing iphone android",
+      experiments: [],
+      rufusQa: [],
+      creativeBrief: null,
     },
     {
       versionName: "性价比版",
@@ -328,6 +334,9 @@ export function generateThreeListingVersions(): ListingVersion[] {
       ],
       description: "Smart shoppers know that premium features don't require premium prices. These wireless earbuds prove you can have it all - exceptional sound quality, long battery life, waterproof durability, and comfortable fit - without overspending. We've focused on what really matters: reliable performance, great sound, and features you'll actually use every day. No fancy packaging or celebrity endorsements, just honest value and quality you can count on. Perfect for anyone who wants flagship performance at a fraction of the cost.",
       searchTerms: "wireless earbuds budget affordable cheap best value bluetooth headphones under 50 quality sound long battery waterproof reliable durable everyday use workout sports iphone android compatible good reviews recommended",
+      experiments: [],
+      rufusQa: [],
+      creativeBrief: null,
     },
   ];
 }

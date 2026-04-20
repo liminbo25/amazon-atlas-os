@@ -2,8 +2,11 @@ import type {
   CompetitorCopyAnalysis,
   CompetitorListing,
   PainPoint,
+  ProductProfile,
   ReviewData,
+  SupportFaqItem,
   ValuePoint,
+  VocActionPlan,
 } from "@/lib/types";
 import {
   RouteError,
@@ -20,8 +23,11 @@ import {
   resolveAiConfig,
   toErrorResponse,
 } from "@/lib/ai-route-helpers";
-
-const DEFAULT_MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B";
+import { getListingDefaultModel } from "@/lib/listing-ai-runtime";
+import {
+  buildSupportFaqs,
+  buildVocActionPlan,
+} from "@/lib/listing-operator";
 
 const PRIMARY_PROMPT_PLAN: VocPromptPlan = {
   negativeReviewLimit: 18,
@@ -46,13 +52,14 @@ const RETRY_PROMPT_PLAN: VocPromptPlan = {
 };
 
 const VOC_SYSTEM_PROMPT = [
-  "You analyze Amazon competitor listings and review VOC.",
+  "You analyze Amazon competitor listings and review VOC for operators.",
   "Return exactly one valid JSON object.",
   "Do not use markdown code fences.",
   "Do not add explanations before or after the JSON.",
 ].join(" ");
 
 interface KeywordsRequestPayload {
+  productProfile: ProductProfile;
   reviews: Record<string, ReviewData[]>;
   positiveReviews: Record<string, ReviewData[]>;
   listings: CompetitorListing[];
@@ -62,6 +69,8 @@ interface KeywordsResponsePayload {
   painPoints: PainPoint[];
   valuePoints: ValuePoint[];
   competitorAnalysis: CompetitorCopyAnalysis[];
+  vocActionPlan: VocActionPlan | null;
+  supportFaqs: SupportFaqItem[];
 }
 
 interface VocPromptPlan {
@@ -82,10 +91,10 @@ export async function POST(request: Request) {
     const payload = validateKeywordsRequest(body);
     const config = resolveAiConfig({
       runtimeConfig,
-      defaultModel: DEFAULT_MODEL,
+      defaultModel: getListingDefaultModel("vocAnalysis"),
     });
 
-    const result = await requestStructuredJson<KeywordsResponsePayload>({
+    const partialResult = await requestStructuredJson<KeywordsResponsePayload>({
       operationName: "VOC analysis",
       requestText: (attempt) =>
         requestAiTextCompletion({
@@ -99,6 +108,26 @@ export async function POST(request: Request) {
       parseResult: parseKeywordsResponse,
     });
 
+    const result: KeywordsResponsePayload = {
+      ...partialResult,
+      vocActionPlan:
+        partialResult.vocActionPlan ??
+        buildVocActionPlan({
+          productProfile: payload.productProfile,
+          painPoints: partialResult.painPoints,
+          valuePoints: partialResult.valuePoints,
+          competitorAnalysis: partialResult.competitorAnalysis,
+        }),
+      supportFaqs:
+        partialResult.supportFaqs.length > 0
+          ? partialResult.supportFaqs
+          : buildSupportFaqs(
+              payload.productProfile.productName,
+              partialResult.painPoints,
+              partialResult.valuePoints
+            ),
+    };
+
     return Response.json(result);
   } catch (error) {
     if (!(error instanceof RouteError) || error.status >= 500) {
@@ -109,15 +138,14 @@ export async function POST(request: Request) {
   }
 }
 
-function validateKeywordsRequest(
-  body: Record<string, unknown>
-): KeywordsRequestPayload {
+function validateKeywordsRequest(body: Record<string, unknown>): KeywordsRequestPayload {
   const reviews = normalizeReviewGroups(body.reviews, "reviews");
   const positiveReviews = normalizeReviewGroups(
     body.positiveReviews ?? {},
     "positiveReviews"
   );
   const listings = normalizeListings(body.listings);
+  const productProfile = normalizeProductProfile(body.productProfile);
 
   if (listings.length === 0) {
     throw new RouteError("listings must include at least one valid competitor listing.", {
@@ -138,9 +166,34 @@ function validateKeywordsRequest(
   }
 
   return {
+    productProfile,
     reviews,
     positiveReviews,
     listings,
+  };
+}
+
+function normalizeProductProfile(value: unknown): ProductProfile {
+  if (!isRecord(value)) {
+    return {
+      brandName: "",
+      productName: "",
+      productCategory: "",
+      productDescription: "",
+      coreKeywords: "",
+    };
+  }
+
+  return {
+    brandName: normalizeStringValue(value.brandName, { allowEmpty: true }),
+    productName: normalizeStringValue(value.productName, { allowEmpty: true }),
+    productCategory: normalizeStringValue(value.productCategory, {
+      allowEmpty: true,
+    }),
+    productDescription: normalizeStringValue(value.productDescription, {
+      allowEmpty: true,
+    }),
+    coreKeywords: normalizeStringValue(value.coreKeywords, { allowEmpty: true }),
   };
 }
 
@@ -304,6 +357,8 @@ function parseKeywordsResponse(value: unknown): KeywordsResponsePayload {
     painPoints,
     valuePoints,
     competitorAnalysis,
+    vocActionPlan: normalizeVocActionPlan(value.vocActionPlan),
+    supportFaqs: normalizeSupportFaqs(value.supportFaqs),
   };
 }
 
@@ -419,10 +474,107 @@ function normalizeCompetitorAnalysis(
   };
 }
 
-function buildVocPrompt(
-  payload: KeywordsRequestPayload,
-  attempt: number
-): string {
+function normalizeVocActionPlan(value: unknown): VocActionPlan | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const product = normalizeVocActionItems(value.product);
+  const copy = normalizeVocActionItems(value.copy);
+  const aPlus = normalizeVocActionItems(value.aPlus);
+  const support = normalizeVocActionItems(value.support);
+
+  if (
+    product.length === 0 &&
+    copy.length === 0 &&
+    aPlus.length === 0 &&
+    support.length === 0
+  ) {
+    return null;
+  }
+
+  return { product, copy, aPlus, support };
+}
+
+function normalizeVocActionItems(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) {
+        return null;
+      }
+
+      const title = normalizeStringValue(item.title, { allowEmpty: true });
+      const action = normalizeStringValue(item.action, { allowEmpty: true });
+
+      if (!title && !action) {
+        return null;
+      }
+
+      const priorityRaw = normalizeStringValue(item.priority, { allowEmpty: true }).toLowerCase();
+      const priority =
+        priorityRaw === "high" || priorityRaw === "medium" || priorityRaw === "low"
+          ? priorityRaw
+          : "medium";
+
+      return {
+        title,
+        priority,
+        owner: normalizeStringValue(item.owner, { allowEmpty: true }),
+        action,
+        evidence: normalizeTextList(item.evidence, { maxItems: 4, unique: true }),
+      };
+    })
+    .filter(
+      (
+        item
+      ): item is {
+        title: string;
+        priority: "high" | "medium" | "low";
+        owner: string;
+        action: string;
+        evidence: string[];
+      } => item !== null
+    );
+}
+
+function normalizeSupportFaqs(value: unknown): SupportFaqItem[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) {
+        return null;
+      }
+
+      const question = normalizeStringValue(item.question, { allowEmpty: true });
+      const shortAnswer = normalizeStringValue(item.shortAnswer, {
+        allowEmpty: true,
+      });
+
+      if (!question && !shortAnswer) {
+        return null;
+      }
+
+      return {
+        question,
+        shortAnswer,
+        supportGuidance: normalizeStringValue(item.supportGuidance, {
+          allowEmpty: true,
+        }),
+        scenario: normalizeStringValue(item.scenario, { allowEmpty: true }),
+      };
+    })
+    .filter((item): item is SupportFaqItem => item !== null)
+    .slice(0, 6);
+}
+
+function buildVocPrompt(payload: KeywordsRequestPayload, attempt: number): string {
   const promptPlan = resolvePromptPlan(attempt);
   const allNegativeReviews = Object.values(payload.reviews).flat();
   const allPositiveReviews = Object.values(payload.positiveReviews).flat();
@@ -463,10 +615,16 @@ function buildVocPrompt(
     .join("\n\n---\n\n");
 
   return `
-Use the supplied competitor listings and reviews to produce a VOC summary for downstream listing strategy work.
+Use the supplied competitor listings and reviews to produce a VOC summary for downstream Amazon operator execution.
 
 Return all analysis text in Simplified Chinese.
 The input below is a representative sample chosen from the supplied dataset to keep latency stable.
+
+Product context:
+Brand: ${payload.productProfile.brandName || "None"}
+Product: ${payload.productProfile.productName || "None"}
+Category: ${payload.productProfile.productCategory || "None"}
+Seed keywords: ${payload.productProfile.coreKeywords || "None"}
 
 Competitor listings:
 ${listingSummary || "None"}
@@ -507,6 +665,28 @@ Return exactly one JSON object with this shape:
       "strengths": ["Strength 1", "Strength 2"],
       "weaknesses": ["Weakness 1", "Weakness 2"]
     }
+  ],
+  "vocActionPlan": {
+    "product": [
+      {
+        "title": "动作标题",
+        "priority": "high",
+        "owner": "产品 / 供应链",
+        "action": "要做什么",
+        "evidence": ["评论原话"]
+      }
+    ],
+    "copy": [],
+    "aPlus": [],
+    "support": []
+  },
+  "supportFaqs": [
+    {
+      "question": "用户会怎么问",
+      "shortAnswer": "客服 / 文案简答",
+      "supportGuidance": "客服动作",
+      "scenario": "场景标签"
+    }
   ]
 }
 
@@ -515,6 +695,8 @@ Rules:
 - valuePoints must use positive-review evidence only.
 - typicalQuotes must be direct excerpts from the supplied reviews.
 - competitorAnalysis must be based only on the supplied listings.
+- vocActionPlan must split into product / copy / A+ / support four execution lanes.
+- supportFaqs must focus on real shopper objections, not generic FAQ filler.
 - Return JSON only.
 ${getRetryPromptSuffix(attempt)}
   `.trim();

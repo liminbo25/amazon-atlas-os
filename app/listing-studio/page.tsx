@@ -17,8 +17,8 @@ export default function ListingStudioPage() {
     <div className="min-h-screen pb-10">
       <StudioHeader
         eyebrow="Listing 工坊"
-        title="把产品输入、多源数据分析、VOC 诊断、文案生成和导出，放进一条连续的亚马逊 Listing 工作流。"
-        description="现在的流程会先接住产品信息，再串联卖家精灵真实数据、ABA、Rufus 与现有 VOC 分析，让最终文案生成真正做到三源结合。"
+        title="把产品输入、多源分析、VOC 动作层、实验计划和素材执行，放进一条连续的亚马逊专业操盘工作流。"
+        description="现在的流程不只做文案生成，而是先判断值不值得打，再拆关键词路由、PPC 执行单、VOC 行动层、Rufus 承接、A+ / 图片 / 视频 brief，最后统一导出。"
       />
 
       <section className="page-shell mt-8">

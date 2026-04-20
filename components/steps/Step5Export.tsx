@@ -28,10 +28,14 @@ type ExportFormat = "docx" | "xlsx" | "json";
 
 export function Step5Export() {
   const {
+    productProfile,
     targetMarket,
     competitorListings,
+    dataAnalysis,
     painPoints,
     valuePoints,
+    vocActionPlan,
+    supportFaqs,
     listingVersions,
     complianceResults,
     setCurrentStep,
@@ -49,10 +53,14 @@ export function Step5Export() {
   );
 
   const exportInput = {
+    productProfile,
     targetMarket,
     competitorListings,
+    dataAnalysis,
     painPoints,
     valuePoints,
+    vocActionPlan,
+    supportFaqs,
     listingVersions,
     complianceResults,
   };
@@ -118,6 +126,35 @@ export function Step5Export() {
           accentClass="text-red-500"
         />
         <SummaryCard
+          label="Versions / FAQ"
+          value={`${listingVersions.length} / ${supportFaqs.length}`}
+          accentClass="text-blue-500"
+        />
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <SummaryCard
+          label="Opportunity score"
+          value={
+            dataAnalysis?.opportunityAssessment?.score !== undefined
+              ? String(dataAnalysis.opportunityAssessment.score)
+              : "--"
+          }
+          accentClass="text-emerald-600"
+        />
+        <SummaryCard
+          label="VOC actions"
+          value={
+            String(
+              (vocActionPlan?.product.length ?? 0) +
+                (vocActionPlan?.copy.length ?? 0) +
+                (vocActionPlan?.aPlus.length ?? 0) +
+                (vocActionPlan?.support.length ?? 0)
+            )
+          }
+          accentClass="text-violet-600"
+        />
+        <SummaryCard
           label="Versions"
           value={String(listingVersions.length)}
           accentClass="text-blue-500"
@@ -168,7 +205,7 @@ export function Step5Export() {
       <div className="grid gap-4 lg:grid-cols-3">
         <ExportCard
           title="Word report"
-          description="A real .docx report with competitor overview, insights, listing copy, and compliance notes."
+          description="A real .docx report with opportunity scoring, VOC actions, FAQ, listing copy, experiments, creative brief, and compliance notes."
           extension=".docx"
           icon={<FileText className="h-6 w-6 text-blue-600" />}
           iconWrapperClass="bg-blue-100"
@@ -179,7 +216,7 @@ export function Step5Export() {
 
         <ExportCard
           title="Excel workbook"
-          description="A real .xlsx workbook with separate sheets for summary, competitors, insights, listings, and compliance."
+          description="A real .xlsx workbook with summary, opportunity routing, VOC actions, support FAQ, listings, and compliance."
           extension=".xlsx"
           icon={<Table2 className="h-6 w-6 text-green-600" />}
           iconWrapperClass="bg-green-100"
@@ -190,7 +227,7 @@ export function Step5Export() {
 
         <ExportCard
           title="JSON payload"
-          description="A structured .json export with schemaVersion, summary, listingVersions, and complianceResults."
+          description="A structured .json export with opportunity, VOC action plan, FAQ, listing versions, and compliance results."
           extension=".json"
           icon={<FileJson className="h-6 w-6 text-amber-600" />}
           iconWrapperClass="bg-amber-100"

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { checkFieldCompliance } from "@/lib/compliance";
+import { buildCompliancePlaybook, checkFieldCompliance } from "@/lib/compliance";
 import { useListingStore } from "@/lib/store";
 import {
   AiRequestErrorAlert,
@@ -100,10 +100,12 @@ function CompliancePanel({
   versionName,
   results,
   totalViolations,
+  playbook,
 }: {
   versionName: string;
   results: ComplianceResult[];
   totalViolations: number;
+  playbook: ReturnType<typeof buildCompliancePlaybook>;
 }) {
   const fieldNames: Record<string, string> = {
     title: "标题",
@@ -180,6 +182,68 @@ function CompliancePanel({
             </div>
           ))
         )}
+
+        {playbook.length > 0 ? (
+          <div className="space-y-3 rounded-2xl border border-dashed p-4">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4 text-amber-600" />
+              <p className="text-sm font-semibold">类目化合规 Playbook</p>
+            </div>
+            <div className="grid gap-3 lg:grid-cols-2">
+              {playbook.map((item) => (
+                <div
+                  key={`${item.area}-${item.rule}`}
+                  className={[
+                    "rounded-2xl border p-4",
+                    item.triggered
+                      ? "border-amber-300 bg-amber-50/70"
+                      : "border-slate-200 bg-slate-50/50",
+                  ].join(" ")}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium">{item.area}</p>
+                    <Badge
+                      className={
+                        item.riskLevel === "high"
+                          ? "bg-rose-600"
+                          : item.riskLevel === "medium"
+                            ? "bg-amber-500"
+                            : "bg-slate-700"
+                      }
+                    >
+                      {item.riskLevel}
+                    </Badge>
+                    {item.triggered ? (
+                      <Badge variant="destructive">当前文本已触发</Badge>
+                    ) : (
+                      <Badge variant="outline">建议预防检查</Badge>
+                    )}
+                  </div>
+                  <p className="mt-2 text-sm text-slate-900">{item.rule}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{item.whyItMatters}</p>
+                  <p className="mt-2 text-sm text-slate-900">{item.suggestedAction}</p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    需要准备的证据: {item.evidenceNeeded}
+                  </p>
+                  {item.watchTerms.length > 0 ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {item.watchTerms.map((term) => (
+                        <Badge key={`${item.area}-${term}`} variant="outline">
+                          {term}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null}
+                  {item.triggeredExamples.length > 0 ? (
+                    <p className="mt-2 text-xs text-amber-800">
+                      当前命中词: {item.triggeredExamples.join(", ")}
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
@@ -359,6 +423,9 @@ export function Step4Generate() {
 
   const currentCompliance = currentVersion
     ? complianceResults[resolvedActiveVersion] ?? buildComplianceResults(currentVersion)
+    : [];
+  const currentPlaybook = currentVersion
+    ? buildCompliancePlaybook(productProfile.productCategory, currentVersion)
     : [];
 
   const totalViolations = currentCompliance.reduce(
@@ -741,6 +808,127 @@ export function Step4Generate() {
                 />
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">实验层</CardTitle>
+                <CardDescription>
+                  给出可测试变量、假设和建议观察指标，便于进入 MYE 或运营手动 AB 测试。
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {version.experiments.length > 0 ? (
+                  version.experiments.map((item) => (
+                    <div key={`${version.versionName}-${item.variable}`} className="rounded-2xl border p-4">
+                      <p className="font-medium">{item.variable}</p>
+                      <p className="mt-2 text-sm text-muted-foreground">{item.hypothesis}</p>
+                      <p className="mt-2 text-sm text-slate-900">指标: {item.successMetric}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{item.executionNote}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">当前版本没有额外实验建议。</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Rufus 承接</CardTitle>
+                <CardDescription>
+                  面向场景 / 人群 / 顾虑 / 对比问法，方便后续同步到 Q&A、客服和素材脚本。
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 lg:grid-cols-2">
+                {version.rufusQa.length > 0 ? (
+                  version.rufusQa.map((item) => (
+                    <div key={`${version.versionName}-${item.question}`} className="rounded-2xl border p-4">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline">{item.intent || "intent"}</Badge>
+                        <p className="font-medium">{item.question}</p>
+                      </div>
+                      <p className="mt-3 text-sm text-slate-900">{item.answer}</p>
+                      {item.hook ? (
+                        <p className="mt-2 text-xs text-muted-foreground">承接钩子: {item.hook}</p>
+                      ) : null}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-sm text-muted-foreground">当前版本没有额外 Rufus 问答建议。</p>
+                )}
+              </CardContent>
+            </Card>
+
+            {version.creativeBrief ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">A+ / 图片 / 视频 Brief</CardTitle>
+                  <CardDescription>
+                    把文案结果继续延展成设计、拍摄和内容执行方案。
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-2xl border bg-muted/20 p-4">
+                    <p className="text-sm font-semibold">定位</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      {version.creativeBrief.positioning}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-3">
+                    <div className="space-y-2 rounded-2xl border p-4">
+                      <p className="text-sm font-semibold">A+ 模块</p>
+                      {version.creativeBrief.aPlusModules.map((item) => (
+                        <p key={item} className="rounded-lg bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                          {item}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="space-y-2 rounded-2xl border p-4">
+                      <p className="text-sm font-semibold">图片角度</p>
+                      {version.creativeBrief.imageAngles.map((item) => (
+                        <p key={item} className="rounded-lg bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                          {item}
+                        </p>
+                      ))}
+                    </div>
+                    <div className="space-y-2 rounded-2xl border p-4">
+                      <p className="text-sm font-semibold">视频角度</p>
+                      {version.creativeBrief.videoAngles.map((item) => (
+                        <p key={item} className="rounded-lg bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                          {item}
+                        </p>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 rounded-2xl border p-4">
+                    <p className="text-sm font-semibold">交付物</p>
+                    <div className="flex flex-wrap gap-2">
+                      {version.creativeBrief.deliverables.map((item) => (
+                        <Badge key={item}>{item}</Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <p className="text-sm font-semibold">Shot List</p>
+                    {version.creativeBrief.shotList.map((shot) => (
+                      <div key={`${version.versionName}-${shot.title}`} className="rounded-2xl border p-4">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">{shot.assetType}</Badge>
+                          <p className="font-medium">{shot.title}</p>
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">目标: {shot.objective}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">场景: {shot.scene}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">图上文案: {shot.overlay}</p>
+                        <p className="mt-1 text-sm text-slate-900">必须出现的证据: {shot.proof}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
           </TabsContent>
         ))}
       </Tabs>
@@ -750,6 +938,7 @@ export function Step4Generate() {
           versionName={currentVersion.versionName}
           results={currentCompliance}
           totalViolations={totalViolations}
+          playbook={currentPlaybook}
         />
       ) : null}
 

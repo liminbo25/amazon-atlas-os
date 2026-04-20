@@ -1,6 +1,3 @@
-// Listing全案模块类型定义
-
-// ===== 竞品数据 =====
 export interface CompetitorListing {
   asin: string;
   title: string;
@@ -41,7 +38,6 @@ export interface ProductProfile {
   coreKeywords: string;
 }
 
-// ===== VOC 分析 =====
 export type PainPointCategory =
   | "质量问题"
   | "功能缺陷"
@@ -66,7 +62,6 @@ export interface ValuePoint {
   leverageSuggestion: string;
 }
 
-// ===== 竞品文案分析 =====
 export interface CompetitorCopyAnalysis {
   asin: string;
   titleStructure: string;
@@ -76,7 +71,124 @@ export interface CompetitorCopyAnalysis {
   weaknesses: string[];
 }
 
-// ===== Listing 生成 =====
+export type OpportunityVerdict = "priority" | "test" | "watch";
+export type PriorityLevel = "high" | "medium" | "low";
+export type MatchType = "exact" | "phrase" | "broad" | "auto";
+export type AssetType = "image" | "video" | "a-plus";
+
+export interface OpportunityBreakdownItem {
+  key: "demand" | "competition" | "conversion" | "intent";
+  label: string;
+  score: number;
+  rationale: string;
+  evidence: string[];
+}
+
+export interface OpportunityAssessment {
+  score: number;
+  verdict: OpportunityVerdict;
+  summary: string;
+  strengths: string[];
+  risks: string[];
+  nextActions: string[];
+  breakdown: OpportunityBreakdownItem[];
+}
+
+export interface KeywordAllocationItem {
+  keyword: string;
+  priority: PriorityLevel;
+  reason: string;
+  evidence: string;
+}
+
+export interface KeywordCampaignPlan {
+  name: string;
+  goal: string;
+  matchType: MatchType;
+  budgetPriority: PriorityLevel;
+  keywords: string[];
+  negativeKeywords: string[];
+  launchPlan: string;
+}
+
+export interface KeywordStrategy {
+  titleKeywords: KeywordAllocationItem[];
+  bulletKeywords: KeywordAllocationItem[];
+  searchTermKeywords: KeywordAllocationItem[];
+  ppcCoreKeywords: KeywordAllocationItem[];
+  ppcExploratoryKeywords: KeywordAllocationItem[];
+  negativeKeywords: KeywordAllocationItem[];
+  campaignPlans: KeywordCampaignPlan[];
+}
+
+export interface RufusIntentItem {
+  intent: string;
+  question: string;
+  responseAngle: string;
+  listingHooks: string[];
+}
+
+export interface RufusIntentLayer {
+  scene: RufusIntentItem[];
+  audience: RufusIntentItem[];
+  objections: RufusIntentItem[];
+  comparisons: RufusIntentItem[];
+}
+
+export interface VocActionItem {
+  title: string;
+  priority: PriorityLevel;
+  owner: string;
+  action: string;
+  evidence: string[];
+}
+
+export interface VocActionPlan {
+  product: VocActionItem[];
+  copy: VocActionItem[];
+  aPlus: VocActionItem[];
+  support: VocActionItem[];
+}
+
+export interface SupportFaqItem {
+  question: string;
+  shortAnswer: string;
+  supportGuidance: string;
+  scenario: string;
+}
+
+export interface ExperimentPlanItem {
+  variable: string;
+  hypothesis: string;
+  successMetric: string;
+  executionNote: string;
+}
+
+export interface RufusQaItem {
+  intent: string;
+  question: string;
+  answer: string;
+  hook: string;
+}
+
+export interface CreativeShotItem {
+  assetType: AssetType;
+  title: string;
+  objective: string;
+  scene: string;
+  overlay: string;
+  proof: string;
+}
+
+export interface CreativeBrief {
+  positioning: string;
+  aPlusModules: string[];
+  imageAngles: string[];
+  videoAngles: string[];
+  deliverables: string[];
+  shotList: CreativeShotItem[];
+}
+
 export interface ListingVersion {
   versionName: string;
   style: string;
@@ -84,29 +196,49 @@ export interface ListingVersion {
   bulletPoints: string[];
   description: string;
   searchTerms: string;
+  experiments: ExperimentPlanItem[];
+  rufusQa: RufusQaItem[];
+  creativeBrief: CreativeBrief | null;
 }
 
-// ===== 合规检查 =====
 export interface ProhibitedWordMatch {
   word: string;
   position: number;
   context: string;
-  severity: "high" | "medium" | "low";
+  severity: PriorityLevel;
   reason: string;
+  category?: string;
 }
 
+export type ComplianceField =
+  | "title"
+  | "bulletPoints"
+  | "description"
+  | "searchTerms";
+
 export interface ComplianceResult {
-  field: "title" | "bulletPoints" | "description" | "searchTerms";
+  field: ComplianceField;
   passed: boolean;
   violations: ProhibitedWordMatch[];
 }
 
-// ===== 产品图片 =====
+export interface CompliancePlaybookItem {
+  area: string;
+  riskLevel: PriorityLevel;
+  rule: string;
+  whyItMatters: string;
+  suggestedAction: string;
+  evidenceNeeded: string;
+  watchTerms: string[];
+  triggered: boolean;
+  triggeredExamples: string[];
+}
+
 export type ImageCategory = "front" | "left" | "right" | "back" | "detail";
 
 export interface ProductImage {
   id: string;
-  preview: string; // base64 data URL
+  preview: string;
   category: ImageCategory;
   label: string;
 }
@@ -148,6 +280,9 @@ export interface DataAnalysisResult {
   rufusInsights: string[];
   aiRecommendations: string[];
   cosmoFocus: string[];
+  opportunityAssessment: OpportunityAssessment | null;
+  keywordStrategy: KeywordStrategy | null;
+  rufusIntentLayer: RufusIntentLayer | null;
 }
 
 export type AiProvider = "anthropic" | "openai";
@@ -180,13 +315,10 @@ export interface AiRuntimeRequestConfig extends AiRuntimeServiceConfig {
   task: AiRuntimeServiceKey;
 }
 
-// ===== Store State =====
 export interface ListingStore {
-  // 步骤控制
   currentStep: number;
   aiRuntimeSettings: AiRuntimeSettings;
 
-  // Step 1: 需求确认
   productProfile: ProductProfile;
   targetMarket: string;
   competitorAsins: string[];
@@ -195,26 +327,23 @@ export interface ListingStore {
   visionAnalysis: VisionAnalysisResult | null;
   supportAssets: SupportAssets;
 
-  // Step 2: 竞品数据采集
   competitorListings: CompetitorListing[];
-  competitorReviews: Record<string, ReviewData[]>; // asin -> negative reviews
-  positiveReviews: Record<string, ReviewData[]>; // asin -> positive reviews
-  trafficKeywords: Record<string, TrafficKeyword[]>; // asin -> keywords
+  competitorReviews: Record<string, ReviewData[]>;
+  positiveReviews: Record<string, ReviewData[]>;
+  trafficKeywords: Record<string, TrafficKeyword[]>;
   dataAnalysis: DataAnalysisResult | null;
 
-  // Step 3: VOC 深度分析
   painPoints: PainPoint[];
   valuePoints: ValuePoint[];
   competitorAnalysis: CompetitorCopyAnalysis[];
+  vocActionPlan: VocActionPlan | null;
+  supportFaqs: SupportFaqItem[];
 
-  // Step 4: Listing 生成
   listingVersions: ListingVersion[];
-  complianceResults: Record<string, ComplianceResult[]>; // versionName -> results
+  complianceResults: Record<string, ComplianceResult[]>;
 
-  // UI 状态
   isLoading: boolean;
 
-  // Actions
   setCurrentStep: (step: number) => void;
   updateAiRuntimeSettings: (
     service: AiRuntimeServiceKey,
@@ -236,6 +365,8 @@ export interface ListingStore {
   setPainPoints: (points: PainPoint[]) => void;
   setValuePoints: (points: ValuePoint[]) => void;
   setCompetitorAnalysis: (analysis: CompetitorCopyAnalysis[]) => void;
+  setVocActionPlan: (plan: VocActionPlan | null) => void;
+  setSupportFaqs: (items: SupportFaqItem[]) => void;
   setListingVersions: (versions: ListingVersion[]) => void;
   setComplianceResults: (results: Record<string, ComplianceResult[]>) => void;
   setIsLoading: (loading: boolean) => void;

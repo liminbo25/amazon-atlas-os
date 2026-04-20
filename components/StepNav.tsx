@@ -13,9 +13,9 @@ import {
 
 const steps = [
   { num: 1, name: "产品输入", icon: Search },
-  { num: 2, name: "数据分析", icon: Database },
-  { num: 3, name: "VOC 诊断", icon: MessageSquareText },
-  { num: 4, name: "文案生成", icon: FileText },
+  { num: 2, name: "机会与词路由", icon: Database },
+  { num: 3, name: "VOC 行动层", icon: MessageSquareText },
+  { num: 4, name: "文案与执行", icon: FileText },
   { num: 5, name: "导出", icon: Download },
 ];
 

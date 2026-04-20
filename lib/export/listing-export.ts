@@ -1,9 +1,14 @@
+import { buildCompliancePlaybook } from "@/lib/compliance";
 import type {
   ComplianceResult,
   CompetitorListing,
+  DataAnalysisResult,
   ListingVersion,
   PainPoint,
+  ProductProfile,
+  SupportFaqItem,
   ValuePoint,
+  VocActionPlan,
 } from "@/lib/types";
 
 const DOCX_MIME =
@@ -16,10 +21,14 @@ const EXPORT_SCHEMA_VERSION = "listing-module.export.v1";
 type DocxModule = typeof import("docx");
 
 export interface ListingExportInput {
+  productProfile: ProductProfile;
   targetMarket: string;
   competitorListings: CompetitorListing[];
+  dataAnalysis: DataAnalysisResult | null;
   painPoints: PainPoint[];
   valuePoints: ValuePoint[];
+  vocActionPlan: VocActionPlan | null;
+  supportFaqs: SupportFaqItem[];
   listingVersions: ListingVersion[];
   complianceResults: Record<string, ComplianceResult[]>;
 }
@@ -31,18 +40,24 @@ export interface ListingExportPayload {
   targetMarket: string;
   summary: {
     competitorCount: number;
+    opportunityScore: number | null;
     painPointCount: number;
     valuePointCount: number;
+    supportFaqCount: number;
     listingVersionCount: number;
     totalViolations: number;
   };
   competitorListings: CompetitorListing[];
+  dataAnalysis: DataAnalysisResult | null;
   painPoints: PainPoint[];
   valuePoints: ValuePoint[];
+  vocActionPlan: VocActionPlan | null;
+  supportFaqs: SupportFaqItem[];
   listingVersions: Array<
     ListingVersion & {
       totalViolations: number;
       complianceResults: ComplianceResult[];
+      compliancePlaybook: ReturnType<typeof buildCompliancePlaybook>;
     }
   >;
   complianceResults: Record<string, ComplianceResult[]>;
@@ -63,6 +78,10 @@ export function buildListingExportPayload(
       ...version,
       totalViolations,
       complianceResults: versionCompliance,
+      compliancePlaybook: buildCompliancePlaybook(
+        input.productProfile.productCategory,
+        version
+      ),
     };
   });
 
@@ -78,14 +97,19 @@ export function buildListingExportPayload(
     targetMarket: input.targetMarket,
     summary: {
       competitorCount: input.competitorListings.length,
+      opportunityScore: input.dataAnalysis?.opportunityAssessment?.score ?? null,
       painPointCount: input.painPoints.length,
       valuePointCount: input.valuePoints.length,
+      supportFaqCount: input.supportFaqs.length,
       listingVersionCount: input.listingVersions.length,
       totalViolations,
     },
     competitorListings: input.competitorListings,
+    dataAnalysis: input.dataAnalysis,
     painPoints: input.painPoints,
     valuePoints: input.valuePoints,
+    vocActionPlan: input.vocActionPlan,
+    supportFaqs: input.supportFaqs,
     listingVersions,
     complianceResults: input.complianceResults,
   };
@@ -131,6 +155,11 @@ export async function exportListingReportDocx(
     }),
     ...buildCompetitorParagraphs(docx, payload),
     new Paragraph({
+      text: "Opportunity And Keyword Routing",
+      heading: HeadingLevel.HEADING_1,
+    }),
+    ...buildOpportunityParagraphs(docx, payload),
+    new Paragraph({
       text: "Pain Point Insights",
       heading: HeadingLevel.HEADING_1,
     }),
@@ -140,6 +169,16 @@ export async function exportListingReportDocx(
       heading: HeadingLevel.HEADING_1,
     }),
     ...buildValuePointParagraphs(docx, payload),
+    new Paragraph({
+      text: "VOC Action Plan",
+      heading: HeadingLevel.HEADING_1,
+    }),
+    ...buildVocActionParagraphs(docx, payload),
+    new Paragraph({
+      text: "Support FAQs",
+      heading: HeadingLevel.HEADING_1,
+    }),
+    ...buildSupportFaqParagraphs(docx, payload),
     new Paragraph({
       text: "Listing Versions",
       heading: HeadingLevel.HEADING_1,
@@ -188,6 +227,11 @@ export async function exportListingWorkbookXlsx(
   );
   XLSX.utils.book_append_sheet(
     workbook,
+    XLSX.utils.json_to_sheet(buildOpportunityRows(payload)),
+    "Opportunity"
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
     XLSX.utils.json_to_sheet(buildPainPointRows(payload)),
     "PainPoints"
   );
@@ -195,6 +239,16 @@ export async function exportListingWorkbookXlsx(
     workbook,
     XLSX.utils.json_to_sheet(buildValuePointRows(payload)),
     "ValuePoints"
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(buildVocActionRows(payload)),
+    "VocActions"
+  );
+  XLSX.utils.book_append_sheet(
+    workbook,
+    XLSX.utils.json_to_sheet(buildSupportFaqRows(payload)),
+    "SupportFaqs"
   );
   XLSX.utils.book_append_sheet(
     workbook,
@@ -268,6 +322,72 @@ function buildCompetitorParagraphs(
   ]);
 }
 
+function buildOpportunityParagraphs(
+  docx: DocxModule,
+  payload: ListingExportPayload
+) {
+  const { HeadingLevel, Paragraph } = docx;
+  const opportunity = payload.dataAnalysis?.opportunityAssessment;
+  const keywordStrategy = payload.dataAnalysis?.keywordStrategy;
+
+  if (!opportunity && !keywordStrategy) {
+    return [new Paragraph("No opportunity or keyword strategy data available.")];
+  }
+
+  return [
+    ...(opportunity
+      ? [
+          new Paragraph({
+            text: "Opportunity Score",
+            heading: HeadingLevel.HEADING_2,
+          }),
+          createLabelParagraph(
+            docx,
+            "Score / Verdict",
+            `${opportunity.score} / ${opportunity.verdict}`
+          ),
+          createLabelParagraph(docx, "Summary", opportunity.summary),
+          ...createBulletParagraphs(docx, opportunity.strengths, "Strengths"),
+          ...createBulletParagraphs(docx, opportunity.risks, "Risks"),
+          ...createBulletParagraphs(docx, opportunity.nextActions, "Next Actions"),
+        ]
+      : []),
+    ...(keywordStrategy
+      ? [
+          new Paragraph({
+            text: "Keyword Routing",
+            heading: HeadingLevel.HEADING_2,
+          }),
+          createLabelParagraph(
+            docx,
+            "Title Keywords",
+            keywordStrategy.titleKeywords.map((item) => item.keyword).join(" | ")
+          ),
+          createLabelParagraph(
+            docx,
+            "Bullet Keywords",
+            keywordStrategy.bulletKeywords.map((item) => item.keyword).join(" | ")
+          ),
+          createLabelParagraph(
+            docx,
+            "Search Terms Keywords",
+            keywordStrategy.searchTermKeywords.map((item) => item.keyword).join(" | ")
+          ),
+          createLabelParagraph(
+            docx,
+            "PPC Core Keywords",
+            keywordStrategy.ppcCoreKeywords.map((item) => item.keyword).join(" | ")
+          ),
+          createLabelParagraph(
+            docx,
+            "Negative Keywords",
+            keywordStrategy.negativeKeywords.map((item) => item.keyword).join(" | ")
+          ),
+        ]
+      : []),
+  ];
+}
+
 function buildPainPointParagraphs(
   docx: DocxModule,
   payload: ListingExportPayload
@@ -318,6 +438,61 @@ function buildValuePointParagraphs(
   ]);
 }
 
+function buildVocActionParagraphs(
+  docx: DocxModule,
+  payload: ListingExportPayload
+) {
+  const { HeadingLevel, Paragraph } = docx;
+  const plan = payload.vocActionPlan;
+
+  if (!plan) {
+    return [new Paragraph("No VOC action plan available.")];
+  }
+
+  return (
+    [
+      ["Product", plan.product],
+      ["Copy", plan.copy],
+      ["A+", plan.aPlus],
+      ["Support", plan.support],
+    ] as const
+  ).flatMap(([title, items]) => [
+    new Paragraph({
+      text: title,
+      heading: HeadingLevel.HEADING_2,
+    }),
+    ...(items.length > 0
+      ? items.flatMap((item) => [
+          createLabelParagraph(docx, "Action", `${item.title} | ${item.owner}`),
+          createLabelParagraph(docx, "Details", item.action),
+          ...createBulletParagraphs(docx, item.evidence, "Evidence"),
+        ])
+      : [new Paragraph("No actions.")]),
+  ]);
+}
+
+function buildSupportFaqParagraphs(
+  docx: DocxModule,
+  payload: ListingExportPayload
+) {
+  const { HeadingLevel, Paragraph } = docx;
+
+  if (payload.supportFaqs.length === 0) {
+    return [new Paragraph("No support FAQs available.")];
+  }
+
+  return payload.supportFaqs.flatMap((faq, index) => [
+    new Paragraph({
+      text: `FAQ ${index + 1}`,
+      heading: HeadingLevel.HEADING_2,
+    }),
+    createLabelParagraph(docx, "Question", faq.question),
+    createLabelParagraph(docx, "Short Answer", faq.shortAnswer),
+    createLabelParagraph(docx, "Guidance", faq.supportGuidance),
+    createLabelParagraph(docx, "Scenario", faq.scenario),
+  ]);
+}
+
 function buildListingVersionParagraphs(
   docx: DocxModule,
   payload: ListingExportPayload
@@ -338,6 +513,28 @@ function buildListingVersionParagraphs(
     createLabelParagraph(docx, "Bullet Points", version.bulletPoints.join("\n")),
     createLabelParagraph(docx, "Description", version.description),
     createLabelParagraph(docx, "Search Terms", version.searchTerms),
+    ...createBulletParagraphs(
+      docx,
+      version.experiments.map(
+        (item) => `${item.variable} | ${item.hypothesis} | ${item.successMetric}`
+      ),
+      "Experiments"
+    ),
+    ...createBulletParagraphs(
+      docx,
+      version.rufusQa.map((item) => `${item.intent} | ${item.question} | ${item.answer}`),
+      "Rufus QA"
+    ),
+    createLabelParagraph(
+      docx,
+      "Creative Positioning",
+      version.creativeBrief?.positioning || "None"
+    ),
+    ...createBulletParagraphs(
+      docx,
+      version.creativeBrief?.deliverables || [],
+      "Creative Deliverables"
+    ),
   ]);
 }
 
@@ -392,6 +589,12 @@ function buildComplianceParagraphs(
           })
         ),
       ]),
+      ...version.compliancePlaybook.map((item) =>
+        new Paragraph({
+          text: `[${item.riskLevel.toUpperCase()}] ${item.area} | ${item.rule} | ${item.triggered ? `Triggered: ${item.triggeredExamples.join(", ")}` : "Preventive check"}`,
+          bullet: { level: 0 },
+        })
+      ),
     ];
   });
 }
@@ -403,8 +606,10 @@ function buildSummaryRows(payload: ListingExportPayload) {
     { item: "exportedAtLocal", value: payload.exportedAtLocal },
     { item: "targetMarket", value: payload.targetMarket },
     { item: "competitorCount", value: payload.summary.competitorCount },
+    { item: "opportunityScore", value: payload.summary.opportunityScore ?? "" },
     { item: "painPointCount", value: payload.summary.painPointCount },
     { item: "valuePointCount", value: payload.summary.valuePointCount },
+    { item: "supportFaqCount", value: payload.summary.supportFaqCount },
     { item: "listingVersionCount", value: payload.summary.listingVersionCount },
     { item: "totalViolations", value: payload.summary.totalViolations },
   ];
@@ -423,6 +628,38 @@ function buildCompetitorRows(payload: ListingExportPayload) {
     bulletPoints: listing.bulletPoints.join("\n"),
     attributes: formatAttributes(listing.attributes),
   }));
+}
+
+function buildOpportunityRows(payload: ListingExportPayload) {
+  const opportunity = payload.dataAnalysis?.opportunityAssessment;
+  const keywordStrategy = payload.dataAnalysis?.keywordStrategy;
+
+  return [
+    {
+      section: "opportunity",
+      key: "score",
+      value: opportunity?.score ?? "",
+      detail: opportunity?.summary ?? "",
+    },
+    {
+      section: "opportunity",
+      key: "verdict",
+      value: opportunity?.verdict ?? "",
+      detail: (opportunity?.nextActions ?? []).join(" | "),
+    },
+    {
+      section: "keywordRouting",
+      key: "titleKeywords",
+      value: keywordStrategy?.titleKeywords.map((item) => item.keyword).join(" | ") ?? "",
+      detail: "",
+    },
+    {
+      section: "keywordRouting",
+      key: "ppcCoreKeywords",
+      value: keywordStrategy?.ppcCoreKeywords.map((item) => item.keyword).join(" | ") ?? "",
+      detail: "",
+    },
+  ];
 }
 
 function buildPainPointRows(payload: ListingExportPayload) {
@@ -447,6 +684,41 @@ function buildValuePointRows(payload: ListingExportPayload) {
   }));
 }
 
+function buildVocActionRows(payload: ListingExportPayload) {
+  if (!payload.vocActionPlan) {
+    return [{ lane: "", title: "", owner: "", priority: "", action: "", evidence: "" }];
+  }
+
+  return (
+    [
+      ["product", payload.vocActionPlan.product],
+      ["copy", payload.vocActionPlan.copy],
+      ["aPlus", payload.vocActionPlan.aPlus],
+      ["support", payload.vocActionPlan.support],
+    ] as const
+  ).flatMap(([lane, items]) =>
+    items.map((item) => ({
+      lane,
+      title: item.title,
+      owner: item.owner,
+      priority: item.priority,
+      action: item.action,
+      evidence: item.evidence.join(" | "),
+    }))
+  );
+}
+
+function buildSupportFaqRows(payload: ListingExportPayload) {
+  return payload.supportFaqs.length > 0
+    ? payload.supportFaqs.map((item) => ({
+        question: item.question,
+        shortAnswer: item.shortAnswer,
+        supportGuidance: item.supportGuidance,
+        scenario: item.scenario,
+      }))
+    : [{ question: "", shortAnswer: "", supportGuidance: "", scenario: "" }];
+}
+
 function buildListingRows(payload: ListingExportPayload) {
   return payload.listingVersions.map((version) => ({
     versionName: version.versionName,
@@ -459,6 +731,9 @@ function buildListingRows(payload: ListingExportPayload) {
     bulletPoint5: version.bulletPoints[4] || "",
     description: version.description,
     searchTerms: version.searchTerms,
+    experiments: version.experiments.map((item) => item.variable).join(" | "),
+    rufusQa: version.rufusQa.map((item) => item.question).join(" | "),
+    creativePositioning: version.creativeBrief?.positioning || "",
     totalViolations: version.totalViolations,
   }));
 }
@@ -508,8 +783,22 @@ function buildComplianceRows(payload: ListingExportPayload) {
     });
   });
 
-  return rows.length > 0
-    ? rows
+  const playbookRows = payload.listingVersions.flatMap((version) =>
+    version.compliancePlaybook.map((item) => ({
+      versionName: version.versionName,
+      field: `Playbook:${item.area}`,
+      passed: item.triggered ? "Triggered" : "Check",
+      severity: item.riskLevel,
+      word: item.triggeredExamples.join(" | "),
+      reason: item.rule,
+      context: item.suggestedAction,
+    }))
+  );
+
+  const combinedRows = [...rows, ...playbookRows];
+
+  return combinedRows.length > 0
+    ? combinedRows
     : [
         {
           versionName: "",

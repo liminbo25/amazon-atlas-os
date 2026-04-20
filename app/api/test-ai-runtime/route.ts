@@ -7,13 +7,17 @@ import {
   resolveAiConfig,
   toErrorResponse,
 } from "@/lib/ai-route-helpers";
+import { getListingDefaultModel } from "@/lib/listing-ai-runtime";
 
 const DEFAULT_MODEL_BY_SERVICE = {
-  imageAnalysis: "vision-model",
-  vocAnalysis: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
-  listingGeneration: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
-  legacyCopyDiagnosis: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+  imageAnalysis: getListingDefaultModel("imageAnalysis"),
+  vocAnalysis: getListingDefaultModel("vocAnalysis"),
+  listingGeneration: getListingDefaultModel("listingGeneration"),
+  legacyCopyDiagnosis: getListingDefaultModel("legacyCopyDiagnosis"),
 } as const;
+
+const FALLBACK_RUNTIME_TEST_SERVICE: keyof typeof DEFAULT_MODEL_BY_SERVICE =
+  "vocAnalysis";
 
 export async function POST(request: Request) {
   try {
@@ -22,7 +26,9 @@ export async function POST(request: Request) {
     const service = readServiceName(body);
     const config = resolveAiConfig({
       runtimeConfig,
-      defaultModel: service ? DEFAULT_MODEL_BY_SERVICE[service] : undefined,
+      defaultModel: service
+        ? DEFAULT_MODEL_BY_SERVICE[service]
+        : DEFAULT_MODEL_BY_SERVICE[FALLBACK_RUNTIME_TEST_SERVICE],
     });
 
     const output = await requestAiTextCompletion({

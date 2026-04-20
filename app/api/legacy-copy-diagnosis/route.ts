@@ -12,6 +12,7 @@ import {
   resolveAiConfig,
   toErrorResponse,
 } from "@/lib/ai-route-helpers";
+import { getListingDefaultModel } from "@/lib/listing-ai-runtime";
 import { buildLegacyDiagnosisReport } from "@/lib/legacy-copy-diagnosis/analysis";
 import type {
   LegacyAiOutput,
@@ -25,8 +26,6 @@ import {
   isSellerSpriteClientError,
 } from "@/lib/seller-sprite-client";
 import type { SellerSpriteRuntimeConfig } from "@/lib/types";
-
-const DEFAULT_MODEL = "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B";
 
 const LEGACY_DIAGNOSIS_SYSTEM_PROMPT = [
   "You diagnose Amazon legacy listing copy for an internal workflow.",
@@ -295,7 +294,7 @@ async function maybeGenerateAiRecommendations(
   try {
     config = resolveAiConfig({
       runtimeConfig,
-      defaultModel: DEFAULT_MODEL,
+      defaultModel: getListingDefaultModel("legacyCopyDiagnosis"),
     });
   } catch (error) {
     if (error instanceof RouteError) {
