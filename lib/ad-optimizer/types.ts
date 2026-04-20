@@ -2,18 +2,41 @@ export type ReportKind = "search-term" | "placement" | "bulk-identity";
 
 export type TargetingType = "keyword" | "auto" | "product" | "unknown";
 
+export type StrategyTemplateId =
+  | "launch"
+  | "profit"
+  | "clearance"
+  | "brand-defense";
+
 export type RecommendationType =
   | "harvest_exact"
   | "harvest_product_target"
   | "negative_exact"
+  | "negative_phrase"
+  | "governance_negative_exact"
+  | "governance_negative_phrase"
   | "lower_bid"
   | "raise_bid"
   | "raise_placement_modifier"
-  | "lower_placement_modifier";
+  | "lower_placement_modifier"
+  | "watch_placement_modifier"
+  | "increase_budget"
+  | "decrease_budget";
+
+export type RecommendationSurface =
+  | "harvest"
+  | "governance"
+  | "bid"
+  | "placement"
+  | "budget";
 
 export type RecommendationStatus = "ready" | "needs_review";
 
 export type RecommendationPriority = "high" | "medium" | "low";
+
+export type NegativeScope = "ad_group" | "campaign";
+
+export type RecommendationLifecycleStatus = "new" | "accepted" | "ignored";
 
 export interface MetricBundle {
   impressions: number;
@@ -29,12 +52,32 @@ export interface MetricBundle {
   roas: number;
 }
 
+export interface ProfitView {
+  grossMarginPct: number | null;
+  profitSafetyMarginPct: number;
+  breakEvenAcos: number | null;
+  profitSafeAcos: number | null;
+  estimatedProfit: number | null;
+  estimatedProfitMargin: number | null;
+  tacos: number | null;
+  tacosIsEstimated: boolean;
+}
+
 export interface UploadedWorkbookMeta {
   kind: ReportKind;
   fileName: string;
   sheetName: string;
   rowCount: number;
   warnings: string[];
+  recognized: boolean;
+}
+
+export interface PlacementDiagnostics {
+  recognized: boolean;
+  fallbackReason: string | null;
+  hasAdGroupDimension: boolean;
+  detectedPlacementColumn: string | null;
+  normalizedPlacementCount: number;
 }
 
 export interface SearchTermRecord {
@@ -43,6 +86,7 @@ export interface SearchTermRecord {
   portfolioName: string;
   currency: string;
   country: string;
+  retailer: string;
   targetingText: string;
   customerSearchTerm: string;
   matchType: string;
@@ -73,11 +117,16 @@ export interface ParsedPlacementReport {
   meta: UploadedWorkbookMeta;
   rows: PlacementRecord[];
   usable: boolean;
+  diagnostics: PlacementDiagnostics;
 }
 
 export interface BulkCampaignIdentity {
   campaignId: string;
   campaignName: string;
+  portfolioName: string;
+  dailyBudget: number | null;
+  bidStrategy: string;
+  status: string;
 }
 
 export interface BulkAdGroupIdentity {
@@ -86,6 +135,7 @@ export interface BulkAdGroupIdentity {
   adGroupId: string;
   adGroupName: string;
   defaultBid: number | null;
+  status: string;
 }
 
 export interface BulkKeywordIdentity {
@@ -143,7 +193,10 @@ export interface AggregatedSearchTerm {
   id: string;
   campaignName: string;
   adGroupName: string;
+  portfolioName: string;
   targetingText: string;
+  sourceTargets: string[];
+  sourceMatchTypes: string[];
   matchType: string;
   targetingType: TargetingType;
   customerSearchTerm: string;
@@ -159,6 +212,7 @@ export interface AggregatedSearchTerm {
   sourceProductTargetId: string | null;
   hasExactKeywordAlready: boolean;
   hasNegativeExactAlready: boolean;
+  hasNegativePhraseAlready: boolean;
   hasProductTargetAlready: boolean;
 }
 
@@ -166,6 +220,7 @@ export interface AggregatedTarget {
   id: string;
   campaignName: string;
   adGroupName: string;
+  portfolioName: string;
   targetingText: string;
   matchType: string;
   targetingType: TargetingType;
@@ -190,11 +245,88 @@ export interface PlacementPerformance {
   deltaSalesPct: number | null;
   campaignId: string | null;
   currentAdjustment: number | null;
+  sourceAdGroupCount: number;
+}
+
+export interface BudgetGuidance {
+  type: "increase_budget" | "decrease_budget" | null;
+  currentBudget: number | null;
+  suggestedBudget: number | null;
+  utilization: number | null;
+  reason: string | null;
+}
+
+export interface CampaignPerformance {
+  id: string;
+  campaignName: string;
+  portfolioName: string;
+  campaignId: string | null;
+  current: MetricBundle;
+  previous: MetricBundle | null;
+  deltaCostPct: number | null;
+  deltaSalesPct: number | null;
+  deltaOrders: number;
+  profitView: ProfitView;
+  dailyBudget: number | null;
+  budgetUtilization: number | null;
+  budgetGuidance: BudgetGuidance;
+  placementSuggestionCount: number;
+  governanceRiskCount: number;
+  budgetSuggestionCount: number;
+  recommendationCount: number;
+}
+
+export interface AdGroupPerformance {
+  id: string;
+  campaignName: string;
+  adGroupName: string;
+  portfolioName: string;
+  campaignId: string | null;
+  adGroupId: string | null;
+  current: MetricBundle;
+  previous: MetricBundle | null;
+  deltaCostPct: number | null;
+  deltaSalesPct: number | null;
+  deltaOrders: number;
+  profitView: ProfitView;
+  parentBudgetGuidance: BudgetGuidance;
+  placementSuggestionCount: number;
+  governanceRiskCount: number;
+  recommendationCount: number;
+}
+
+export interface GovernanceRiskEntity {
+  campaignName: string;
+  adGroupName: string;
+  targetingText: string;
+  spend: number;
+  sales: number;
+  orders: number;
+  acos: number | null;
+}
+
+export interface GovernanceRisk {
+  id: string;
+  searchTerm: string;
+  overlapType: "cross_campaign" | "cross_ad_group";
+  severity: RecommendationPriority;
+  winningCampaignName: string;
+  winningAdGroupName: string;
+  winningTargetingText: string;
+  losers: GovernanceRiskEntity[];
+  spendAtRisk: number;
+  suggestedMatchType: "negative-exact" | "negative-phrase";
+  suggestedScope: NegativeScope;
+  reason: string;
+  affectedCampaignNames: string[];
+  affectedAdGroupKeys: string[];
+  recommendationIds: string[];
 }
 
 export interface Recommendation {
   id: string;
   type: RecommendationType;
+  surface: RecommendationSurface;
   actionLabel: string;
   title: string;
   reason: string;
@@ -209,10 +341,13 @@ export interface Recommendation {
   matchType: string;
   targetingType: TargetingType;
   entityLevel: string;
+  negativeScope: NegativeScope | null;
   keywordId: string | null;
   productTargetId: string | null;
   currentBid: number | null;
   suggestedBid: number | null;
+  currentBudget: number | null;
+  suggestedBudget: number | null;
   suggestedMatchType: string | null;
   suggestedTargetExpression: string | null;
   placementName: string | null;
@@ -231,11 +366,27 @@ export interface Recommendation {
 }
 
 export interface AnalysisControls {
+  templateId: StrategyTemplateId;
   targetAcos: number;
   minHarvestOrders: number;
   minNegateClicks: number;
   minBidClicks: number;
   minRaiseOrders: number;
+  grossMarginPct: number | null;
+  profitSafetyMarginPct: number;
+  tacosTarget: number | null;
+  budgetIncreasePct: number;
+  budgetDecreasePct: number;
+  minBudgetUsagePct: number;
+  minCampaignSpend: number;
+  minPlacementClicks: number;
+}
+
+export interface StrategyTemplate {
+  id: StrategyTemplateId;
+  label: string;
+  description: string;
+  defaultControls: Omit<AnalysisControls, "templateId">;
 }
 
 export interface AnalysisSummary {
@@ -248,11 +399,14 @@ export interface AnalysisSummary {
   uniqueAdGroups: number;
   uniqueTargets: number;
   uniqueSearchTerms: number;
+  profitView: ProfitView;
+  totalRecommendationCount: number;
 }
 
 export interface RecommendationBucketSummary {
   type: RecommendationType;
   label: string;
+  surface: RecommendationSurface;
   count: number;
   readyCount: number;
   reviewCount: number;
@@ -268,9 +422,30 @@ export interface MappingCoverageSummary {
   reviewRecommendations: number;
 }
 
+export interface RecommendationLifecycleEntry {
+  at: string;
+  action: "generated" | "accepted" | "ignored" | "note";
+  detail: string;
+}
+
+export interface RecommendationLifecycleState {
+  recommendationId: string;
+  status: RecommendationLifecycleStatus;
+  note: string;
+  generatedAt: string;
+  updatedAt: string | null;
+  history: RecommendationLifecycleEntry[];
+}
+
+export type RecommendationLifecycleMap = Record<
+  string,
+  RecommendationLifecycleState
+>;
+
 export interface AdOptimizerAnalysisResult {
   generatedAt: string;
   controls: AnalysisControls;
+  template: StrategyTemplate;
   files: {
     current: UploadedWorkbookMeta;
     previous: UploadedWorkbookMeta | null;
@@ -281,10 +456,14 @@ export interface AdOptimizerAnalysisResult {
   summary: AnalysisSummary;
   bulkIdentitySummary: BulkIdentitySummary | null;
   mappingCoverage: MappingCoverageSummary | null;
+  placementDiagnostics: PlacementDiagnostics;
   recommendationSummary: RecommendationBucketSummary[];
   recommendations: Recommendation[];
   topSearchTerms: AggregatedSearchTerm[];
   topTargets: AggregatedTarget[];
   topPlacements: PlacementPerformance[];
+  campaignRows: CampaignPerformance[];
+  adGroupRows: AdGroupPerformance[];
+  governanceRisks: GovernanceRisk[];
   reviewItems: Recommendation[];
 }

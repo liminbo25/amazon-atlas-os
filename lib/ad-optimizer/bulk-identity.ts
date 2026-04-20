@@ -8,19 +8,78 @@ import type {
   BulkPlacementAdjustmentIdentity,
   BulkProductTargetIdentity,
   SearchTermRecord,
-  TargetingType,
 } from "@/lib/ad-optimizer/types";
+import {
+  buildAdGroupKey,
+  buildCampaignKey,
+  buildKeywordKey,
+  buildNegativeKeywordKey,
+  buildPlacementAdjustmentKey,
+  buildProductTargetKey,
+  canonicalizeMatchType,
+  canonicalizeNegativeMatchType,
+  canonicalizePlacementName,
+  normalizeText,
+  parseNumberLike,
+  resolveTargetingType,
+} from "@/lib/ad-optimizer/shared";
 
 type SheetRow = Record<string, unknown>;
 
 const BULK_SHEET_NAME = "商品推广活动";
+
+const BULK_HEADERS = {
+  entityLevel: ["实体层级", "Entity", "Entity Level"],
+  campaignId: ["广告活动编号", "Campaign Id", "Campaign ID"],
+  adGroupId: ["广告组编号", "Ad Group Id", "Ad Group ID"],
+  keywordId: ["关键词编号", "Keyword Id", "Keyword ID"],
+  productTargetId: ["商品投放 ID", "Product Targeting ID"],
+  campaignName: [
+    "广告活动名称",
+    "广告活动名称（仅供参考）",
+    "Campaign Name",
+    "Campaign Name (Informational only)",
+  ],
+  adGroupName: [
+    "广告组名称",
+    "广告组名称（仅供参考）",
+    "Ad Group Name",
+    "Ad Group Name (Informational only)",
+  ],
+  portfolioName: [
+    "广告组合名称（仅供参考）",
+    "广告组合名称",
+    "Portfolio Name (Informational only)",
+    "Portfolio Name",
+  ],
+  dailyBudget: ["每日预算", "Daily Budget", "Budget"],
+  bidStrategy: ["竞价方案", "Bidding Strategy"],
+  status: ["状态", "State", "Status"],
+  defaultBid: [
+    "广告组默认竞价",
+    "广告组默认竞价（仅供参考）",
+    "Ad Group Default Bid",
+    "Ad Group Default Bid (Informational only)",
+  ],
+  bid: ["竞价", "Bid"],
+  keywordText: ["关键词文本", "Keyword Text"],
+  matchType: ["匹配类型", "Match Type"],
+  placementName: ["广告位", "Placement"],
+  percentage: ["百分比", "Percentage"],
+  targetExpression: [
+    "拓展商品投放编号",
+    "拓展商品投放名称（仅供参考）",
+    "Resolved Product Targeting Expression",
+    "Product Targeting Expression",
+    "Keyword Text",
+  ],
+} as const;
 
 export async function parseBulkIdentityWorkbookFile(
   file: File
 ): Promise<BulkIdentityBundle> {
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: "array", cellDates: false });
-
   return buildBulkIdentityBundleFromWorkbook(workbook, file.name);
 }
 
@@ -31,7 +90,7 @@ export function buildBulkIdentityBundleFromWorkbook(
   const sheetName = findSponsoredProductsSheetName(workbook);
   if (!sheetName) {
     throw new Error(
-      "未在 bulk 文件中找到“商品推广活动”工作表，请重新导出 Sponsored Products bulk。"
+      "未在 bulk 文件中找到“商品推广活动 / Sponsored Products”工作表，请重新导出 Amazon Ads bulk。"
     );
   }
 
@@ -58,23 +117,30 @@ export function buildBulkIdentityBundleFromWorkbook(
   let placementAdjustmentCount = 0;
 
   for (const row of rows) {
-    const entityLevel = readString(row["实体层级"]);
-    const campaignId = readString(row["广告活动编号"]);
-    const adGroupId = readString(row["广告组编号"]);
-    const keywordId = readString(row["关键词编号"]);
-    const productTargetId = readString(row["商品投放 ID"]);
-    const campaignName = resolveBulkCampaignName(row);
-    const adGroupName = resolveBulkAdGroupName(row);
+    const entityLevel = canonicalizeEntityLevel(readFromHeaders(row, BULK_HEADERS.entityLevel));
+    const campaignId = readFromHeaders(row, BULK_HEADERS.campaignId);
+    const adGroupId = readFromHeaders(row, BULK_HEADERS.adGroupId);
+    const keywordId = readFromHeaders(row, BULK_HEADERS.keywordId);
+    const productTargetId = readFromHeaders(row, BULK_HEADERS.productTargetId);
+    const campaignName = readFromHeaders(row, BULK_HEADERS.campaignName);
+    const adGroupName = readFromHeaders(row, BULK_HEADERS.adGroupName);
+    const portfolioName = readFromHeaders(row, BULK_HEADERS.portfolioName);
+    const status = readFromHeaders(row, BULK_HEADERS.status);
 
-    if (entityLevel === "广告活动" && campaignId && campaignName) {
+    if (entityLevel === "campaign" && campaignId && campaignName) {
       campaignsByName.set(buildCampaignKey(campaignName), {
         campaignId,
         campaignName,
+        portfolioName,
+        dailyBudget: parseNumberLike(readFromHeaders(row, BULK_HEADERS.dailyBudget)),
+        bidStrategy: readFromHeaders(row, BULK_HEADERS.bidStrategy),
+        status,
       });
+      continue;
     }
 
     if (
-      entityLevel === "广告组" &&
+      entityLevel === "ad-group" &&
       campaignId &&
       adGroupId &&
       campaignName &&
@@ -85,53 +151,54 @@ export function buildBulkIdentityBundleFromWorkbook(
         campaignName,
         adGroupId,
         adGroupName,
-        defaultBid:
-          parseNumberLike(row["广告组默认竞价"]) ??
-          parseNumberLike(row["广告组默认竞价（仅供参考）"]),
+        defaultBid: parseNumberLike(readFromHeaders(row, BULK_HEADERS.defaultBid)),
+        status,
       });
+      continue;
     }
 
     if (
-      entityLevel === "关键词" &&
+      entityLevel === "keyword" &&
       campaignId &&
       adGroupId &&
       keywordId &&
       campaignName &&
       adGroupName
     ) {
-      const keywordText = readString(row["关键词文本"]);
-      const matchType = canonicalizeMatchType(row["匹配类型"]);
-
-      if (keywordText && matchType) {
-        const identity: BulkKeywordIdentity = {
-          campaignId,
-          campaignName,
-          adGroupId,
-          adGroupName,
-          keywordId,
-          keywordText,
-          matchType,
-          bid:
-            parseNumberLike(row["竞价"]) ??
-            parseNumberLike(row["广告组默认竞价"]) ??
-            parseNumberLike(row["广告组默认竞价（仅供参考）"]),
-        };
-
-        keywordsByKey.set(
-          buildKeywordKey(campaignName, adGroupName, keywordText, matchType),
-          identity
-        );
-
-        if (matchType === "exact") {
-          exactKeywordsByKey.add(
-            buildKeywordKey(campaignName, adGroupName, keywordText, "exact")
-          );
-        }
+      const keywordText = readFromHeaders(row, BULK_HEADERS.keywordText);
+      const matchType = canonicalizeMatchType(readFromHeaders(row, BULK_HEADERS.matchType));
+      if (!keywordText || !matchType) {
+        continue;
       }
+
+      const identity: BulkKeywordIdentity = {
+        campaignId,
+        campaignName,
+        adGroupId,
+        adGroupName,
+        keywordId,
+        keywordText,
+        matchType,
+        bid:
+          parseNumberLike(readFromHeaders(row, BULK_HEADERS.bid)) ??
+          parseNumberLike(readFromHeaders(row, BULK_HEADERS.defaultBid)),
+      };
+
+      keywordsByKey.set(
+        buildKeywordKey(campaignName, adGroupName, keywordText, matchType),
+        identity
+      );
+
+      if (matchType === "exact") {
+        exactKeywordsByKey.add(
+          buildKeywordKey(campaignName, adGroupName, keywordText, "exact")
+        );
+      }
+      continue;
     }
 
     if (
-      entityLevel === "商品定向" &&
+      entityLevel === "product-targeting" &&
       campaignId &&
       adGroupId &&
       productTargetId &&
@@ -139,63 +206,69 @@ export function buildBulkIdentityBundleFromWorkbook(
       adGroupName
     ) {
       const targetExpression = extractProductTargetExpression(row);
-      if (targetExpression) {
-        productTargetsByKey.set(
-          buildProductTargetKey(campaignName, adGroupName, targetExpression),
-          {
-            campaignId,
-            campaignName,
-            adGroupId,
-            adGroupName,
-            productTargetId,
-            targetExpression,
-            bid:
-              parseNumberLike(row["竞价"]) ??
-              parseNumberLike(row["广告组默认竞价"]) ??
-              parseNumberLike(row["广告组默认竞价（仅供参考）"]),
-            entityLevel,
-          }
-        );
+      if (!targetExpression) {
+        continue;
       }
+
+      productTargetsByKey.set(
+        buildProductTargetKey(campaignName, adGroupName, targetExpression),
+        {
+          campaignId,
+          campaignName,
+          adGroupId,
+          adGroupName,
+          productTargetId,
+          targetExpression,
+          bid:
+            parseNumberLike(readFromHeaders(row, BULK_HEADERS.bid)) ??
+            parseNumberLike(readFromHeaders(row, BULK_HEADERS.defaultBid)),
+          entityLevel,
+        }
+      );
+      continue;
     }
 
-    if (entityLevel === "竞价调整" && campaignId && campaignName) {
-      const placementName = canonicalizePlacementName(row["广告位"]);
-      if (placementName) {
-        placementAdjustmentCount += 1;
-        placementAdjustmentsByKey.set(
-          buildPlacementAdjustmentKey(campaignName, placementName),
-          {
-            campaignId,
-            campaignName,
-            placementName,
-            percentage: parseNumberLike(row["百分比"]),
-          }
-        );
+    if (entityLevel === "placement-adjustment" && campaignId && campaignName) {
+      const placementName = canonicalizePlacementName(
+        readFromHeaders(row, BULK_HEADERS.placementName)
+      );
+      if (!placementName) {
+        continue;
       }
+
+      placementAdjustmentCount += 1;
+      placementAdjustmentsByKey.set(
+        buildPlacementAdjustmentKey(campaignName, placementName),
+        {
+          campaignId,
+          campaignName,
+          placementName,
+          percentage: parseNumberLike(readFromHeaders(row, BULK_HEADERS.percentage)),
+        }
+      );
+      continue;
     }
 
-    if (
-      entityLevel === "否定关键词" ||
-      entityLevel === "广告活动否定关键词"
-    ) {
-      const keywordText = readString(row["关键词文本"]);
-      const matchType = canonicalizeNegativeMatchType(row["匹配类型"]);
-
-      if (campaignName && keywordText && matchType) {
-        negativeKeywordCount += 1;
-        negativeKeywordsByKey.add(
-          buildNegativeKeywordKey(
-            campaignName,
-            entityLevel === "广告活动否定关键词" ? "" : adGroupName,
-            keywordText,
-            matchType
-          )
-        );
+    if (entityLevel === "negative-keyword" || entityLevel === "campaign-negative-keyword") {
+      const keywordText = readFromHeaders(row, BULK_HEADERS.keywordText);
+      const matchType = canonicalizeNegativeMatchType(readFromHeaders(row, BULK_HEADERS.matchType));
+      if (!campaignName || !keywordText || !matchType) {
+        continue;
       }
+
+      negativeKeywordCount += 1;
+      negativeKeywordsByKey.add(
+        buildNegativeKeywordKey(
+          campaignName,
+          entityLevel === "campaign-negative-keyword" ? "" : adGroupName,
+          keywordText,
+          matchType
+        )
+      );
+      continue;
     }
 
-    if (entityLevel === "否定商品定向") {
+    if (entityLevel === "negative-product-targeting") {
       negativeProductTargetCount += 1;
     }
   }
@@ -212,6 +285,7 @@ export function buildBulkIdentityBundleFromWorkbook(
       sheetName,
       rowCount: rows.length,
       warnings,
+      recognized: rows.length > 0,
     },
     summary: {
       campaignCount: campaignsByName.size,
@@ -232,48 +306,6 @@ export function buildBulkIdentityBundleFromWorkbook(
   };
 }
 
-export function normalizeText(value: unknown) {
-  return String(value ?? "")
-    .trim()
-    .replace(/\s+/g, " ")
-    .toLowerCase();
-}
-
-export function canonicalizeMatchType(value: unknown) {
-  const raw = normalizeText(value);
-  if (!raw || raw === "-") {
-    return "";
-  }
-
-  if (raw.includes("broad") || raw.includes("广泛")) {
-    return "broad";
-  }
-  if (raw.includes("phrase") || raw.includes("词组")) {
-    return "phrase";
-  }
-  if (raw.includes("exact") || raw.includes("精准")) {
-    return "exact";
-  }
-
-  return raw;
-}
-
-export function canonicalizeNegativeMatchType(value: unknown) {
-  const raw = normalizeText(value);
-
-  if (!raw) {
-    return "";
-  }
-  if (raw.includes("否定精准") || raw.includes("negative exact")) {
-    return "negative-exact";
-  }
-  if (raw.includes("否定词组") || raw.includes("negative phrase")) {
-    return "negative-phrase";
-  }
-
-  return raw;
-}
-
 export function toBulkKeywordMatchType(value: string) {
   switch (value) {
     case "broad":
@@ -291,100 +323,9 @@ export function toBulkKeywordMatchType(value: string) {
   }
 }
 
-export function resolveTargetingType(
-  targetingText: string,
-  matchType: string
-): TargetingType {
-  if (matchType === "broad" || matchType === "phrase" || matchType === "exact") {
-    return "keyword";
-  }
-
-  const normalizedTarget = normalizeText(targetingText);
-  if (!normalizedTarget) {
-    return "unknown";
-  }
-
-  if (
-    normalizedTarget === "close-match" ||
-    normalizedTarget === "loose-match" ||
-    normalizedTarget === "substitutes" ||
-    normalizedTarget === "complements"
-  ) {
-    return "auto";
-  }
-
-  if (
-    normalizedTarget.startsWith('asin="') ||
-    normalizedTarget.startsWith('category="') ||
-    normalizedTarget.startsWith('brand="')
-  ) {
-    return "product";
-  }
-
-  return "unknown";
-}
-
-export function buildCampaignKey(campaignName: string) {
-  return normalizeText(campaignName);
-}
-
-export function buildAdGroupKey(campaignName: string, adGroupName: string) {
-  return [normalizeText(campaignName), normalizeText(adGroupName)].join("::");
-}
-
-export function buildKeywordKey(
-  campaignName: string,
-  adGroupName: string,
-  keywordText: string,
-  matchType: string
-) {
-  return [
-    normalizeText(campaignName),
-    normalizeText(adGroupName),
-    normalizeText(keywordText),
-    normalizeText(matchType),
-  ].join("::");
-}
-
-export function buildProductTargetKey(
-  campaignName: string,
-  adGroupName: string,
-  targetExpression: string
-) {
-  return [
-    normalizeText(campaignName),
-    normalizeText(adGroupName),
-    normalizeText(targetExpression),
-  ].join("::");
-}
-
-export function buildPlacementAdjustmentKey(
-  campaignName: string,
-  placementName: string
-) {
-  return [normalizeText(campaignName), normalizeText(placementName)].join("::");
-}
-
-export function buildNegativeKeywordKey(
-  campaignName: string,
-  adGroupName: string,
-  keywordText: string,
-  matchType: string
-) {
-  return [
-    normalizeText(campaignName),
-    normalizeText(adGroupName),
-    normalizeText(keywordText),
-    normalizeText(matchType),
-  ].join("::");
-}
-
 export function lookupBulkEntitiesForSearchTerm(
   bulkIdentity: BulkIdentityBundle | null | undefined,
-  row: Pick<
-    SearchTermRecord,
-    "campaignName" | "adGroupName" | "targetingText" | "matchType"
-  >
+  row: Pick<SearchTermRecord, "campaignName" | "adGroupName" | "targetingText" | "matchType">
 ) {
   if (!bulkIdentity) {
     return {
@@ -397,8 +338,7 @@ export function lookupBulkEntitiesForSearchTerm(
   }
 
   const campaignId =
-    bulkIdentity.campaignsByName.get(buildCampaignKey(row.campaignName))?.campaignId ??
-    null;
+    bulkIdentity.campaignsByName.get(buildCampaignKey(row.campaignName))?.campaignId ?? null;
   const adGroupIdentity = bulkIdentity.adGroupsByKey.get(
     buildAdGroupKey(row.campaignName, row.adGroupName)
   );
@@ -443,50 +383,53 @@ export function lookupPlacementAdjustment(
   };
 }
 
-export function canonicalizePlacementName(value: unknown) {
+function extractProductTargetExpression(row: SheetRow) {
+  return readFromHeaders(row, BULK_HEADERS.targetExpression);
+}
+
+function readFromHeaders(row: SheetRow, headers: readonly string[]) {
+  for (const header of headers) {
+    const value = row[header];
+    const text = String(value ?? "").trim();
+    if (text) {
+      return text;
+    }
+  }
+  return "";
+}
+
+function canonicalizeEntityLevel(value: unknown) {
   const raw = normalizeText(value);
   if (!raw) {
     return "";
   }
 
-  if (
-    raw.includes("top of search") ||
-    raw.includes("搜索结果首页首位") ||
-    raw.includes("搜索结果首页顶部")
-  ) {
-    return "Top of Search";
+  if (raw.includes("campaign negative keyword") || raw.includes("广告活动否定关键词")) {
+    return "campaign-negative-keyword";
   }
-  if (raw.includes("product pages") || raw.includes("商品页面")) {
-    return "Product Pages";
+  if (raw.includes("negative product targeting") || raw.includes("否定商品定向")) {
+    return "negative-product-targeting";
   }
-  if (
-    raw.includes("rest of search") ||
-    raw.includes("搜索结果的其余位置") ||
-    raw.includes("其余搜索位置")
-  ) {
-    return "Rest of Search";
+  if (raw.includes("negative keyword") || raw.includes("否定关键词")) {
+    return "negative-keyword";
   }
-  if (raw.includes("amazon business") || raw.includes("亚马逊企业购")) {
-    return "Amazon Business";
+  if (raw.includes("bidding adjustment") || raw.includes("竞价调整")) {
+    return "placement-adjustment";
+  }
+  if (raw.includes("product targeting") || raw.includes("商品定向")) {
+    return "product-targeting";
+  }
+  if (raw === "campaign" || raw.includes("广告活动")) {
+    return "campaign";
+  }
+  if (raw === "ad group" || raw === "adgroup" || raw.includes("广告组")) {
+    return "ad-group";
+  }
+  if (raw === "keyword" || raw.includes("关键词")) {
+    return "keyword";
   }
 
-  return String(value ?? "").trim();
-}
-
-function extractProductTargetExpression(row: SheetRow) {
-  return readString(
-    row["拓展商品投放编号"] ||
-      row["拓展商品投放名称（仅供参考）"] ||
-      row["关键词文本"]
-  );
-}
-
-function resolveBulkCampaignName(row: SheetRow) {
-  return readString(row["广告活动名称"] || row["广告活动名称（仅供参考）"]);
-}
-
-function resolveBulkAdGroupName(row: SheetRow) {
-  return readString(row["广告组名称"] || row["广告组名称（仅供参考）"]);
+  return raw;
 }
 
 function findSponsoredProductsSheetName(workbook: WorkBook) {
@@ -503,19 +446,16 @@ function findSponsoredProductsSheetName(workbook: WorkBook) {
   );
 }
 
-function parseNumberLike(value: unknown) {
-  const normalized = String(value ?? "")
-    .replace(/[$,%\s,]/g, "")
-    .trim();
-
-  if (!normalized) {
-    return null;
-  }
-
-  const parsed = Number(normalized);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function readString(value: unknown) {
-  return String(value ?? "").trim();
-}
+export {
+  buildAdGroupKey,
+  buildCampaignKey,
+  buildKeywordKey,
+  buildNegativeKeywordKey,
+  buildPlacementAdjustmentKey,
+  buildProductTargetKey,
+  canonicalizeMatchType,
+  canonicalizeNegativeMatchType,
+  canonicalizePlacementName,
+  normalizeText,
+  resolveTargetingType,
+};
