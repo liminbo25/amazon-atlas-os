@@ -1,127 +1,145 @@
 "use client";
 
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import type { AdOptimizerAnalysisResult } from "@/lib/ad-optimizer/types";
 
-const pieColors = ["#102033", "#0B7785", "#F6B63F"];
+const palette = {
+  primary: "#102033",
+  teal: "#0B7785",
+  amber: "#F6B63F",
+};
 
 export function AdOptimizerCharts({
   result,
 }: {
   result: AdOptimizerAnalysisResult;
 }) {
-  const recommendationData = result.recommendationSummary.map((item) => ({
-    name: item.label,
-    ready: item.readyCount,
-    review: item.reviewCount,
+  const recommendationData = result.recommendationSummary
+    .filter((item) => item.count > 0)
+    .map((item) => ({
+      name: item.label,
+      ready: item.readyCount,
+      review: item.reviewCount,
+    }));
+
+  const campaignData = result.campaignRows.slice(0, 8).map((item) => ({
+    name: shrinkLabel(item.campaignName),
+    governance: item.governanceRiskCount,
+    placement: item.placementSuggestionCount,
+    budget: item.budgetSuggestionCount,
   }));
 
-  const coverageData = result.mappingCoverage
-    ? [
-        {
-          name: "Campaign",
-          value: Number((result.mappingCoverage.campaignCoverage * 100).toFixed(1)),
-        },
-        {
-          name: "Ad Group",
-          value: Number((result.mappingCoverage.adGroupCoverage * 100).toFixed(1)),
-        },
-        {
-          name: "Target",
-          value: Number((result.mappingCoverage.targetCoverage * 100).toFixed(1)),
-        },
-      ]
-    : [];
-
   return (
-    <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
+    <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
       <article className="rounded-[1.7rem] border border-slate-200 bg-white p-5">
-        <p className="section-kicker">动作分布</p>
+        <p className="section-kicker">建议分布</p>
         <h3 className="mt-3 text-xl font-semibold text-slate-950">
-          建议动作的可执行度分层
+          各类动作的 ready / review 占比
         </h3>
-        <div className="mt-5 h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={recommendationData}>
+        <MeasuredChartFrame
+          hasData={recommendationData.length > 0}
+          emptyText="当前没有可展示的建议分布。"
+        >
+          {(size) => (
+            <BarChart width={size.width} height={size.height} data={recommendationData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
               <XAxis dataKey="name" tick={{ fill: "#475569", fontSize: 12 }} />
               <YAxis allowDecimals={false} tick={{ fill: "#475569", fontSize: 12 }} />
               <Tooltip />
-              <Bar dataKey="ready" stackId="a" fill="#102033" radius={[8, 8, 0, 0]} />
-              <Bar dataKey="review" stackId="a" fill="#F6B63F" radius={[8, 8, 0, 0]} />
+              <Bar dataKey="ready" stackId="a" fill={palette.primary} radius={[8, 8, 0, 0]} />
+              <Bar dataKey="review" stackId="a" fill={palette.amber} radius={[8, 8, 0, 0]} />
             </BarChart>
-          </ResponsiveContainer>
-        </div>
+          )}
+        </MeasuredChartFrame>
       </article>
 
       <article className="rounded-[1.7rem] border border-slate-200 bg-white p-5">
-        <p className="section-kicker">映射覆盖</p>
+        <p className="section-kicker">Campaign 风险面</p>
         <h3 className="mt-3 text-xl font-semibold text-slate-950">
-          bulk 身份补齐覆盖率
+          重点 campaign 的治理 / placement / 预算动作数
         </h3>
-        <div className="mt-5 h-72">
-          {coverageData.length > 0 ? (
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={coverageData}
-                  dataKey="value"
-                  nameKey="name"
-                  innerRadius={60}
-                  outerRadius={90}
-                  paddingAngle={4}
-                >
-                  {coverageData.map((entry, index) => (
-                    <Cell
-                      key={entry.name}
-                      fill={pieColors[index % pieColors.length]}
-                    />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value) =>
-                    `${typeof value === "number" ? value : Number(value ?? 0)}%`
-                  }
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex h-full items-center justify-center rounded-[1.3rem] border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
-              上传 bulk 身份表后会显示 coverage。
-            </div>
+        <MeasuredChartFrame
+          hasData={campaignData.length > 0}
+          emptyText="当前没有可展示的 campaign 动作数。"
+        >
+          {(size) => (
+            <BarChart width={size.width} height={size.height} data={campaignData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E2E8F0" />
+              <XAxis dataKey="name" tick={{ fill: "#475569", fontSize: 12 }} />
+              <YAxis allowDecimals={false} tick={{ fill: "#475569", fontSize: 12 }} />
+              <Tooltip />
+              <Bar dataKey="governance" fill={palette.amber} radius={[8, 8, 0, 0]} />
+              <Bar dataKey="placement" fill={palette.teal} radius={[8, 8, 0, 0]} />
+              <Bar dataKey="budget" fill={palette.primary} radius={[8, 8, 0, 0]} />
+            </BarChart>
           )}
-        </div>
-        {coverageData.length > 0 ? (
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {coverageData.map((item, index) => (
-              <div
-                key={item.name}
-                className="rounded-[1.2rem] bg-slate-50 px-4 py-3"
-              >
-                <div
-                  className="h-2 w-12 rounded-full"
-                  style={{ backgroundColor: pieColors[index % pieColors.length] }}
-                />
-                <p className="mt-3 text-sm font-semibold text-slate-950">
-                  {item.name}
-                </p>
-                <p className="mt-1 text-sm text-slate-500">{item.value}%</p>
-              </div>
-            ))}
-          </div>
-        ) : null}
+        </MeasuredChartFrame>
       </article>
     </div>
   );
+}
+
+function EmptyChart({ text }: { text: string }) {
+  return (
+    <div className="flex h-full items-center justify-center rounded-[1.3rem] border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
+      {text}
+    </div>
+  );
+}
+
+function MeasuredChartFrame({
+  hasData,
+  emptyText,
+  children,
+}: {
+  hasData: boolean;
+  emptyText: string;
+  children: (size: { width: number; height: number }) => ReactNode;
+}) {
+  const frameRef = useRef<HTMLDivElement | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    const element = frameRef.current;
+    if (!element || typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const updateSize = () => {
+      const nextWidth = Math.max(Math.floor(element.clientWidth), 0);
+      const nextHeight = Math.max(Math.floor(element.clientHeight), 0);
+      setSize((current) =>
+        current.width === nextWidth && current.height === nextHeight
+          ? current
+          : { width: nextWidth, height: nextHeight }
+      );
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(() => updateSize());
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={frameRef} className="mt-5 h-80">
+      {hasData && size.width > 40 && size.height > 40 ? (
+        children(size)
+      ) : (
+        <EmptyChart text={emptyText} />
+      )}
+    </div>
+  );
+}
+
+function shrinkLabel(value: string) {
+  return value.length > 14 ? `${value.slice(0, 14)}...` : value;
 }
