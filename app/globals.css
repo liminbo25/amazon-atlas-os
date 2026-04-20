@@ -162,12 +162,76 @@
     @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
   }
 
+  .obsidian-workbench {
+    @apply rounded-[2rem] border border-white/10 bg-[#111a28]/92 text-[#f7f0e6] shadow-[0_32px_90px_rgba(3,8,17,0.4)] backdrop-blur;
+    background-image:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent 22%),
+      radial-gradient(circle at top right, rgba(246, 182, 63, 0.16), transparent 32%),
+      radial-gradient(circle at bottom left, rgba(102, 69, 41, 0.22), transparent 36%);
+  }
+
+  .obsidian-card {
+    @apply rounded-[1.7rem] border border-white/10 bg-[rgba(18,28,42,0.88)] text-[#f7f0e6] shadow-[0_22px_65px_rgba(3,8,17,0.28)];
+  }
+
+  .obsidian-soft-card {
+    @apply rounded-[1.55rem] border border-white/8 bg-[rgba(255,255,255,0.05)] text-[#f7f0e6] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)];
+  }
+
+  .obsidian-filter-bar {
+    @apply rounded-[1.65rem] border border-white/10 bg-[rgba(10,16,26,0.86)] text-[#f7f0e6] shadow-[inset_0_1px_0_rgba(255,255,255,0.04)];
+  }
+
+  .obsidian-inline-note {
+    @apply rounded-[1.35rem] border border-[rgba(246,182,63,0.2)] bg-[rgba(246,182,63,0.08)] text-[#dfd2c3];
+  }
+
+  .obsidian-empty-state {
+    @apply rounded-[1.6rem] border border-dashed border-white/12 bg-[rgba(255,255,255,0.03)] text-[#c5b9aa];
+  }
+
+  .obsidian-meta-pill {
+    @apply inline-flex items-center rounded-full border border-white/10 bg-[rgba(255,255,255,0.06)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#d7cabd];
+  }
+
+  .obsidian-native-field {
+    @apply h-11 w-full rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.04)] px-4 text-sm text-[#f7f0e6] outline-none transition placeholder:text-[#998e82] focus:border-[rgba(246,182,63,0.4)] focus:bg-[rgba(255,255,255,0.06)];
+  }
+
+  .obsidian-native-select {
+    @apply h-11 w-full appearance-none rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.04)] px-4 text-sm text-[#f7f0e6] outline-none transition focus:border-[rgba(246,182,63,0.4)] focus:bg-[rgba(255,255,255,0.06)];
+  }
+
+  .obsidian-native-textarea {
+    @apply w-full rounded-[1.35rem] border border-white/10 bg-[rgba(255,255,255,0.04)] px-4 py-4 text-sm leading-7 text-[#f7f0e6] outline-none transition placeholder:text-[#998e82] focus:border-[rgba(246,182,63,0.4)] focus:bg-[rgba(255,255,255,0.06)];
+  }
+
+  .obsidian-stat-value {
+    @apply text-2xl font-semibold tracking-[-0.04em] text-[#f7f0e6];
+  }
+
+  .obsidian-muted-copy {
+    @apply text-sm leading-7 text-[#c5b9aa];
+  }
+
+  .obsidian-code-panel {
+    @apply rounded-[1.35rem] border border-white/8 bg-[rgba(8,12,20,0.95)] text-[#f2e8db];
+  }
+
+  .obsidian-action {
+    @apply inline-flex items-center justify-center rounded-full border border-[rgba(246,182,63,0.28)] bg-[rgba(246,182,63,0.16)] px-5 py-3 text-sm font-semibold text-[#f7f0e6] transition hover:border-[rgba(246,182,63,0.4)] hover:bg-[rgba(246,182,63,0.22)];
+  }
+
+  .obsidian-action-secondary {
+    @apply inline-flex items-center justify-center rounded-full border border-white/10 bg-[rgba(255,255,255,0.04)] px-5 py-3 text-sm font-semibold text-[#f7f0e6] transition hover:bg-[rgba(255,255,255,0.08)];
+  }
+
   .glass-panel {
     @apply rounded-[2rem] border border-white/70 bg-white/75 shadow-[0_22px_70px_rgba(16,32,51,0.08)] backdrop-blur;
   }
 
   .section-kicker {
-    @apply text-xs font-semibold uppercase tracking-[0.28em] text-slate-400;
+    @apply text-xs font-semibold uppercase tracking-[0.28em] text-[#a99a89];
   }
 }
 

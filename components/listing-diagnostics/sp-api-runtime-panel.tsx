@@ -255,11 +255,11 @@ export function SpApiRuntimePanel({
   }
 
   return (
-    <Card className="border-dashed border-slate-300 bg-slate-50/75">
+    <Card className="obsidian-filter-bar">
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-full bg-white p-2 text-slate-700 shadow-sm">
+            <div className="rounded-full border border-[rgba(246,182,63,0.2)] bg-[rgba(246,182,63,0.12)] p-2 text-[#f6c26a]">
               <ShieldCheck className="h-4 w-4" />
             </div>
             <CardTitle>Amazon SP-API Verification</CardTitle>
@@ -308,9 +308,9 @@ export function SpApiRuntimePanel({
       </CardHeader>
 
       <CardContent className="space-y-4">
-        <div className="grid gap-3 rounded-2xl border border-slate-200 bg-white/85 p-4 text-sm text-slate-600 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="obsidian-soft-card grid gap-3 p-4 text-sm text-[#c5b9aa] lg:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-2">
-            <div className="flex items-center gap-2 font-medium text-slate-900">
+            <div className="flex items-center gap-2 font-medium text-[#f7f0e6]">
               <Server className="h-4 w-4 text-[#FF9900]" />
               Capability status
             </div>
@@ -326,13 +326,13 @@ export function SpApiRuntimePanel({
           </div>
 
           <div className="space-y-2">
-            <p className="font-medium text-slate-900">Runtime behavior</p>
+            <p className="font-medium text-[#f7f0e6]">Runtime behavior</p>
             <p>
               Runtime mode keeps credentials in local storage only. They are sent
               with the analyze request and are never persisted by this app.
             </p>
             {marketplaceCount > 0 ? (
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-[#998e82]">
                 Marketplace mapping is ready for {marketplaceCount} listing-diagnostics
                 markets.
               </p>
@@ -343,7 +343,10 @@ export function SpApiRuntimePanel({
         {isOpen ? (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="listing-diagnostics-sp-api-mode">
+              <Label
+                htmlFor="listing-diagnostics-sp-api-mode"
+                className="text-[#dfd2c3]"
+              >
                 Verification mode
               </Label>
               <Select
@@ -363,7 +366,7 @@ export function SpApiRuntimePanel({
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs leading-5 text-slate-500">
+              <p className="text-xs leading-5 text-[#998e82]">
                 {MODE_OPTIONS.find((option) => option.value === config.mode)?.description}
               </p>
             </div>
@@ -408,7 +411,7 @@ export function SpApiRuntimePanel({
             ) : null}
 
             {config.mode === "server-default" ? (
-              <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 text-sm leading-6 text-slate-600">
+              <div className="obsidian-inline-note p-4 text-sm leading-6 text-[#dfd2c3]">
                 {serverDefaultConfigured
                   ? "The server default is ready. Analyze requests will try to verify Amazon catalog and seller-account status with the shared credentials."
                   : "The server default is not configured yet. The request will stay on the SellerSprite MVP path unless runtime credentials are supplied instead."}
@@ -416,17 +419,17 @@ export function SpApiRuntimePanel({
             ) : null}
 
             {config.mode === "off" ? (
-              <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 text-sm leading-6 text-slate-600">
+              <div className="obsidian-soft-card p-4 text-sm leading-6 text-[#c5b9aa]">
                 SP-API verification is disabled. This keeps the current deterministic
                 SellerSprite flow unchanged.
               </div>
             ) : null}
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+            <div className="obsidian-soft-card p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-slate-800">Connection test</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-sm font-medium text-[#f7f0e6]">Connection test</p>
+                  <p className="text-xs text-[#998e82]">
                     Validate the credentials before starting a full diagnosis.
                     When the current target ASIN is valid, the test also checks
                     catalog and account access.
@@ -451,32 +454,32 @@ export function SpApiRuntimePanel({
               </div>
 
               {testResult.status !== "idle" ? (
-                <div className="mt-3 rounded-md border bg-white px-3 py-2 text-xs">
+                <div className="mt-3 rounded-[1rem] border border-white/10 bg-[rgba(8,12,20,0.72)] px-3 py-2 text-xs">
                   <div className="flex items-start gap-2">
                     {testResult.status === "success" ? (
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-600" />
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-300" />
                     ) : testResult.status === "error" ? (
-                      <XCircle className="mt-0.5 h-4 w-4 text-red-600" />
+                      <XCircle className="mt-0.5 h-4 w-4 text-rose-300" />
                     ) : (
-                      <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-slate-500" />
+                      <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-[#998e82]" />
                     )}
                     <div className="space-y-1">
                       <p
                         className={
                           testResult.status === "success"
-                            ? "font-medium text-green-700"
+                            ? "font-medium text-emerald-200"
                             : testResult.status === "error"
-                              ? "font-medium text-red-700"
-                              : "font-medium text-slate-700"
+                              ? "font-medium text-rose-200"
+                              : "font-medium text-[#dfd2c3]"
                         }
                       >
                         {formatTestHeading(testResult)}
                       </p>
                       {testResult.message ? (
-                        <p className="text-slate-700">{testResult.message}</p>
+                        <p className="text-[#dfd2c3]">{testResult.message}</p>
                       ) : null}
                       {testResult.detail ? (
-                        <p className="text-slate-500">{testResult.detail}</p>
+                        <p className="text-[#998e82]">{testResult.detail}</p>
                       ) : null}
                     </div>
                   </div>
@@ -486,7 +489,7 @@ export function SpApiRuntimePanel({
           </div>
         ) : null}
 
-        <div className="rounded-lg border border-slate-200 bg-white/85 p-3 text-xs leading-5 text-slate-500">
+        <div className="obsidian-soft-card p-3 text-xs leading-5 text-[#998e82]">
           Sensitive fields are masked in UI responses and excluded from server
           logs. The only time runtime credentials leave the browser is when you
           deliberately submit an analyze request in{" "}
@@ -516,9 +519,11 @@ function CredentialInput({
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} className="text-[#dfd2c3]">
+        {label}
+      </Label>
       <div className="relative">
-        <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#998e82]" />
         <Input
           id={id}
           value={value}

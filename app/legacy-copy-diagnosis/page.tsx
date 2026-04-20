@@ -319,10 +319,10 @@ const pillarIcons: LucideIcon[] = [
 
 function BulletList({ items }: { items: string[] }) {
   return (
-    <ul className="space-y-2 text-sm leading-7 text-slate-600">
+    <ul className="space-y-2 text-sm leading-7 text-[#d2c5b7]">
       {items.map((item) => (
         <li key={item} className="flex gap-3">
-          <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-400" />
+          <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[rgba(246,182,63,0.55)]" />
           <span>{item}</span>
         </li>
       ))}
@@ -345,56 +345,56 @@ export default function LegacyCopyDiagnosisPage() {
       <LegacyCopyDiagnosisWorkbench />
 
       <section className="page-shell mt-8 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-        <article className="glass-panel p-6 sm:p-7">
+        <article className="obsidian-workbench p-6 sm:p-7">
           <p className="section-kicker">Module brief</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[#f7f0e6]">
             这个模块会把“分析表”升级成“诊断系统”。
           </h2>
-          <p className="mt-4 max-w-3xl text-sm leading-8 text-slate-600">
+          <p className="mt-4 max-w-3xl text-sm leading-8 text-[#c8bcad]">
             你给的 Excel 很强，已经有竞品对比、关键词对标、优缺点和行动清单。但它更像一次性的人工分析稿。
             这个新模块要承担的是标准化诊断能力，所以我把它扩成了 9 大支柱、100 分打分、字段级问题归因、
             P0/P1/P2 动作和 7/14/28 天验证节奏。
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-3">
-            <div className="rounded-[1.5rem] border border-slate-200 bg-white/80 p-5">
+            <div className="obsidian-card p-5">
               <p className="section-kicker">Workbook</p>
-              <p className="mt-3 text-3xl font-semibold text-slate-950">
+              <p className="mt-3 text-3xl font-semibold text-[#f7f0e6]">
                 {workbookLayers.length}
               </p>
-              <p className="mt-2 text-sm leading-7 text-slate-500">
+              <p className="mt-2 text-sm leading-7 text-[#bfb3a5]">
                 个表格层次被提炼成模块输入，不再只是一次性比对。
               </p>
             </div>
-            <div className="rounded-[1.5rem] border border-slate-200 bg-white/80 p-5">
+            <div className="obsidian-card p-5">
               <p className="section-kicker">Pillars</p>
-              <p className="mt-3 text-3xl font-semibold text-slate-950">
+              <p className="mt-3 text-3xl font-semibold text-[#f7f0e6]">
                 {diagnosisPillars.length}
               </p>
-              <p className="mt-2 text-sm leading-7 text-slate-500">
+              <p className="mt-2 text-sm leading-7 text-[#bfb3a5]">
                 大诊断支柱覆盖搜索、转化、资产、商业和执行层。
               </p>
             </div>
-            <div className="rounded-[1.5rem] border border-slate-200 bg-white/80 p-5">
+            <div className="obsidian-card p-5">
               <p className="section-kicker">Scoring</p>
-              <p className="mt-3 text-3xl font-semibold text-slate-950">
+              <p className="mt-3 text-3xl font-semibold text-[#f7f0e6]">
                 {totalWeight}
               </p>
-              <p className="mt-2 text-sm leading-7 text-slate-500">
+              <p className="mt-2 text-sm leading-7 text-[#bfb3a5]">
                 分模型让团队知道先救哪里，而不是所有字段一起动。
               </p>
             </div>
           </div>
         </article>
 
-        <article className="glass-panel p-6 sm:p-7">
+        <article className="obsidian-workbench p-6 sm:p-7">
           <div className="flex items-center gap-3">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[rgba(246,182,63,0.28)] bg-[rgba(246,182,63,0.16)] text-[#f7f0e6]">
               <BarChart3 className="h-5 w-5" />
             </div>
             <div>
               <p className="section-kicker">What is new</p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+              <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#f7f0e6]">
                 比现有表格更完整的地方
               </h2>
             </div>
@@ -409,7 +409,7 @@ export default function LegacyCopyDiagnosisPage() {
             ].map((item) => (
               <div
                 key={item}
-                className="rounded-[1.35rem] border border-slate-200 bg-white/85 px-4 py-4 text-sm leading-7 text-slate-600"
+                className="obsidian-soft-card px-4 py-4 text-sm leading-7 text-[#d2c5b7]"
               >
                 {item}
               </div>
@@ -418,7 +418,7 @@ export default function LegacyCopyDiagnosisPage() {
 
           <Link
             href="/listing-studio"
-            className="mt-6 inline-flex items-center gap-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className="obsidian-action mt-6 gap-2"
           >
             Link with Listing Studio
             <ArrowRight className="h-4 w-4" />
@@ -427,29 +427,29 @@ export default function LegacyCopyDiagnosisPage() {
       </section>
 
       <section className="page-shell mt-8">
-        <div className="glass-panel p-6 sm:p-7">
+        <div className="obsidian-workbench p-6 sm:p-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="section-kicker">Workbook Basis</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[#f7f0e6]">
                 这份 Excel 里的维度，已经被吸收到模块底盘里。
               </h2>
             </div>
-            <Badge variant="secondary" className="w-fit">
+            <Badge className="obsidian-meta-pill w-fit">
               基于你提供的 `Listing竞品分析_优化方案_SIR.xlsx`
             </Badge>
           </div>
 
           <div className="mt-8 grid gap-4 lg:grid-cols-5">
             {workbookLayers.map((layer) => (
-              <Card key={layer.title} className="h-full border-slate-200/80 bg-white/80 shadow-none">
+              <Card key={layer.title} className="obsidian-card h-full shadow-none">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-lg text-slate-950">{layer.title}</CardTitle>
+                  <CardTitle className="text-lg text-[#f7f0e6]">{layer.title}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm leading-7 text-slate-600">{layer.summary}</p>
+                  <p className="text-sm leading-7 text-[#d2c5b7]">{layer.summary}</p>
                   <BulletList items={layer.dimensions} />
-                  <div className="rounded-[1.2rem] bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
+                  <div className="obsidian-inline-note px-4 py-3 text-sm leading-7">
                     {layer.upgrade}
                   </div>
                 </CardContent>
@@ -460,18 +460,18 @@ export default function LegacyCopyDiagnosisPage() {
       </section>
 
       <section className="page-shell mt-8">
-        <div className="glass-panel p-6 sm:p-7">
+        <div className="obsidian-workbench p-6 sm:p-7">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="section-kicker">Diagnosis Framework</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[#f7f0e6]">
                 升级后的老品文案诊断框架
               </h2>
-              <p className="mt-3 max-w-4xl text-sm leading-8 text-slate-600">
+              <p className="mt-3 max-w-4xl text-sm leading-8 text-[#c8bcad]">
                 每个支柱都明确了来源维度、检查动作和最终输出，方便后面继续接 AI 分析、表单输入或自动打分。
               </p>
             </div>
-            <Badge className="w-fit bg-slate-950 text-white hover:bg-slate-950">
+            <Badge className="obsidian-meta-pill w-fit border-[rgba(246,182,63,0.3)] bg-[rgba(246,182,63,0.14)] text-[#f2e8db]">
               9 大支柱 / 100 分
             </Badge>
           </div>
@@ -483,28 +483,31 @@ export default function LegacyCopyDiagnosisPage() {
               return (
                 <Card
                   key={pillar.title}
-                  className="h-full border-slate-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.92),rgba(245,248,251,0.9))] shadow-none"
+                  className="obsidian-card h-full shadow-none"
                 >
                   <CardHeader className="space-y-4 pb-3">
                     <div className="flex items-start justify-between gap-4">
-                      <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                      <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.06)] text-[#f7f0e6]">
                         <Icon className="h-5 w-5" />
                       </div>
                       <Badge variant="secondary">{pillar.weight} 分</Badge>
                     </div>
                     <div>
-                      <CardTitle className="text-xl text-slate-950">{pillar.title}</CardTitle>
-                      <p className="mt-3 text-sm leading-7 text-slate-600">{pillar.intent}</p>
+                      <CardTitle className="text-xl text-[#f7f0e6]">{pillar.title}</CardTitle>
+                      <p className="mt-3 text-sm leading-7 text-[#d2c5b7]">{pillar.intent}</p>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-5">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#9c8f80]">
                         来源维度
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {pillar.basedOn.map((item) => (
-                          <Badge key={`${pillar.title}-${item}`} variant="outline">
+                          <Badge
+                            key={`${pillar.title}-${item}`}
+                            className="obsidian-meta-pill border-white/8 bg-[rgba(255,255,255,0.05)]"
+                          >
                             {item}
                           </Badge>
                         ))}
@@ -512,7 +515,7 @@ export default function LegacyCopyDiagnosisPage() {
                     </div>
 
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#9c8f80]">
                         关键检查项
                       </p>
                       <div className="mt-3">
@@ -521,12 +524,15 @@ export default function LegacyCopyDiagnosisPage() {
                     </div>
 
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#9c8f80]">
                         模块输出
                       </p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {pillar.outputs.map((item) => (
-                          <Badge key={`${pillar.title}-${item}`} className="bg-white text-slate-700 hover:bg-white">
+                          <Badge
+                            key={`${pillar.title}-${item}`}
+                            className="obsidian-meta-pill border-[rgba(246,182,63,0.2)] bg-[rgba(246,182,63,0.1)] text-[#f0e4d5]"
+                          >
                             {item}
                           </Badge>
                         ))}
@@ -541,9 +547,9 @@ export default function LegacyCopyDiagnosisPage() {
       </section>
 
       <section className="page-shell mt-8 grid gap-5 xl:grid-cols-[0.95fr_1.05fr]">
-        <article className="glass-panel p-6 sm:p-7">
+        <article className="obsidian-workbench p-6 sm:p-7">
           <p className="section-kicker">Workflow</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[#f7f0e6]">
             模块执行流程
           </h2>
 
@@ -551,18 +557,18 @@ export default function LegacyCopyDiagnosisPage() {
             {workflow.map((item) => (
               <div
                 key={item.step}
-                className="rounded-[1.5rem] border border-slate-200 bg-white/85 p-5"
+                className="obsidian-card p-5"
               >
                 <div className="flex items-center gap-3">
-                  <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-950 text-sm font-semibold text-white">
+                  <span className="obsidian-meta-pill h-10 w-10 justify-center rounded-full px-0 py-0 text-sm tracking-[0.08em] text-[#f7f0e6]">
                     {item.step}
                   </span>
-                  <h3 className="text-xl font-semibold text-slate-950">{item.title}</h3>
+                  <h3 className="text-xl font-semibold text-[#f7f0e6]">{item.title}</h3>
                 </div>
-                <p className="mt-4 text-sm leading-7 text-slate-600">{item.description}</p>
+                <p className="mt-4 text-sm leading-7 text-[#d2c5b7]">{item.description}</p>
                 <div className="mt-4 flex flex-wrap gap-2">
                   {item.deliverables.map((deliverable) => (
-                    <Badge key={`${item.step}-${deliverable}`} variant="secondary">
+                    <Badge key={`${item.step}-${deliverable}`} className="obsidian-meta-pill">
                       {deliverable}
                     </Badge>
                   ))}
@@ -572,36 +578,36 @@ export default function LegacyCopyDiagnosisPage() {
           </div>
         </article>
 
-        <article className="glass-panel p-6 sm:p-7">
+        <article className="obsidian-workbench p-6 sm:p-7">
           <p className="section-kicker">Outputs</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+          <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[#f7f0e6]">
             交付物与评分口径
           </h2>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
             {deliverables.map((item) => (
-              <Card key={item.title} className="border-slate-200/80 bg-white/80 shadow-none">
+              <Card key={item.title} className="obsidian-card shadow-none">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-lg text-slate-950">{item.title}</CardTitle>
+                  <CardTitle className="text-lg text-[#f7f0e6]">{item.title}</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <p className="text-sm leading-7 text-slate-600">{item.description}</p>
+                  <p className="text-sm leading-7 text-[#d2c5b7]">{item.description}</p>
                   <BulletList items={item.items} />
                 </CardContent>
               </Card>
             ))}
           </div>
 
-          <div className="mt-8 rounded-[1.7rem] border border-slate-200 bg-slate-950 p-6 text-white">
+          <div className="obsidian-card mt-8 p-6">
             <div className="flex items-center gap-3">
-              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10">
+              <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[rgba(246,182,63,0.28)] bg-[rgba(246,182,63,0.14)] text-[#f7f0e6]">
                 <ClipboardList className="h-5 w-5" />
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/50">
+                <p className="text-xs font-semibold uppercase tracking-[0.28em] text-[#9c8f80]">
                   Score Bands
                 </p>
-                <h3 className="mt-1 text-2xl font-semibold tracking-[-0.03em]">
+                <h3 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#f7f0e6]">
                   老品诊断分数解释
                 </h3>
               </div>
@@ -611,15 +617,15 @@ export default function LegacyCopyDiagnosisPage() {
               {scoreBands.map((band) => (
                 <div
                   key={band.range}
-                  className="rounded-[1.35rem] border border-white/10 bg-white/6 px-4 py-4"
+                  className="obsidian-soft-card px-4 py-4"
                 >
                   <div className="flex flex-wrap items-center gap-3">
-                    <span className="rounded-full bg-white px-3 py-1 text-sm font-semibold text-slate-950">
+                    <span className="obsidian-meta-pill border-[rgba(246,182,63,0.24)] bg-[rgba(246,182,63,0.14)] text-[#f7f0e6]">
                       {band.range}
                     </span>
-                    <p className="text-base font-semibold">{band.label}</p>
+                    <p className="text-base font-semibold text-[#f7f0e6]">{band.label}</p>
                   </div>
-                  <p className="mt-2 text-sm leading-7 text-white/75">{band.note}</p>
+                  <p className="mt-2 text-sm leading-7 text-[#c8bcad]">{band.note}</p>
                 </div>
               ))}
             </div>

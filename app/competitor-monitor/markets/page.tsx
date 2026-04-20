@@ -48,76 +48,80 @@ export default async function CompetitorMonitorMarketsPage({
       >
         <form
           action={competitorMonitorRoutes.markets}
-          className="grid gap-3 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 lg:grid-cols-[1fr_180px_auto]"
+          className="obsidian-filter-bar grid gap-3 p-4 lg:grid-cols-[1fr_180px_auto]"
         >
           <input
             type="search"
             name="query"
             defaultValue={data.filters.query}
             placeholder="Search market, region, ASIN, description..."
-            className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-slate-950"
+            className="obsidian-native-field"
           />
           <select
             name="health"
             defaultValue={data.filters.health}
-            className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-slate-950"
+            className="obsidian-native-select"
           >
             <option value="all">All health states</option>
             <option value="healthy">Healthy</option>
             <option value="watch">Watch</option>
             <option value="risk">Risk</option>
           </select>
-          <button
-            type="submit"
-            className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800"
-          >
+          <button type="submit" className="obsidian-action h-11">
             Apply filters
           </button>
         </form>
 
-        <div className="mt-6">
+        <div className="obsidian-soft-card mt-6 overflow-hidden px-3 py-3">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Market</TableHead>
-                <TableHead>Health</TableHead>
-                <TableHead>Tracked ASINs</TableHead>
-                <TableHead>Coverage</TableHead>
-                <TableHead>Open alerts</TableHead>
-                <TableHead>Avg price</TableHead>
-                <TableHead>Last sync</TableHead>
+              <TableRow className="border-white/10 hover:bg-transparent">
+                <TableHead className="px-4 text-[#a99a89]">Market</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Health</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Tracked ASINs</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Coverage</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Open alerts</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Avg price</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Last sync</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data.items.length > 0 ? (
                 data.items.map((market) => (
-                  <TableRow key={market.marketId}>
-                    <TableCell>
+                  <TableRow
+                    key={market.marketId}
+                    className="border-white/8 hover:bg-white/[0.03]"
+                  >
+                    <TableCell className="px-4 py-4">
                       <Link
                         href={competitorMonitorRoutes.marketDetail(market.marketId)}
-                        className="font-semibold text-slate-950 hover:text-slate-700"
+                        className="font-semibold text-[#f7f0e6] transition hover:text-[#f6b63f]"
                       >
                         {market.marketName}
                       </Link>
-                      <p className="mt-1 text-xs whitespace-normal text-slate-500">
+                      <p className="mt-1 text-xs whitespace-normal text-[#a99a89]">
                         {market.countryCode} / {market.region}
                         {market.heroAsin ? ` / ${market.heroAsin}` : ""}
                       </p>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-4 py-4">
                       <CompetitorMonitorStatusBadge kind="health" value={market.health} />
                     </TableCell>
-                    <TableCell>{market.asinCount}</TableCell>
-                    <TableCell>{market.coverageRate.toFixed(0)}%</TableCell>
-                    <TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {market.asinCount}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {market.coverageRate.toFixed(0)}%
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
                       {market.activeAlertCount}
                       {market.criticalAlertCount > 0 ? (
-                        <span className="ml-2 text-xs font-semibold text-rose-700">
+                        <span className="ml-2 text-xs font-semibold text-rose-200">
                           {market.criticalAlertCount} critical
                         </span>
                       ) : null}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
                       {market.averagePrice !== null
                         ? formatCompetitorMonitorCurrency(
                             market.averagePrice,
@@ -125,7 +129,7 @@ export default async function CompetitorMonitorMarketsPage({
                           )
                         : "Pending"}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="px-4 py-4 text-[#c5b9aa]">
                       {market.lastSyncedAt
                         ? formatCompetitorMonitorDateTime(market.lastSyncedAt)
                         : "Not synced"}
@@ -133,9 +137,11 @@ export default async function CompetitorMonitorMarketsPage({
                   </TableRow>
                 ))
               ) : (
-                <TableRow>
-                  <TableCell colSpan={7} className="py-8 text-center text-slate-500">
-                    No markets matched the current filters.
+                <TableRow className="border-white/8 hover:bg-transparent">
+                  <TableCell colSpan={7} className="px-4 py-8">
+                    <div className="obsidian-empty-state px-5 py-6 text-center text-sm leading-7">
+                      No markets matched the current filters.
+                    </div>
                   </TableCell>
                 </TableRow>
               )}

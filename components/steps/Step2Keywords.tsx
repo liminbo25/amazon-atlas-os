@@ -41,10 +41,10 @@ function SummaryCard({
   value: string | number;
 }) {
   return (
-    <Card>
+    <Card className="obsidian-soft-card border-white/8 bg-[rgba(255,255,255,0.04)]">
       <CardContent className="pt-6 text-center">
         <div className="text-2xl font-bold text-[#FF9900]">{value}</div>
-        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="text-sm text-stone-400/80">{label}</p>
       </CardContent>
     </Card>
   );
@@ -52,7 +52,7 @@ function SummaryCard({
 
 function SectionEmpty({ description }: { description: string }) {
   return (
-    <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-6 text-center text-sm text-muted-foreground">
+    <div className="obsidian-empty-state px-4 py-6 text-center text-sm text-stone-300/80">
       {description}
     </div>
   );
@@ -68,18 +68,18 @@ function InsightBlock({
   emptyText: string;
 }) {
   return (
-    <div className="space-y-3 rounded-2xl border p-4">
+    <div className="obsidian-soft-card space-y-3 p-4">
       <h4 className="text-sm font-semibold">{title}</h4>
       {items.length > 0 ? (
-        <ul className="space-y-2 text-sm text-muted-foreground">
+        <ul className="space-y-2 text-sm text-stone-300/80">
           {items.map((item) => (
-            <li key={item} className="rounded-lg bg-muted/40 px-3 py-2">
+            <li key={item} className="rounded-lg bg-white/[0.05] px-3 py-2">
               {item}
             </li>
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-muted-foreground">{emptyText}</p>
+        <p className="text-sm text-stone-400/80">{emptyText}</p>
       )}
     </div>
   );
@@ -350,12 +350,12 @@ export function Step2Keywords() {
 
   if (!hasRequiredInput) {
     return (
-      <Card className="border-dashed">
+      <Card className="obsidian-empty-state border-dashed">
         <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-          <Database className="h-10 w-10 text-muted-foreground" />
+          <Database className="h-10 w-10 text-stone-300/80" />
           <div className="space-y-1">
             <p className="text-base font-medium">还没有可分析的竞品</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-stone-300/80">
               请先返回 Step 1 填写产品信息和竞品 ASIN，再开始数据分析流程。
             </p>
           </div>
@@ -372,7 +372,7 @@ export function Step2Keywords() {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-20">
         <Loader2 className="h-8 w-8 animate-spin text-[#FF9900]" />
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-stone-300/80">
           正在拉取卖家精灵真实数据，并联动 AI 生成多源分析...
         </p>
       </div>
@@ -382,7 +382,7 @@ export function Step2Keywords() {
   if (fetchError) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-20">
-        <div className="space-y-2 text-center text-red-500">
+        <div className="obsidian-inline-note space-y-2 border-rose-400/20 bg-rose-500/10 px-4 py-3 text-center text-rose-100">
           <p className="font-semibold">卖家精灵数据采集失败</p>
           <p className="text-sm">{fetchError}</p>
         </div>
@@ -400,12 +400,12 @@ export function Step2Keywords() {
 
   if (hasFetchedOnce && competitorListings.length === 0) {
     return (
-      <Card className="border-dashed">
+      <Card className="obsidian-empty-state border-dashed">
         <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-          <Database className="h-10 w-10 text-muted-foreground" />
+          <Database className="h-10 w-10 text-stone-300/80" />
           <div className="space-y-1">
             <p className="text-base font-medium">这次没有采集到可展示的竞品数据</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-stone-300/80">
               请检查 ASIN 是否有效，或返回 Step 1 调整竞品后重试。
             </p>
           </div>
@@ -473,8 +473,8 @@ export function Step2Keywords() {
       </Card>
 
       {analysisLoading ? (
-        <Card className="border-dashed">
-          <CardContent className="flex items-center gap-3 py-6 text-sm text-muted-foreground">
+        <Card className="obsidian-empty-state border-dashed">
+          <CardContent className="flex items-center gap-3 py-6 text-sm text-stone-300/80">
             <Loader2 className="h-4 w-4 animate-spin text-[#FF9900]" />
             AI 正在融合卖家精灵、ABA 和 Rufus 数据，生成可执行洞察...
           </CardContent>
@@ -482,13 +482,13 @@ export function Step2Keywords() {
       ) : null}
 
       {analysisError ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <div className="obsidian-inline-note rounded-lg border-rose-400/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
           {analysisError}
         </div>
       ) : null}
 
       {dataAnalysis ? (
-        <Card className="border-[#FF9900]/20 bg-orange-50/40">
+        <Card className="obsidian-card border-[rgba(246,182,63,0.16)] bg-[rgba(40,27,14,0.42)]">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-base">
               <Bot className="h-5 w-5 text-[#FF9900]" />
@@ -499,9 +499,9 @@ export function Step2Keywords() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-2xl border bg-white/80 p-4">
+            <div className="obsidian-soft-card p-4">
               <h4 className="text-sm font-semibold">多源市场总结</h4>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-2 text-sm text-stone-300/80">
                 {dataAnalysis.marketOverview}
               </p>
             </div>
@@ -556,9 +556,9 @@ export function Step2Keywords() {
               ))}
             </div>
             {supportAssets.abaReport.rows.length > 0 ? (
-              <div className="space-y-2 text-sm text-muted-foreground">
+              <div className="space-y-2 text-sm text-stone-300/80">
                 {supportAssets.abaReport.rows.slice(0, 5).map((row, index) => (
-                  <div key={index} className="rounded-lg bg-muted/40 px-3 py-2">
+                  <div key={index} className="obsidian-soft-card rounded-lg px-3 py-2">
                     {row.join(" | ")}
                   </div>
                 ))}
@@ -580,8 +580,8 @@ export function Step2Keywords() {
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-3">
             {supportAssets.rufusScreenshots.map((item) => (
-              <div key={item.id} className="overflow-hidden rounded-xl border">
-                <div className="relative aspect-[4/3] bg-slate-100">
+              <div key={item.id} className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+                <div className="relative aspect-[4/3] bg-white/[0.03]">
                   <Image
                     src={item.preview}
                     alt={item.name}
@@ -591,7 +591,7 @@ export function Step2Keywords() {
                     className="object-cover"
                   />
                 </div>
-                <div className="truncate px-3 py-2 text-xs text-muted-foreground">
+                <div className="truncate px-3 py-2 text-xs text-stone-300/80">
                   {item.name}
                 </div>
               </div>

@@ -437,22 +437,22 @@ export function VideoRuntimeConfigPanel({
   const serverBusy = serverSyncState !== "idle";
 
   return (
-    <Card className="border-dashed border-slate-300 bg-slate-50/70">
+    <Card className="obsidian-card border-dashed border-white/10 text-[#f3e8d2]">
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-full bg-white p-2 text-slate-700 shadow-sm">
+            <div className="obsidian-meta-pill p-2 text-[#f3e8d2] shadow-none">
               <Settings2 className="h-4 w-4" />
             </div>
-            <CardTitle>Video Runtime Settings</CardTitle>
-            <Badge variant="outline">
+            <CardTitle className="text-[#f3e8d2]">Video Runtime Settings</CardTitle>
+            <Badge variant="outline" className="obsidian-meta-pill border-white/10 text-stone-200/80">
               {customizedCount > 0
                 ? `Customized ${customizedCount}/${runtimeSections.length}`
                 : "Using server defaults"}
             </Badge>
-            <Badge variant="secondary">Stored in this browser</Badge>
+            <Badge variant="secondary" className="obsidian-meta-pill border-white/10 bg-white/[0.04] text-stone-200/80">Stored in this browser</Badge>
           </div>
-          <CardDescription>
+          <CardDescription className="text-stone-300/75">
             Configure provider, base URL, model, and optional API key for
             frame analysis and copy generation. The upload flow and the script
             rewrite flow can use different AI endpoints.
@@ -465,6 +465,7 @@ export function VideoRuntimeConfigPanel({
             variant="outline"
             size="sm"
             onClick={() => setIsOpen((value) => !value)}
+            className="obsidian-action-secondary"
           >
             {isOpen ? (
               <>
@@ -478,7 +479,7 @@ export function VideoRuntimeConfigPanel({
               </>
             )}
           </Button>
-          <Button type="button" variant="ghost" size="sm" onClick={handleReset}>
+          <Button type="button" variant="ghost" size="sm" onClick={handleReset} className="obsidian-action-secondary">
             <RotateCcw className="mr-1 h-4 w-4" />
             Reset
           </Button>
@@ -488,7 +489,7 @@ export function VideoRuntimeConfigPanel({
       <CardContent className="space-y-4">
         <div className="flex flex-wrap gap-2">
           {runtimeSections.map((section) => (
-            <Badge key={section.key} variant="outline" className="gap-1">
+            <Badge key={section.key} variant="outline" className="obsidian-meta-pill gap-1 border-white/10 text-stone-200/80">
               <section.Icon className="h-3 w-3" />
               {section.title}: {formatRuntimeSummary(aiRuntimeSettings[section.key])}
             </Badge>
@@ -496,19 +497,19 @@ export function VideoRuntimeConfigPanel({
         </div>
 
         {useLegacyApi ? (
-          <div className="rounded-lg border border-dashed border-slate-300 bg-white/80 p-4 text-sm leading-6 text-slate-600">
+          <div className="obsidian-inline-note rounded-lg border-dashed p-4 text-sm leading-6 text-stone-300/80">
             Legacy video API mode is enabled. The fields below still work as
             per-request overrides, but the shared server default only applies to
             the built-in Next.js video runtime.
           </div>
         ) : (
-          <div className="rounded-lg border border-slate-200 bg-white/90 p-4">
+          <div className="obsidian-soft-card rounded-lg p-4">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-sm font-semibold text-slate-900">
+                <p className="text-sm font-semibold text-[#f3e8d2]">
                   Shared Server Default
                 </p>
-                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                <p className="mt-1 text-xs leading-5 text-stone-400/80">
                   Used whenever the browser-side overrides are blank. This is the
                   shared fallback for the built-in video runtime.
                 </p>
@@ -516,6 +517,7 @@ export function VideoRuntimeConfigPanel({
               <div className="flex flex-wrap items-center gap-2">
                 <Badge
                   variant={serverStatus?.configured ? "secondary" : "outline"}
+                  className="obsidian-meta-pill border-white/10 text-stone-200/80"
                 >
                   {serverSyncState === "loading"
                     ? "Loading"
@@ -524,14 +526,19 @@ export function VideoRuntimeConfigPanel({
                       : "Not configured"}
                 </Badge>
                 {serverStatus?.config_error ? (
-                  <Badge variant="destructive">Config issue</Badge>
+                  <Badge
+                    variant="destructive"
+                    className="obsidian-meta-pill border-amber-400/20 bg-amber-500/10 text-amber-100"
+                  >
+                    Config issue
+                  </Badge>
                 ) : null}
               </div>
             </div>
 
-            <div className="mt-4 grid gap-2 rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-600 sm:grid-cols-2">
+            <div className="obsidian-code-panel mt-4 grid gap-2 rounded-lg p-3 text-xs text-stone-300/80 sm:grid-cols-2">
               <div>
-                <span className="font-medium text-slate-700">Protocol:</span>{" "}
+                <span className="font-medium text-[#f3e8d2]">Protocol:</span>{" "}
                 <span className="font-mono break-all">
                   {serverStatus?.provider
                     ? formatProviderLabel(serverStatus.provider)
@@ -539,19 +546,19 @@ export function VideoRuntimeConfigPanel({
                 </span>
               </div>
               <div>
-                <span className="font-medium text-slate-700">Model:</span>{" "}
+                <span className="font-medium text-[#f3e8d2]">Model:</span>{" "}
                 <span className="font-mono break-all">
                   {serverStatus?.model || "Not set"}
                 </span>
               </div>
               <div className="sm:col-span-2">
-                <span className="font-medium text-slate-700">Base URL:</span>{" "}
+                <span className="font-medium text-[#f3e8d2]">Base URL:</span>{" "}
                 <span className="font-mono break-all">
                   {serverStatus?.base_url || "Provider default"}
                 </span>
               </div>
               <div>
-                <span className="font-medium text-slate-700">Credential:</span>{" "}
+                <span className="font-medium text-[#f3e8d2]">Credential:</span>{" "}
                 <span>
                   {serverStatus?.has_api_key
                     ? serverStatus.api_key_masked || "Configured"
@@ -559,7 +566,7 @@ export function VideoRuntimeConfigPanel({
                 </span>
               </div>
               <div>
-                <span className="font-medium text-slate-700">Source:</span>{" "}
+                <span className="font-medium text-[#f3e8d2]">Source:</span>{" "}
                 <span>
                   {serverStatus
                     ? formatServerSource(serverStatus)
@@ -575,6 +582,7 @@ export function VideoRuntimeConfigPanel({
                 variant="outline"
                 disabled={serverBusy}
                 onClick={() => void loadServerStatus(true)}
+                className="obsidian-action-secondary"
               >
                 {serverSyncState === "loading" ? (
                   <>
@@ -591,6 +599,7 @@ export function VideoRuntimeConfigPanel({
                 variant="secondary"
                 disabled={serverBusy}
                 onClick={() => void handleSaveServerDefault("frameAnalysis")}
+                className="obsidian-action-secondary"
               >
                 {serverSyncState === "saving" ? (
                   <>
@@ -607,6 +616,7 @@ export function VideoRuntimeConfigPanel({
                 variant="secondary"
                 disabled={serverBusy}
                 onClick={() => void handleSaveServerDefault("copyGeneration")}
+                className="obsidian-action-secondary"
               >
                 {serverSyncState === "saving" ? (
                   <>
@@ -623,23 +633,26 @@ export function VideoRuntimeConfigPanel({
                 variant="destructive"
                 disabled={serverBusy}
                 onClick={() => void handleClearServerDefault()}
+                className="obsidian-action"
               >
                 Clear default
               </Button>
             </div>
 
             {serverMessage ? (
-              <p className="mt-3 text-xs leading-5 text-emerald-700">
+              <div className="obsidian-inline-note mt-3 rounded-lg border-emerald-400/15 bg-emerald-500/8 px-3 py-2 text-xs leading-5 text-emerald-100">
                 {serverMessage}
-              </p>
+              </div>
             ) : null}
             {serverError ? (
-              <p className="mt-3 text-xs leading-5 text-rose-700">{serverError}</p>
+              <div className="obsidian-inline-note mt-3 rounded-lg border-rose-400/20 bg-rose-500/10 px-3 py-2 text-xs leading-5 text-rose-100">
+                {serverError}
+              </div>
             ) : null}
             {serverStatus?.config_error ? (
-              <p className="mt-3 text-xs leading-5 text-amber-700">
+              <div className="obsidian-inline-note mt-3 rounded-lg border-amber-400/20 bg-amber-500/10 px-3 py-2 text-xs leading-5 text-amber-100">
                 {serverStatus.config_error}
-              </p>
+              </div>
             ) : null}
           </div>
         )}
@@ -647,20 +660,20 @@ export function VideoRuntimeConfigPanel({
         {isOpen ? (
           <div className="grid gap-4 xl:grid-cols-2">
             {runtimeSections.map((section) => (
-              <Card key={section.key} className="border border-slate-200 bg-white/90">
+              <Card key={section.key} className="obsidian-soft-card border-white/10 text-[#f3e8d2]">
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <section.Icon className="h-4 w-4 text-[#FF9900]" />
-                    <CardTitle className="text-sm">{section.title}</CardTitle>
+                    <CardTitle className="text-sm text-[#f3e8d2]">{section.title}</CardTitle>
                   </div>
-                  <CardDescription className="space-y-1">
+                  <CardDescription className="space-y-1 text-stone-300/75">
                     <span>{section.description}</span>
                     <span className="block text-xs">{section.step}</span>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor={`${section.key}-provider`}>Protocol</Label>
+                    <Label htmlFor={`${section.key}-provider`} className="text-stone-200/90">Protocol</Label>
                     <Select
                       value={aiRuntimeSettings[section.key].provider || "auto"}
                       onValueChange={(value) =>
@@ -669,7 +682,7 @@ export function VideoRuntimeConfigPanel({
                         })
                       }
                     >
-                      <SelectTrigger id={`${section.key}-provider`}>
+                      <SelectTrigger id={`${section.key}-provider`} className="obsidian-native-select">
                         <SelectValue placeholder="Select protocol" />
                       </SelectTrigger>
                       <SelectContent>
@@ -680,26 +693,27 @@ export function VideoRuntimeConfigPanel({
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-stone-400/80">
                       Auto will infer from the chosen model and base URL. Set a
                       provider explicitly if you use a custom gateway.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`${section.key}-baseUrl`}>API Base URL</Label>
+                    <Label htmlFor={`${section.key}-baseUrl`} className="text-stone-200/90">API Base URL</Label>
                     <Input
                       id={`${section.key}-baseUrl`}
                       type="url"
                       placeholder={section.placeholderBaseUrl}
                       value={aiRuntimeSettings[section.key].baseUrl}
+                      className="obsidian-native-field"
                       onChange={(event) =>
                         updateServiceSettings(section.key, {
                           baseUrl: event.target.value,
                         })
                       }
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-stone-400/80">
                       Leave blank to use the server default. Root URLs such as
                       `https://api.openai.com` and `https://api.anthropic.com`
                       are both supported.
@@ -707,31 +721,32 @@ export function VideoRuntimeConfigPanel({
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`${section.key}-model`}>Model</Label>
+                    <Label htmlFor={`${section.key}-model`} className="text-stone-200/90">Model</Label>
                     <Input
                       id={`${section.key}-model`}
                       placeholder={section.placeholderModel}
                       value={aiRuntimeSettings[section.key].model}
+                      className="obsidian-native-field"
                       onChange={(event) =>
                         updateServiceSettings(section.key, {
                           model: event.target.value,
                         })
                       }
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-stone-400/80">
                       Use the exact model id exposed by the upstream provider.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`${section.key}-apiKey`}>API Key (optional)</Label>
+                    <Label htmlFor={`${section.key}-apiKey`} className="text-stone-200/90">API Key (optional)</Label>
                     <div className="relative">
-                      <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400/80" />
                       <Input
                         id={`${section.key}-apiKey`}
                         type="password"
                         placeholder="sk-..."
-                        className="pl-9"
+                        className="obsidian-native-field pl-9"
                         value={aiRuntimeSettings[section.key].apiKey}
                         onChange={(event) =>
                           updateServiceSettings(section.key, {
@@ -740,19 +755,19 @@ export function VideoRuntimeConfigPanel({
                         }
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-stone-400/80">
                       Optional runtime override. If left blank, the server falls
                       back to the shared default and environment variables.
                     </p>
                   </div>
 
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+                  <div className="obsidian-code-panel rounded-lg p-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-medium text-slate-800">
+                        <p className="text-sm font-medium text-[#f3e8d2]">
                           Connection test
                         </p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-xs text-stone-400/80">
                           Sends one tiny real request with the current runtime
                           settings.
                         </p>
@@ -763,6 +778,7 @@ export function VideoRuntimeConfigPanel({
                         variant="outline"
                         disabled={testResults[section.key]?.status === "testing"}
                         onClick={() => void handleTest(section.key)}
+                        className="obsidian-action-secondary"
                       >
                         {testResults[section.key]?.status === "testing" ? (
                           <>
@@ -776,23 +792,23 @@ export function VideoRuntimeConfigPanel({
                     </div>
 
                     {testResults[section.key] ? (
-                      <div className="mt-3 rounded-md border bg-white px-3 py-2 text-xs">
+                      <div className="obsidian-soft-card mt-3 rounded-md px-3 py-2 text-xs">
                         <div className="flex items-start gap-2">
                           {testResults[section.key]?.status === "success" ? (
-                            <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-600" />
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-300" />
                           ) : testResults[section.key]?.status === "error" ? (
-                            <XCircle className="mt-0.5 h-4 w-4 text-red-600" />
+                            <XCircle className="mt-0.5 h-4 w-4 text-rose-300" />
                           ) : (
-                            <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-slate-500" />
+                            <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-stone-400/80" />
                           )}
                           <div className="space-y-1">
                             <p
                               className={
                                 testResults[section.key]?.status === "success"
-                                  ? "font-medium text-green-700"
+                                  ? "font-medium text-emerald-200"
                                   : testResults[section.key]?.status === "error"
-                                    ? "font-medium text-red-700"
-                                    : "font-medium text-slate-700"
+                                    ? "font-medium text-rose-200"
+                                    : "font-medium text-stone-100"
                               }
                             >
                               {formatTestHeading(
@@ -800,12 +816,12 @@ export function VideoRuntimeConfigPanel({
                               )}
                             </p>
                             {testResults[section.key]?.message ? (
-                              <p className="text-slate-700">
+                              <p className="text-stone-200/90">
                                 {testResults[section.key]?.message}
                               </p>
                             ) : null}
                             {testResults[section.key]?.detail ? (
-                              <p className="text-muted-foreground">
+                              <p className="text-stone-400/80">
                                 {testResults[section.key]?.detail}
                               </p>
                             ) : null}
@@ -820,7 +836,7 @@ export function VideoRuntimeConfigPanel({
           </div>
         ) : null}
 
-        <div className="rounded-lg border border-slate-200 bg-white/80 p-3 text-xs leading-5 text-muted-foreground">
+        <div className="obsidian-inline-note rounded-lg p-3 text-xs leading-5 text-stone-300/80">
           Runtime settings are sent in both <span className="font-mono">runtime</span>{" "}
           and <span className="font-mono">runtimeConfig</span> fields, so the
           video studio can use the same override contract as the Listing flow.

@@ -84,16 +84,16 @@ export function DiagnosticsResults({
 
   if (status === "loading") {
     return (
-      <Card className="border-slate-200/80 bg-white/85">
+      <Card className="obsidian-empty-state">
         <CardContent className="flex min-h-[280px] flex-col items-center justify-center gap-4 pt-10 text-center">
-          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-950 text-white">
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-[rgba(246,182,63,0.24)] bg-[rgba(246,182,63,0.12)] text-[#f6c26a]">
             <LoaderCircle className="h-6 w-6 animate-spin" />
           </span>
           <div className="space-y-2">
-            <p className="text-lg font-semibold text-slate-950">
+            <p className="text-lg font-semibold text-[#f7f0e6]">
               Building the diagnostic model
             </p>
-            <p className="max-w-2xl text-sm leading-7 text-slate-600">
+            <p className="max-w-2xl text-sm leading-7 text-[#c5b9aa]">
               Pulling SellerSprite listing, review, and keyword sources, then running the
               deterministic scoring engine and action-plan rules.
             </p>
@@ -105,18 +105,18 @@ export function DiagnosticsResults({
 
   if (status === "error") {
     return (
-      <Card className="border-red-200 bg-red-50/85">
+      <Card className="border-rose-400/25 bg-rose-500/10 text-rose-100">
         <CardContent className="space-y-4 pt-6">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-red-600 shadow-sm">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-400/20 bg-rose-500/12 text-rose-200">
               <AlertTriangle className="h-5 w-5" />
             </span>
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="font-semibold text-red-950">Listing diagnosis failed</p>
+                <p className="font-semibold text-rose-100">Listing diagnosis failed</p>
                 {errorCode ? <Badge variant="outline">code: {errorCode}</Badge> : null}
               </div>
-              <p className="text-sm text-red-900">{errorMessage}</p>
+              <p className="text-sm text-rose-100/90">{errorMessage}</p>
             </div>
           </div>
 
@@ -133,16 +133,16 @@ export function DiagnosticsResults({
 
   if (!visibleResult) {
     return (
-      <Card className="border-dashed border-slate-300/90 bg-white/70">
+      <Card className="obsidian-empty-state">
         <CardContent className="flex min-h-[260px] flex-col items-center justify-center gap-4 pt-10 text-center">
-          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full bg-slate-100 text-slate-600">
+          <span className="inline-flex h-14 w-14 items-center justify-center rounded-full border border-white/10 bg-[rgba(255,255,255,0.05)] text-[#c5b9aa]">
             <Radar className="h-6 w-6" />
           </span>
           <div className="space-y-2">
-            <p className="text-lg font-semibold text-slate-950">
+            <p className="text-lg font-semibold text-[#f7f0e6]">
               No diagnosis yet
             </p>
-            <p className="max-w-2xl text-sm leading-7 text-slate-600">
+            <p className="max-w-2xl text-sm leading-7 text-[#c5b9aa]">
               Enter a target ASIN and optionally 2-3 competitor ASINs. The page will show
               score bands, findings, source coverage, confidence, and inferred tags once
               the Phase 1 run finishes.
@@ -156,15 +156,15 @@ export function DiagnosticsResults({
   return (
     <div className="space-y-6">
       {visibleResult.status === "partial" ? (
-        <Card className="border-amber-200 bg-amber-50/90">
+        <Card className="obsidian-inline-note border-[rgba(246,182,63,0.24)] bg-[rgba(246,182,63,0.1)]">
           <CardContent className="flex flex-col gap-3 pt-6">
             <div className="flex items-start gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-amber-700 shadow-sm">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[rgba(246,182,63,0.2)] bg-[rgba(246,182,63,0.12)] text-[#f6c26a]">
                 <AlertTriangle className="h-5 w-5" />
               </span>
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-amber-950">Partial result</p>
+                  <p className="font-semibold text-[#f3dfb6]">Partial result</p>
                   <Badge variant="outline">confidence {visibleResult.confidence}%</Badge>
                   {visibleResult.inferredCount > 0 ? (
                     <Badge variant="secondary">
@@ -172,14 +172,14 @@ export function DiagnosticsResults({
                     </Badge>
                   ) : null}
                 </div>
-                <p className="text-sm text-amber-900">
+                <p className="text-sm text-[#dfd2c3]">
                   At least one source was missing or benchmark logic had to fall back to
                   inferred signals. The warnings below explain where confidence is softer.
                 </p>
               </div>
             </div>
 
-            <div className="grid gap-2 rounded-2xl border border-amber-200/80 bg-white/80 p-4 text-sm text-slate-700">
+            <div className="obsidian-soft-card grid gap-2 p-4 text-sm text-[#dfd2c3]">
               {visibleResult.warnings.map((warning) => (
                 <p key={warning}>- {warning}</p>
               ))}
@@ -189,15 +189,15 @@ export function DiagnosticsResults({
       ) : null}
 
       {visibleResult.spApiVerification?.scoreCapApplied ? (
-        <Card className="border-red-200 bg-red-50/90">
+        <Card className="border-rose-400/25 bg-rose-500/10 text-rose-100">
           <CardContent className="flex flex-col gap-3 pt-6">
             <div className="flex items-start gap-3">
-              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-red-700 shadow-sm">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-rose-400/20 bg-rose-500/12 text-rose-200">
                 <AlertTriangle className="h-5 w-5" />
               </span>
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-semibold text-red-950">Amazon verified blocker</p>
+                  <p className="font-semibold text-rose-100">Amazon verified blocker</p>
                   <Badge variant="outline">
                     score capped at {visibleResult.spApiVerification.scoreCeiling}/100
                   </Badge>
@@ -205,7 +205,7 @@ export function DiagnosticsResults({
                     {visibleResult.spApiVerification.blockingVerifiedFindingIds.length} blocking
                   </Badge>
                 </div>
-                <p className="text-sm text-red-900">
+                <p className="text-sm text-rose-100/90">
                   Amazon SP-API confirmed account or catalog blockers for this ASIN, so the
                   overall score is being held down until those verified issues are cleared.
                 </p>
@@ -216,8 +216,8 @@ export function DiagnosticsResults({
       ) : null}
 
       <div className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
-        <Card className="border-slate-200/80 bg-white/90">
-          <CardHeader className="border-b border-slate-200/80">
+        <Card className="obsidian-card">
+          <CardHeader className="border-b border-white/10">
             <div className="flex flex-wrap items-center gap-3">
               <Badge variant="secondary">{visibleResult.request.marketplace}</Badge>
               <Badge variant="outline">ASIN {visibleResult.request.targetAsin}</Badge>
@@ -240,12 +240,12 @@ export function DiagnosticsResults({
                 <Badge variant="outline">inferred labels on</Badge>
               ) : null}
             </div>
-            <CardTitle className="text-2xl text-slate-950">
+            <CardTitle className="text-2xl text-[#f7f0e6]">
               {visibleResult.headline}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5 pt-6">
-            <p className="text-sm leading-7 text-slate-600">{visibleResult.summary}</p>
+            <p className="text-sm leading-7 text-[#c5b9aa]">{visibleResult.summary}</p>
 
             <div className="grid gap-4 md:grid-cols-4">
               <SummaryMetric
@@ -276,8 +276,8 @@ export function DiagnosticsResults({
             </div>
 
             {visibleResult.spApiVerification?.enabled ? (
-              <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/75 p-4 text-sm text-slate-600">
-                <p className="font-semibold text-slate-900">Amazon verification</p>
+              <div className="obsidian-inline-note p-4 text-sm text-[#dfd2c3]">
+                <p className="font-semibold text-[#f3dfb6]">Amazon verification</p>
                 <p className="mt-2 leading-7">
                   Catalog coverage is {visibleResult.spApiVerification.catalogStatus} and
                   account coverage is {visibleResult.spApiVerification.accountStatus}.
@@ -292,20 +292,20 @@ export function DiagnosticsResults({
               {visibleResult.dimensions.map((dimension) => (
                 <div
                   key={dimension.id}
-                  className="rounded-[1.4rem] border border-slate-200 bg-slate-50/70 p-4"
+                  className="obsidian-soft-card p-4"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-slate-900">
+                    <p className="text-sm font-semibold text-[#f7f0e6]">
                       {dimension.label}
                     </p>
                     <Badge variant={dimension.coverage === "covered" ? "secondary" : "outline"}>
                       {dimension.score}
                     </Badge>
                   </div>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                  <p className="mt-2 text-sm leading-7 text-[#c5b9aa]">
                     {dimension.summary}
                   </p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-[#998e82]">
                     <span>weight {Math.round(dimension.weight * 100)}%</span>
                     <span>confidence {Math.round(dimension.confidence * 100)}%</span>
                     {dimension.inferred ? <Badge variant="outline">inferred</Badge> : null}
@@ -316,9 +316,9 @@ export function DiagnosticsResults({
           </CardContent>
         </Card>
 
-        <Card className="border-slate-200/80 bg-white/90">
-          <CardHeader className="border-b border-slate-200/80">
-            <CardTitle className="text-xl text-slate-950">Benchmark snapshot</CardTitle>
+        <Card className="obsidian-card">
+          <CardHeader className="border-b border-white/10">
+            <CardTitle className="text-xl text-[#f7f0e6]">Benchmark snapshot</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5 pt-6">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -340,8 +340,8 @@ export function DiagnosticsResults({
               />
             </div>
 
-            <div className="space-y-3 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-sm font-semibold text-slate-900">Top benchmark keywords</p>
+            <div className="obsidian-soft-card space-y-3 p-4">
+              <p className="text-sm font-semibold text-[#f7f0e6]">Top benchmark keywords</p>
               <div className="flex flex-wrap gap-2">
                 {visibleResult.benchmark.topKeywords.length > 0 ? (
                   visibleResult.benchmark.topKeywords.map((keyword) => (
@@ -350,19 +350,19 @@ export function DiagnosticsResults({
                     </Badge>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-500">No competitor keyword model yet.</p>
+                  <p className="text-sm text-[#998e82]">No competitor keyword model yet.</p>
                 )}
               </div>
             </div>
 
-            <div className="space-y-3 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-sm font-semibold text-slate-900">Top benchmark themes</p>
+            <div className="obsidian-soft-card space-y-3 p-4">
+              <p className="text-sm font-semibold text-[#f7f0e6]">Top benchmark themes</p>
               <div className="space-y-3">
                 {visibleResult.benchmark.topThemes.length > 0 ? (
                   visibleResult.benchmark.topThemes.map((theme) => (
-                    <div key={theme.id} className="rounded-2xl bg-white/90 p-3">
+                    <div key={theme.id} className="rounded-2xl border border-white/8 bg-[rgba(255,255,255,0.04)] p-3">
                       <div className="flex items-center justify-between gap-3">
-                        <p className="font-medium text-slate-900">{theme.label}</p>
+                        <p className="font-medium text-[#f7f0e6]">{theme.label}</p>
                         <div className="flex items-center gap-2">
                           <Badge variant="outline">
                             {(theme.share * 100).toFixed(0)}%
@@ -370,13 +370,13 @@ export function DiagnosticsResults({
                           {theme.inferred ? <Badge variant="outline">inferred</Badge> : null}
                         </div>
                       </div>
-                      <p className="mt-2 text-sm text-slate-600">
+                      <p className="mt-2 text-sm text-[#c5b9aa]">
                         {theme.mentions} negative-review mentions
                       </p>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-[#998e82]">
                     No competitor review clusters are available yet.
                   </p>
                 )}
@@ -388,8 +388,8 @@ export function DiagnosticsResults({
 
       <DiagnosticsExportControls result={visibleResult} />
 
-      <Tabs defaultValue="findings" className="glass-panel rounded-[2rem] border border-white/70 bg-white/85 p-5">
-        <TabsList variant="line">
+      <Tabs defaultValue="findings" className="obsidian-workbench p-5">
+        <TabsList variant="line" className="rounded-full border border-white/8 bg-[rgba(255,255,255,0.04)] p-1">
           <TabsTrigger value="findings">Findings</TabsTrigger>
           <TabsTrigger value="actions">Action plan</TabsTrigger>
           <TabsTrigger value="evidence">Evidence</TabsTrigger>
@@ -436,7 +436,7 @@ export function DiagnosticsResults({
 
         <TabsContent value="evidence" className="pt-5">
           {evidenceRows.length > 0 ? (
-            <Card className="border-slate-200/80 bg-white/90">
+            <Card className="obsidian-card">
               <CardContent className="pt-6">
                 <Table>
                   <TableHeader>
@@ -465,7 +465,7 @@ export function DiagnosticsResults({
         </TabsContent>
 
         <TabsContent value="coverage" className="pt-5">
-          <Card className="border-slate-200/80 bg-white/90">
+          <Card className="obsidian-card">
             <CardContent className="pt-6">
               <Table>
                 <TableHeader>
@@ -501,12 +501,12 @@ function SummaryMetric({
   icon: React.ReactNode;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4">
-      <div className="flex items-center gap-2 text-sm font-medium text-slate-500">
+    <div className="obsidian-soft-card p-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-[#998e82]">
         {icon}
         {label}
       </div>
-      <p className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-slate-950">
+      <p className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[#f7f0e6]">
         {value}
       </p>
     </div>
@@ -515,11 +515,11 @@ function SummaryMetric({
 
 function BenchmarkValue({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[1.3rem] border border-slate-200 bg-slate-50/80 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+    <div className="obsidian-soft-card p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#998e82]">
         {label}
       </p>
-      <p className="mt-2 text-xl font-semibold text-slate-950">{value}</p>
+      <p className="mt-2 text-xl font-semibold text-[#f7f0e6]">{value}</p>
     </div>
   );
 }
@@ -532,7 +532,7 @@ function FindingCard({
   isVerified: boolean;
 }) {
   return (
-    <Card className="border-slate-200/80 bg-white/90">
+    <Card className="obsidian-card">
       <CardContent className="space-y-4 pt-6">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={finding.priority === "P0" ? "destructive" : "outline"}>
@@ -559,8 +559,8 @@ function FindingCard({
         </div>
 
         <div>
-          <p className="text-lg font-semibold text-slate-950">{finding.title}</p>
-          <p className="mt-2 text-sm leading-7 text-slate-600">
+          <p className="text-lg font-semibold text-[#f7f0e6]">{finding.title}</p>
+          <p className="mt-2 text-sm leading-7 text-[#c5b9aa]">
             {finding.description}
           </p>
         </div>
@@ -572,17 +572,17 @@ function FindingCard({
           <DetailPanel label="Where To Change" value={finding.whereToChange} />
         </div>
 
-        <div className="rounded-[1.3rem] border border-emerald-200 bg-emerald-50/80 p-4">
-          <p className="text-sm font-semibold text-emerald-900">Expected impact</p>
-          <p className="mt-2 text-sm leading-7 text-emerald-800">
+        <div className="obsidian-inline-note rounded-[1.3rem] border-emerald-400/20 bg-emerald-500/10 p-4">
+          <p className="text-sm font-semibold text-emerald-100">Expected impact</p>
+          <p className="mt-2 text-sm leading-7 text-emerald-50/90">
             {finding.expectedImpact}
           </p>
         </div>
 
         {finding.evidence.length > 0 ? (
-          <div className="rounded-[1.3rem] border border-slate-200 bg-slate-50/80 p-4">
-            <p className="text-sm font-semibold text-slate-900">Evidence</p>
-            <div className="mt-3 grid gap-2 text-sm text-slate-600">
+          <div className="obsidian-soft-card p-4">
+            <p className="text-sm font-semibold text-[#f7f0e6]">Evidence</p>
+            <div className="mt-3 grid gap-2 text-sm text-[#c5b9aa]">
               {finding.evidence.map((item) => (
                 <p key={item}>- {item}</p>
               ))}
@@ -604,7 +604,7 @@ function ActionCard({
   showPriorityBadge?: boolean;
 }) {
   return (
-    <Card className="border-slate-200/80 bg-white/90">
+    <Card className="obsidian-card">
       <CardContent className="space-y-4 pt-6">
         <div className="flex flex-wrap items-center gap-2">
           {showPriorityBadge ? (
@@ -627,8 +627,8 @@ function ActionCard({
         </div>
 
         <div>
-          <p className="text-lg font-semibold text-slate-950">{action.title}</p>
-          <p className="mt-2 text-sm leading-7 text-slate-600">
+          <p className="text-lg font-semibold text-[#f7f0e6]">{action.title}</p>
+          <p className="mt-2 text-sm leading-7 text-[#c5b9aa]">
             {action.description}
           </p>
         </div>
@@ -640,15 +640,15 @@ function ActionCard({
           <DetailPanel label="Where To Change" value={action.whereToChange} />
         </div>
 
-        <div className="rounded-[1.3rem] border border-emerald-200 bg-emerald-50/80 p-4">
-          <p className="text-sm font-semibold text-emerald-900">Expected impact</p>
-          <p className="mt-2 text-sm leading-7 text-emerald-800">
+        <div className="obsidian-inline-note rounded-[1.3rem] border-emerald-400/20 bg-emerald-500/10 p-4">
+          <p className="text-sm font-semibold text-emerald-100">Expected impact</p>
+          <p className="mt-2 text-sm leading-7 text-emerald-50/90">
             {action.expectedImpact}
           </p>
         </div>
 
         {action.linkedFindingIds.length > 0 ? (
-          <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+          <div className="flex flex-wrap items-center gap-2 text-sm text-[#998e82]">
             <ArrowRight className="h-4 w-4" />
             <span>Linked findings: {action.linkedFindingIds.join(", ")}</span>
           </div>
@@ -666,15 +666,15 @@ function ActionPrioritySection({
   verifiedFindingIds: Set<string>;
 }) {
   return (
-    <Card className="border-slate-200/80 bg-white/90">
-      <CardHeader className="border-b border-slate-200/80">
+    <Card className="obsidian-card">
+      <CardHeader className="border-b border-white/10">
         <div className="flex flex-wrap items-center gap-3">
           <Badge variant={section.id === "P0" ? "destructive" : "outline"}>
             {section.label}
           </Badge>
           <Badge variant="outline">{section.items.length} items</Badge>
         </div>
-        <CardTitle className="text-lg text-slate-950">
+        <CardTitle className="text-lg text-[#f7f0e6]">
           {section.description}
         </CardTitle>
       </CardHeader>
@@ -694,11 +694,11 @@ function ActionPrioritySection({
 
 function DetailPanel({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/80 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+    <div className="obsidian-soft-card p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#998e82]">
         {label}
       </p>
-      <p className="mt-2 text-sm leading-7 text-slate-700">{value}</p>
+      <p className="mt-2 text-sm leading-7 text-[#dfd2c3]">{value}</p>
     </div>
   );
 }
@@ -710,8 +710,8 @@ function CoverageRow({ item }: { item: ListingDiagnosticsSourceCoverageItem }) {
     <TableRow>
       <TableCell>
         <div>
-          <p className="font-medium text-slate-900">{item.label}</p>
-          <p className="mt-1 text-xs text-slate-500">{item.source}</p>
+          <p className="font-medium text-[#f7f0e6]">{item.label}</p>
+          <p className="mt-1 text-xs text-[#998e82]">{item.source}</p>
         </div>
       </TableCell>
       <TableCell>
@@ -727,7 +727,7 @@ function CoverageRow({ item }: { item: ListingDiagnosticsSourceCoverageItem }) {
         {item.available} / {item.expected}
       </TableCell>
       <TableCell>{Math.round(item.confidence * 100)}%</TableCell>
-      <TableCell className="whitespace-normal text-sm text-slate-600">
+      <TableCell className="whitespace-normal text-sm text-[#c5b9aa]">
         {item.detail}
       </TableCell>
     </TableRow>
@@ -739,18 +739,18 @@ function EvidenceTableRow({ row }: { row: ListingDiagnosticsEvidenceRow }) {
     <TableRow>
       <TableCell>
         <div>
-          <p className="font-medium text-slate-900">{row.signal}</p>
-          <p className="mt-1 text-xs text-slate-500">{row.category}</p>
+          <p className="font-medium text-[#f7f0e6]">{row.signal}</p>
+          <p className="mt-1 text-xs text-[#998e82]">{row.category}</p>
         </div>
       </TableCell>
-      <TableCell className="text-sm text-slate-700">{row.source}</TableCell>
+      <TableCell className="text-sm text-[#dfd2c3]">{row.source}</TableCell>
       <TableCell>{Math.round(row.confidence * 100)}%</TableCell>
       <TableCell>
         <Badge variant={getEvidenceBadgeVariant(row.verification)}>
           {formatEvidenceVerificationLabel(row.verification)}
         </Badge>
       </TableCell>
-      <TableCell className="whitespace-normal text-sm leading-7 text-slate-600">
+      <TableCell className="whitespace-normal text-sm leading-7 text-[#c5b9aa]">
         {row.evidence}
       </TableCell>
     </TableRow>
@@ -763,16 +763,16 @@ function RootCauseQueueCard({
   items: ListingDiagnosticsRootCauseSummaryItem[];
 }) {
   return (
-    <Card className="border-slate-200/80 bg-white/90">
-      <CardHeader className="border-b border-slate-200/80">
-        <CardTitle className="text-xl text-slate-950">Root-cause queue</CardTitle>
+    <Card className="obsidian-card">
+      <CardHeader className="border-b border-white/10">
+        <CardTitle className="text-xl text-[#f7f0e6]">Root-cause queue</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-6">
         {items.length > 0 ? (
           items.slice(0, 4).map((item) => (
             <div
               key={item.label}
-              className="rounded-[1.4rem] border border-slate-200 bg-slate-50/70 p-4"
+              className="obsidian-soft-card p-4"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={item.topPriority === "P0" ? "destructive" : "outline"}>
@@ -793,7 +793,7 @@ function RootCauseQueueCard({
                   <Badge variant="outline">{item.inferredCount} inferred</Badge>
                 ) : null}
               </div>
-              <p className="mt-3 text-sm font-semibold text-slate-900">
+              <p className="mt-3 text-sm font-semibold text-[#f7f0e6]">
                 Lead issue: {item.leadFindingTitle}
               </p>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
@@ -802,18 +802,18 @@ function RootCauseQueueCard({
                 <DetailPanel label="Next Move" value={item.nextMove} />
                 <DetailPanel label="Where To Change" value={item.recommendedSurface} />
               </div>
-              <div className="mt-3 rounded-[1.2rem] border border-emerald-200 bg-emerald-50/80 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">
+              <div className="obsidian-inline-note mt-3 rounded-[1.2rem] border-emerald-400/20 bg-emerald-500/10 p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-100">
                   Expected impact
                 </p>
-                <p className="mt-2 text-sm leading-7 text-emerald-800">
+                <p className="mt-2 text-sm leading-7 text-emerald-50/90">
                   {item.expectedImpact}
                 </p>
               </div>
             </div>
           ))
         ) : (
-          <p className="text-sm leading-7 text-slate-500">
+          <p className="text-sm leading-7 text-[#998e82]">
             No root-cause queue is available for this run.
           </p>
         )}
@@ -828,16 +828,16 @@ function ImpactQueueCard({
   items: ListingDiagnosticsImpactSummaryItem[];
 }) {
   return (
-    <Card className="border-slate-200/80 bg-white/90">
-      <CardHeader className="border-b border-slate-200/80">
-        <CardTitle className="text-xl text-slate-950">Business impact queue</CardTitle>
+    <Card className="obsidian-card">
+      <CardHeader className="border-b border-white/10">
+        <CardTitle className="text-xl text-[#f7f0e6]">Business impact queue</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4 pt-6">
         {items.length > 0 ? (
           items.map((item) => (
             <div
               key={item.impactType}
-              className="rounded-[1.4rem] border border-slate-200 bg-slate-50/70 p-4"
+              className="obsidian-soft-card p-4"
             >
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant={item.topPriority === "P0" ? "destructive" : "outline"}>
@@ -857,10 +857,10 @@ function ImpactQueueCard({
                   <Badge variant="outline">{item.inferredCount} inferred</Badge>
                 ) : null}
               </div>
-              <p className="mt-3 text-sm font-semibold text-slate-900">
+              <p className="mt-3 text-sm font-semibold text-[#f7f0e6]">
                 Lead issue: {item.leadFindingTitle}
               </p>
-              <p className="mt-3 text-sm leading-7 text-slate-700">{item.headline}</p>
+              <p className="mt-3 text-sm leading-7 text-[#dfd2c3]">{item.headline}</p>
               <div className="mt-3 grid gap-3 md:grid-cols-2">
                 <DetailPanel
                   label="Root-Cause Lead"
@@ -873,7 +873,7 @@ function ImpactQueueCard({
             </div>
           ))
         ) : (
-          <p className="text-sm leading-7 text-slate-500">
+          <p className="text-sm leading-7 text-[#998e82]">
             No business impact queue is available for this run.
           </p>
         )}
@@ -890,10 +890,10 @@ function EmptyPanel({
   description: string;
 }) {
   return (
-    <Card className="border-dashed border-slate-300/90 bg-white/70">
+    <Card className="obsidian-empty-state">
       <CardContent className="py-10 text-center">
-        <p className="text-lg font-semibold text-slate-950">{title}</p>
-        <p className="mt-2 text-sm leading-7 text-slate-600">{description}</p>
+        <p className="text-lg font-semibold text-[#f7f0e6]">{title}</p>
+        <p className="mt-2 text-sm leading-7 text-[#c5b9aa]">{description}</p>
       </CardContent>
     </Card>
   );

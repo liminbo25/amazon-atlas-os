@@ -284,18 +284,18 @@ export function LegacyCopyDiagnosisWorkbench() {
 
   return (
     <section className="page-shell mt-8">
-      <div className="glass-panel p-6 sm:p-7">
+      <div className="obsidian-workbench p-6 sm:p-7">
         <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
           <div className="space-y-6">
-            <Card className="border-slate-200/80 bg-white/85 shadow-none">
+            <Card className="obsidian-card shadow-none">
               <CardHeader className="pb-3">
                 <div className="flex items-center gap-3">
-                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                  <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[rgba(246,182,63,0.28)] bg-[rgba(246,182,63,0.16)] text-[#f7f0e6]">
                     <Radar className="h-5 w-5" />
                   </div>
                   <div>
-                    <CardTitle className="text-xl text-slate-950">诊断输入</CardTitle>
-                    <p className="mt-1 text-sm leading-7 text-slate-500">
+                    <CardTitle className="text-xl text-[#f7f0e6]">诊断输入</CardTitle>
+                    <p className="mt-1 text-sm leading-7 text-[#c8bcad]">
                       数据来源已经切到卖家精灵 MCP。目标 ASIN、竞品 ASIN 必填，当前文案字段可留空后直接用卖家精灵抓取到的页面文案。
                     </p>
                   </div>
@@ -407,11 +407,11 @@ export function LegacyCopyDiagnosisWorkbench() {
                   />
                 </div>
 
-                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
+                <div className="obsidian-filter-bar p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-950">API 接入设置</p>
-                      <p className="mt-1 text-sm leading-7 text-slate-500">
+                      <p className="text-sm font-semibold text-[#f7f0e6]">API 接入设置</p>
+                      <p className="mt-1 text-sm leading-7 text-[#c8bcad]">
                         这里可以直接配置 SellerSprite MCP 和分析模型 API。这里的模型用于分析卖家精灵抓回的数据并生成诊断与优化建议，比如 gpt-5.4；密钥留空时会优先使用服务端环境变量。
                       </p>
                     </div>
@@ -419,6 +419,7 @@ export function LegacyCopyDiagnosisWorkbench() {
                       type="button"
                       variant="outline"
                       size="sm"
+                      className="obsidian-action-secondary h-9 px-4 py-2"
                       onClick={() => setRuntimeOpen((current) => !current)}
                     >
                       {runtimeOpen ? "收起" : "展开"}
@@ -432,10 +433,10 @@ export function LegacyCopyDiagnosisWorkbench() {
 
                   {runtimeOpen ? (
                     <div className="mt-4 grid gap-4">
-                      <div className="rounded-2xl border border-slate-200 bg-white/70 p-4">
+                      <div className="obsidian-soft-card p-4">
                         <div className="flex items-center gap-2">
                           <Badge variant="secondary">SellerSprite MCP</Badge>
-                          <p className="text-sm font-semibold text-slate-950">数据源接入</p>
+                          <p className="text-sm font-semibold text-[#f7f0e6]">数据源接入</p>
                         </div>
 
                         <div className="mt-4 grid gap-4">
@@ -490,9 +491,9 @@ export function LegacyCopyDiagnosisWorkbench() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white/70 px-4 py-3">
+                      <div className="obsidian-filter-bar flex items-center gap-2 px-4 py-3">
                         <Badge variant="secondary">Analysis Model</Badge>
-                        <p className="text-sm font-semibold text-slate-950">分析模型 API</p>
+                        <p className="text-sm font-semibold text-[#f7f0e6]">分析模型 API</p>
                       </div>
 
                       <div className="grid gap-4 md:grid-cols-2">
@@ -568,13 +569,13 @@ export function LegacyCopyDiagnosisWorkbench() {
                         />
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 md:col-span-2">
+                      <div className="obsidian-soft-card p-4 md:col-span-2">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
-                            <p className="text-sm font-semibold text-slate-950">
+                            <p className="text-sm font-semibold text-[#f7f0e6]">
                               API 可用性测试
                             </p>
-                            <p className="mt-1 text-xs leading-6 text-slate-500">
+                            <p className="mt-1 text-xs leading-6 text-[#c8bcad]">
                               用当前分析模型配置发送一条极小请求，快速确认接口是否可用。
                             </p>
                           </div>
@@ -582,6 +583,7 @@ export function LegacyCopyDiagnosisWorkbench() {
                             type="button"
                             variant="outline"
                             size="sm"
+                            className="obsidian-action-secondary h-9 px-4 py-2"
                             disabled={runtimeTesting}
                             onClick={() => void handleTestRuntime()}
                           >
@@ -599,10 +601,10 @@ export function LegacyCopyDiagnosisWorkbench() {
                         {runtimeTestResult ? (
                           <div
                             className={cn(
-                              "mt-3 rounded-xl border px-3 py-3 text-sm",
+                              "mt-3 rounded-[1rem] border px-3 py-3 text-sm",
                               runtimeTestResult.status === "success"
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                                : "border-rose-200 bg-rose-50 text-rose-800"
+                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-100"
+                                : "border-rose-500/30 bg-rose-500/10 text-rose-100"
                             )}
                           >
                             <p className="font-medium">
@@ -628,7 +630,7 @@ export function LegacyCopyDiagnosisWorkbench() {
                     type="button"
                     onClick={() => void handleAnalyze()}
                     disabled={loading}
-                    className="bg-slate-950 hover:bg-slate-800"
+                    className="obsidian-action"
                   >
                     {loading ? (
                       <>
@@ -642,10 +644,20 @@ export function LegacyCopyDiagnosisWorkbench() {
                       </>
                     )}
                   </Button>
-                  <Button type="button" variant="outline" onClick={fillSample}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="obsidian-action-secondary"
+                    onClick={fillSample}
+                  >
                     填充示例
                   </Button>
-                  <Button type="button" variant="ghost" onClick={handleReset}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="border border-transparent text-[#c8bcad] hover:border-white/10 hover:bg-white/5 hover:text-[#f7f0e6]"
+                    onClick={handleReset}
+                  >
                     <RefreshCw className="mr-2 h-4 w-4" />
                     重置
                   </Button>
@@ -666,14 +678,14 @@ export function LegacyCopyDiagnosisWorkbench() {
             {report ? (
               <ResultsPanel report={report} />
             ) : (
-              <Card className="border-dashed border-slate-300 bg-slate-50/80 shadow-none">
+              <Card className="obsidian-empty-state shadow-none">
                 <CardContent className="flex min-h-[560px] flex-col items-center justify-center gap-4 text-center">
-                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-white">
+                  <div className="inline-flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(246,182,63,0.28)] bg-[rgba(246,182,63,0.14)] text-[#f7f0e6]">
                     <ClipboardList className="h-7 w-7" />
                   </div>
                   <div className="space-y-2">
-                    <p className="text-xl font-semibold text-slate-950">诊断结果会显示在这里</p>
-                    <p className="max-w-xl text-sm leading-7 text-slate-500">
+                      <p className="text-xl font-semibold text-[#f7f0e6]">诊断结果会显示在这里</p>
+                      <p className="max-w-xl text-sm leading-7 text-[#c8bcad]">
                       模块会先调用卖家精灵 MCP 拉目标 ASIN、竞品 ASIN、评论和流量词，再输出总分、9 大支柱分、关键词缺口、评论主题和改写建议。
                     </p>
                   </div>
@@ -725,36 +737,36 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
           />
         </div>
 
-        <Card className="border-slate-200/80 bg-white/85 shadow-none">
+        <Card className="obsidian-card shadow-none">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-3">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-white">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[rgba(246,182,63,0.28)] bg-[rgba(246,182,63,0.16)] text-[#f7f0e6]">
                 <Sparkles className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-xl text-slate-950">{report.score.headline}</CardTitle>
-                <p className="mt-1 text-sm leading-7 text-slate-500">
+                <CardTitle className="text-xl text-[#f7f0e6]">{report.score.headline}</CardTitle>
+                <p className="mt-1 text-sm leading-7 text-[#c8bcad]">
                   目标 ASIN：{report.targetAsin}，当前标题与五点会优先用你手动输入的内容；没填的部分回退到卖家精灵抓取结果。
                 </p>
               </div>
             </div>
           </CardHeader>
           <CardContent className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-sm font-semibold text-slate-950">P0 动作</p>
+            <div className="obsidian-soft-card p-4">
+              <p className="text-sm font-semibold text-[#f7f0e6]">P0 动作</p>
               <SimpleList items={report.ai.output?.p0Actions ?? report.actionPlan.p0} />
             </div>
-            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-sm font-semibold text-slate-950">P1 / P2 动作</p>
+            <div className="obsidian-soft-card p-4">
+              <p className="text-sm font-semibold text-[#f7f0e6]">P1 / P2 动作</p>
               <SimpleList items={[...report.actionPlan.p1.slice(0, 3), ...report.actionPlan.p2.slice(0, 2)]} />
             </div>
           </CardContent>
         </Card>
 
         <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
-          <Card className="border-slate-200/80 bg-white/85 shadow-none">
+          <Card className="obsidian-card shadow-none">
             <CardHeader>
-              <CardTitle className="text-lg text-slate-950">评论信号</CardTitle>
+              <CardTitle className="text-lg text-[#f7f0e6]">评论信号</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <SignalColumn
@@ -774,15 +786,15 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
             </CardContent>
           </Card>
 
-          <Card className="border-slate-200/80 bg-white/85 shadow-none">
+          <Card className="obsidian-card shadow-none">
             <CardHeader>
-              <CardTitle className="text-lg text-slate-950">竞品快照</CardTitle>
+              <CardTitle className="text-lg text-[#f7f0e6]">竞品快照</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {report.competitorSnapshots.map((item) => (
                 <div
                   key={item.asin}
-                  className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4"
+                  className="obsidian-soft-card p-4"
                 >
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline">{item.asin}</Badge>
@@ -790,8 +802,8 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
                     {item.hasAPlus ? <Badge variant="secondary">A+</Badge> : null}
                     {item.hasVideo ? <Badge variant="secondary">Video</Badge> : null}
                   </div>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{item.title}</p>
-                  <p className="mt-2 text-sm text-slate-500">
+                  <p className="mt-3 text-sm leading-7 text-[#d2c5b7]">{item.title}</p>
+                  <p className="mt-2 text-sm text-[#c8bcad]">
                     ${item.price.toFixed(2)} / {item.rating.toFixed(1)}★ / {item.reviews} 评 /
                     变体 {item.variationCount || 0}
                   </p>
@@ -805,10 +817,10 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
       <TabsContent value="pillars" className="space-y-4">
         <div className="grid gap-4 xl:grid-cols-2">
           {report.pillars.map((pillar) => (
-            <Card key={pillar.id} className="border-slate-200/80 bg-white/85 shadow-none">
+            <Card key={pillar.id} className="obsidian-card shadow-none">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-lg text-slate-950">{pillar.title}</CardTitle>
+                  <CardTitle className="text-lg text-[#f7f0e6]">{pillar.title}</CardTitle>
                   <div className="flex items-center gap-2">
                     <Badge className={scoreBadgeClassName(pillar.status)}>{statusLabel(pillar.status)}</Badge>
                     <Badge variant="outline">
@@ -816,7 +828,7 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
                     </Badge>
                   </div>
                 </div>
-                <p className="text-sm leading-7 text-slate-500">{pillar.summary}</p>
+                <p className="text-sm leading-7 text-[#c8bcad]">{pillar.summary}</p>
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-3">
                 <DetailBlock title="发现" items={pillar.findings} />
@@ -829,15 +841,15 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
       </TabsContent>
 
       <TabsContent value="keywords" className="space-y-4">
-        <Card className="border-slate-200/80 bg-white/85 shadow-none">
+        <Card className="obsidian-card shadow-none">
           <CardHeader>
-            <CardTitle className="text-lg text-slate-950">重点关键词缺口</CardTitle>
+            <CardTitle className="text-lg text-[#f7f0e6]">重点关键词缺口</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {report.keywordGaps.map((gap) => (
               <div
                 key={gap.keyword}
-                className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4"
+                className="obsidian-soft-card p-4"
               >
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline">{gap.keyword}</Badge>
@@ -852,8 +864,8 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
                     Competitor {gap.bestCompetitorOrganicRank ? `#${gap.bestCompetitorOrganicRank}` : "-"}
                   </Badge>
                 </div>
-                <p className="mt-3 text-sm leading-7 text-slate-600">{gap.reason}</p>
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-3 text-sm leading-7 text-[#d2c5b7]">{gap.reason}</p>
+                <p className="mt-2 text-xs text-[#c8bcad]">
                   当前覆盖：{gap.coverage.title ? "标题 " : ""}
                   {gap.coverage.bullets ? "五点 " : ""}
                   {gap.coverage.searchTerms ? "ST " : ""}
@@ -866,15 +878,15 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
       </TabsContent>
 
       <TabsContent value="rewrite" className="space-y-4">
-        <Card className="border-slate-200/80 bg-white/85 shadow-none">
+        <Card className="obsidian-card shadow-none">
           <CardHeader>
             <div className="flex items-center gap-3">
-              <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-white">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[rgba(246,182,63,0.28)] bg-[rgba(246,182,63,0.16)] text-[#f7f0e6]">
                 <BrainCircuit className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-lg text-slate-950">模型分析与优化建议</CardTitle>
-                <p className="mt-1 text-sm leading-7 text-slate-500">
+                <CardTitle className="text-lg text-[#f7f0e6]">模型分析与优化建议</CardTitle>
+                <p className="mt-1 text-sm leading-7 text-[#c8bcad]">
                   {report.ai.used
                     ? `已使用 ${report.ai.provider} / ${report.ai.model}`
                     : report.ai.reason || "当前没有可用 AI 结果，已返回规则诊断与动作建议。"}
@@ -885,9 +897,9 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
           <CardContent className="space-y-4">
             {report.ai.output ? (
               <>
-                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">总评</p>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                <div className="obsidian-inline-note p-4">
+                  <p className="text-sm font-semibold text-[#f7f0e6]">总评</p>
+                  <p className="mt-2 text-sm leading-7 text-[#d2c5b7]">
                     {report.ai.output.executiveSummary}
                   </p>
                 </div>
@@ -895,25 +907,25 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
                   <DetailBlock title="Quick Wins" items={report.ai.output.quickWins} />
                   <DetailBlock title="Watchouts" items={report.ai.output.watchouts} />
                 </div>
-                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">Title Suggestion</p>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                <div className="obsidian-soft-card p-4">
+                  <p className="text-sm font-semibold text-[#f7f0e6]">Title Suggestion</p>
+                  <p className="mt-2 text-sm leading-7 text-[#d2c5b7]">
                     {report.ai.output.titleSuggestion}
                   </p>
                 </div>
-                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">Bullet Suggestions</p>
+                <div className="obsidian-soft-card p-4">
+                  <p className="text-sm font-semibold text-[#f7f0e6]">Bullet Suggestions</p>
                   <SimpleList items={report.ai.output.bulletSuggestions} />
                 </div>
-                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">Search Terms Suggestion</p>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                <div className="obsidian-soft-card p-4">
+                  <p className="text-sm font-semibold text-[#f7f0e6]">Search Terms Suggestion</p>
+                  <p className="mt-2 text-sm leading-7 text-[#d2c5b7]">
                     {report.ai.output.searchTermsSuggestion}
                   </p>
                 </div>
               </>
             ) : (
-              <div className="rounded-[1.2rem] border border-dashed border-slate-300 bg-slate-50/70 p-5 text-sm leading-7 text-slate-500">
+              <div className="obsidian-empty-state p-5 text-sm leading-7 text-[#c8bcad]">
                 当前没有追加模型分析输出。规则诊断已完成；如果要让模型基于数据进一步生成优化建议与英文标题、五点、Search Terms，请填写分析模型 API 配置，或在服务端补可用模型凭证。
               </div>
             )}
@@ -936,15 +948,15 @@ function MetricCard({
   note: string;
 }) {
   return (
-    <Card className="border-slate-200/80 bg-white/85 shadow-none">
+    <Card className="obsidian-card shadow-none">
       <CardContent className="flex items-start gap-4 pt-5">
-        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white">
+        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[rgba(246,182,63,0.28)] bg-[rgba(246,182,63,0.16)] text-[#f7f0e6]">
           <Icon className="h-5 w-5" />
         </div>
         <div>
-          <p className="text-sm text-slate-500">{title}</p>
-          <p className="mt-1 text-3xl font-semibold tracking-[-0.04em] text-slate-950">{value}</p>
-          <p className="mt-1 text-sm text-slate-500">{note}</p>
+          <p className="text-sm text-[#c8bcad]">{title}</p>
+          <p className="mt-1 text-3xl font-semibold tracking-[-0.04em] text-[#f7f0e6]">{value}</p>
+          <p className="mt-1 text-sm text-[#c8bcad]">{note}</p>
         </div>
       </CardContent>
     </Card>
@@ -953,8 +965,8 @@ function MetricCard({
 
 function SignalColumn({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-      <p className="text-sm font-semibold text-slate-950">{title}</p>
+    <div className="obsidian-soft-card p-4">
+      <p className="text-sm font-semibold text-[#f7f0e6]">{title}</p>
       <SimpleList items={items} />
     </div>
   );
@@ -962,8 +974,8 @@ function SignalColumn({ title, items }: { title: string; items: string[] }) {
 
 function DetailBlock({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-      <p className="text-sm font-semibold text-slate-950">{title}</p>
+    <div className="obsidian-soft-card p-4">
+      <p className="text-sm font-semibold text-[#f7f0e6]">{title}</p>
       <SimpleList items={items} />
     </div>
   );
@@ -971,14 +983,14 @@ function DetailBlock({ title, items }: { title: string; items: string[] }) {
 
 function SimpleList({ items }: { items: string[] }) {
   if (items.length === 0) {
-    return <p className="mt-3 text-sm text-slate-500">暂无</p>;
+    return <p className="mt-3 text-sm text-[#c8bcad]">暂无</p>;
   }
 
   return (
-    <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-600">
+    <ul className="mt-3 space-y-2 text-sm leading-7 text-[#d2c5b7]">
       {items.map((item) => (
         <li key={item} className="flex gap-3">
-          <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-400" />
+          <span className="mt-2 h-1.5 w-1.5 rounded-full bg-[rgba(246,182,63,0.55)]" />
           <span>{item}</span>
         </li>
       ))}
@@ -1050,19 +1062,19 @@ function formatPreviewBaseUrl(baseUrl: string): string {
 
 function scoreBadgeClassName(status: "strong" | "watch" | "weak") {
   return cn(
-    "text-white",
-    status === "strong" && "bg-emerald-600 hover:bg-emerald-600",
-    status === "watch" && "bg-amber-500 hover:bg-amber-500",
-    status === "weak" && "bg-rose-600 hover:bg-rose-600"
+    "border text-white",
+    status === "strong" && "border-emerald-400/25 bg-emerald-500/18 hover:bg-emerald-500/18",
+    status === "watch" && "border-amber-400/25 bg-amber-500/18 hover:bg-amber-500/18",
+    status === "weak" && "border-rose-400/25 bg-rose-500/18 hover:bg-rose-500/18"
   );
 }
 
 function priorityBadgeClassName(priority: "critical" | "high" | "medium") {
   return cn(
-    "text-white",
-    priority === "critical" && "bg-rose-600 hover:bg-rose-600",
-    priority === "high" && "bg-amber-500 hover:bg-amber-500",
-    priority === "medium" && "bg-slate-700 hover:bg-slate-700"
+    "border text-white",
+    priority === "critical" && "border-rose-400/25 bg-rose-500/18 hover:bg-rose-500/18",
+    priority === "high" && "border-amber-400/25 bg-amber-500/18 hover:bg-amber-500/18",
+    priority === "medium" && "border-white/12 bg-white/10 hover:bg-white/10"
   );
 }
 

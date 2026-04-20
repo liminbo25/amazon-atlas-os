@@ -212,10 +212,10 @@ export function ProductImageUpload({
 
   const noticeClassName =
     notice?.tone === "warning"
-      ? "border-amber-200 bg-amber-50 text-amber-800"
+      ? "border-amber-400/25 bg-amber-500/12 text-amber-100"
       : notice?.tone === "success"
-      ? "border-green-200 bg-green-50 text-green-800"
-      : "border-blue-200 bg-blue-50 text-blue-800";
+      ? "border-emerald-400/25 bg-emerald-500/12 text-emerald-100"
+      : "border-sky-400/25 bg-sky-500/12 text-sky-100";
 
   return (
     <div className="space-y-4">
@@ -237,13 +237,13 @@ export function ProductImageUpload({
           onDragLeave={handleDragLeave}
           onClick={handleClick}
           className={[
-            "rounded-lg border-2 border-dashed p-8 text-center transition-colors",
+            "obsidian-empty-state rounded-[1.6rem] border-2 p-8 text-center transition-colors",
             isProcessing || remainingSlots === 0
               ? "cursor-not-allowed opacity-70"
               : "cursor-pointer",
             isDragging
-              ? "border-[#FF9900] bg-orange-50"
-              : "border-muted hover:border-[#FF9900] hover:bg-muted/50",
+              ? "border-[rgba(246,182,63,0.45)] bg-[rgba(246,182,63,0.1)]"
+              : "border-white/12 hover:border-[rgba(246,182,63,0.28)] hover:bg-white/[0.05]",
           ].join(" ")}
         >
           <input
@@ -259,30 +259,30 @@ export function ProductImageUpload({
             <>
               <Loader2 className="mx-auto mb-3 h-12 w-12 animate-spin text-[#FF9900]" />
               <p className="mb-1 text-sm font-medium">正在处理图片...</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-stone-400/80">
                 上传完成后会自动压缩并生成预览。
               </p>
             </>
           ) : (
             <>
-              <Upload className="mx-auto mb-3 h-12 w-12 text-muted-foreground" />
+              <Upload className="mx-auto mb-3 h-12 w-12 text-stone-300/80" />
               <p className="mb-1 text-sm font-medium">点击上传或拖拽图片到此处</p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-stone-400/80">
                 支持 JPG/PNG/WEBP，单张最大 {maxSizeMB}MB
               </p>
             </>
           )}
         </div>
       ) : (
-        <div className="rounded-lg border border-dashed border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-700">
+        <div className="obsidian-inline-note border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
           图片数量已达到上限。删除部分图片后，可继续上传补充视角。
         </div>
       )}
 
       {images.length === 0 && (
-        <div className="rounded-lg border border-dashed bg-muted/20 px-4 py-3">
-          <div className="flex items-start gap-3 text-sm text-muted-foreground">
-            <ImageIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
+        <div className="obsidian-empty-state px-4 py-3">
+          <div className="flex items-start gap-3 text-sm text-stone-300/80">
+            <ImageIcon className="mt-0.5 h-4 w-4 flex-shrink-0 text-stone-300/80" />
             <div>
               <p className="font-medium text-foreground">建议至少上传 1 张主图</p>
               <p>图片越完整，后续 AI 越容易提取外观、材质和卖点线索。</p>
@@ -296,7 +296,7 @@ export function ProductImageUpload({
           {images.map((image) => (
             <Card key={image.id} className="overflow-hidden">
               <CardContent className="p-0">
-                <div className="relative aspect-square bg-muted/20">
+                <div className="relative aspect-square bg-white/[0.03]">
                   <Image
                     src={image.preview}
                     alt={image.label}
@@ -324,7 +324,7 @@ export function ProductImageUpload({
                 </div>
 
                 <div className="space-y-2 p-2">
-                  <p className="truncate text-xs text-muted-foreground" title={image.label}>
+                  <p className="truncate text-xs text-stone-300/80" title={image.label}>
                     {image.label}
                   </p>
                   <Select
@@ -354,7 +354,7 @@ export function ProductImageUpload({
       )}
 
       {images.length > 0 && (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-stone-400/80">
           已上传 {images.length} / {maxImages} 张图片，可继续为不同视角分类，方便后续分析。
         </p>
       )}

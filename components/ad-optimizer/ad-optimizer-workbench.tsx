@@ -392,14 +392,14 @@ export function AdOptimizerWorkbench() {
   return (
     <section className="page-shell mt-8 pb-10">
       <div className="grid gap-5 xl:grid-cols-[1.1fr_0.9fr]">
-        <article className="glass-panel p-6 sm:p-7">
+        <article className="obsidian-workbench p-6 sm:p-7">
           <div className="flex items-center gap-3">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-300 text-slate-950">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[rgba(246,182,63,0.24)] bg-[rgba(246,182,63,0.14)] text-[#f6b63f]">
               <Sparkles className="h-5 w-5" />
             </div>
             <div>
               <p className="section-kicker">执行路径</p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+              <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#f7f0e6]">
                 从搜索词报表直接生成可执行动作
               </h2>
             </div>
@@ -424,27 +424,27 @@ export function AdOptimizerWorkbench() {
           </div>
         </article>
 
-        <article className="glass-panel p-6 sm:p-7">
+        <article className="obsidian-workbench p-6 sm:p-7">
           <div className="flex items-center gap-3">
-            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-950 text-white">
+            <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-white/10 bg-[rgba(255,255,255,0.06)] text-[#f7f0e6]">
               <DatabaseZap className="h-5 w-5" />
             </div>
             <div>
               <p className="section-kicker">策略控制</p>
-              <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+              <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[#f7f0e6]">
                 模板、利润与预算口径
               </h2>
             </div>
           </div>
 
           <div className="mt-6 grid gap-4">
-            <label className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4">
+            <label className="obsidian-soft-card px-4 py-4">
               <span className="section-kicker">策略模板</span>
               <Select
                 value={controls.templateId}
                 onValueChange={(value) => handleTemplateChange(value as StrategyTemplateId)}
               >
-                <SelectTrigger className="mt-3 h-11 w-full rounded-2xl border-slate-200 bg-white px-4">
+                <SelectTrigger className="mt-3 h-11 w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -455,7 +455,7 @@ export function AdOptimizerWorkbench() {
                   ))}
                 </SelectContent>
               </Select>
-              <p className="mt-3 text-sm leading-6 text-slate-500">
+              <p className="mt-3 text-sm leading-6 text-[#b9ab9c]">
                 {STRATEGY_TEMPLATES[controls.templateId].description}
               </p>
             </label>
@@ -519,19 +519,20 @@ export function AdOptimizerWorkbench() {
           <Button
             onClick={() => void handleAnalyze()}
             disabled={isRunning}
-            className="mt-6 h-11 w-full rounded-full bg-slate-950 text-white hover:bg-slate-800"
+            size="lg"
+            className="mt-6 w-full"
           >
             <Play className="mr-2 h-4 w-4" />
             {isRunning ? "分析中..." : "运行广告优化"}
           </Button>
 
-          <p className="mt-4 rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
+          <p className="obsidian-inline-note mt-4 px-4 py-3 text-sm leading-7">
             {message}
           </p>
           {result ? (
-            <div className="mt-4 flex flex-col gap-3 rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
+            <div className="obsidian-soft-card mt-4 flex flex-col gap-3 px-4 py-4 text-sm text-[#c5b9aa] sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="font-semibold text-slate-950">
+                <p className="font-semibold text-[#f7f0e6]">
                   {restoredSessionAt ? "已恢复最近一次分析记录" : "最近一次分析会自动保存"}
                 </p>
                 <p className="mt-1 leading-6">
@@ -641,19 +642,19 @@ export function AdOptimizerWorkbench() {
             />
           </div>
 
-          <div className="glass-panel p-6 sm:p-7">
+          <div className="obsidian-workbench p-6 sm:p-7">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="section-kicker">导出</p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                <h2 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#f7f0e6]">
                   把建议转成可交付文件
                 </h2>
-                <p className="mt-2 text-sm leading-7 text-slate-500">
+                <p className="mt-2 text-sm leading-7 text-[#b9ab9c]">
                   报告工作簿会带上 lifecycle 和治理视图；bulk 草稿会排除 ignored 建议；bulk-ready 只保留可直接上传的动作。
                 </p>
               </div>
 
-              <div className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4">
+              <div className="obsidian-soft-card px-4 py-4">
                 <p className="section-kicker">Bulk 操作值</p>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <ToggleChip
@@ -692,7 +693,7 @@ export function AdOptimizerWorkbench() {
               <Button
                 onClick={() => void handleExport("direct")}
                 disabled={isExporting !== "" || readyExportCount === 0}
-                className="h-11 rounded-full bg-slate-950 px-5 text-white hover:bg-slate-800"
+                className="h-11 px-5"
               >
                 <ArrowDownToLine className="mr-2 h-4 w-4" />
                 {isExporting === "direct" ? "导出中..." : "导出 Bulk Ready"}
@@ -702,7 +703,7 @@ export function AdOptimizerWorkbench() {
 
           <AdOptimizerCharts result={result} />
 
-          <div className="glass-panel p-6 sm:p-7">
+          <div className="obsidian-workbench p-6 sm:p-7">
             <Tabs defaultValue="actions">
               <TabsList variant="line">
                 <TabsTrigger value="actions">动作建议</TabsTrigger>
@@ -714,11 +715,11 @@ export function AdOptimizerWorkbench() {
               </TabsList>
 
               <TabsContent value="actions" className="mt-6 space-y-6">
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+                <div className="obsidian-card p-5">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <p className="section-kicker">建议管理</p>
-                      <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                      <h3 className="mt-2 text-xl font-semibold text-[#f7f0e6]">
                         批量采纳、忽略和备注
                       </h3>
                     </div>
@@ -756,7 +757,7 @@ export function AdOptimizerWorkbench() {
                       value={noteDraft}
                       onChange={(event) => setNoteDraft(event.target.value)}
                       placeholder="给已选建议添加备注，例如：先小批量验证、等本周库存回补后再执行。"
-                      className="min-h-24 rounded-[1.2rem] border-slate-200"
+                      className="min-h-24"
                     />
                     <div className="flex flex-wrap gap-2 lg:w-64 lg:flex-col">
                       <Button
@@ -778,7 +779,7 @@ export function AdOptimizerWorkbench() {
                         批量忽略
                       </Button>
                       <Button
-                        className="h-10 rounded-full bg-slate-950 px-4 text-white hover:bg-slate-800"
+                        className="h-10 px-4"
                         disabled={selectedIds.length === 0 || noteDraft.trim() === ""}
                         onClick={applyNoteToSelection}
                       >
@@ -816,8 +817,8 @@ export function AdOptimizerWorkbench() {
                         {selectedIds.includes(item.id) ? "已选" : "选择"}
                       </Button>,
                       <div key={`${item.id}-action`}>
-                        <p className="font-medium text-slate-950">{item.actionLabel}</p>
-                        <p className="mt-1 text-xs text-slate-500">{item.reason}</p>
+                        <p className="font-medium text-[#f7f0e6]">{item.actionLabel}</p>
+                        <p className="mt-1 text-xs text-[#998e82]">{item.reason}</p>
                       </div>,
                       <StatusPill key={`${item.id}-priority`} tone={item.priority}>
                         {priorityLabel(item.priority)}
@@ -829,12 +830,12 @@ export function AdOptimizerWorkbench() {
                         {item.status === "ready" ? "Ready" : "Review"}
                       </StatusPill>,
                       <div key={`${item.id}-scope`}>
-                        <p className="font-medium text-slate-950">{item.campaignName}</p>
-                        <p className="mt-1 text-slate-500">{item.adGroupName || "-"}</p>
+                        <p className="font-medium text-[#f7f0e6]">{item.campaignName}</p>
+                        <p className="mt-1 text-[#998e82]">{item.adGroupName || "-"}</p>
                       </div>,
                       <div key={`${item.id}-target`}>
-                        <p className="font-medium text-slate-950">{item.targetingText}</p>
-                        <p className="mt-1 text-slate-500">{item.customerSearchTerm || "-"}</p>
+                        <p className="font-medium text-[#f7f0e6]">{item.targetingText}</p>
+                        <p className="mt-1 text-[#998e82]">{item.customerSearchTerm || "-"}</p>
                       </div>,
                       describeCurrentValue(item),
                       describeSuggestedValue(item),
@@ -941,7 +942,7 @@ export function AdOptimizerWorkbench() {
               </TabsContent>
 
               <TabsContent value="placements" className="mt-6 space-y-5">
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white px-5 py-4 text-sm leading-7 text-slate-600">
+                <div className="obsidian-inline-note px-5 py-4 text-sm leading-7">
                   {result.placementDiagnostics.recognized
                     ? "已识别真实 placement 报表，以下按 Top of Search / Product Pages / Rest of Search 聚合。"
                     : result.placementDiagnostics.fallbackReason ?? "当前没有可展示的 placement 数据。"}
@@ -999,89 +1000,89 @@ export function AdOptimizerWorkbench() {
 
               <TabsContent value="notes" className="mt-6">
                 <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-                  <article className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+                  <article className="obsidian-card p-5">
                     <p className="section-kicker">运行提示</p>
                     <div className="mt-4 space-y-3">
                       {result.notices.length > 0 ? (
                         result.notices.map((notice, index) => (
                           <div
                             key={`${notice}-${index}`}
-                            className="rounded-[1.2rem] bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600"
+                            className="obsidian-soft-card px-4 py-3 text-sm leading-7 text-[#c5b9aa]"
                           >
                             {notice}
                           </div>
                         ))
                       ) : (
-                        <div className="rounded-[1.2rem] bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
+                        <div className="obsidian-empty-state px-4 py-3 text-sm leading-7">
                           当前没有额外提示。
                         </div>
                       )}
                     </div>
                   </article>
 
-                  <article className="rounded-[1.5rem] border border-slate-200 bg-white p-5">
+                  <article className="obsidian-card p-5">
                     <p className="section-kicker">文件概况</p>
-                    <div className="mt-4 space-y-3 text-sm text-slate-600">
-                      <div className="rounded-[1.2rem] bg-slate-50 px-4 py-3">
+                    <div className="mt-4 space-y-3 text-sm text-[#c5b9aa]">
+                      <div className="obsidian-soft-card px-4 py-3">
                         当前搜索词：{result.files.current.fileName} / {result.files.current.rowCount} 行
                       </div>
-                      <div className="rounded-[1.2rem] bg-slate-50 px-4 py-3">
+                      <div className="obsidian-soft-card px-4 py-3">
                         上周期：{result.files.previous?.fileName ?? "未上传"} / {result.files.previous?.rowCount ?? 0} 行
                       </div>
-                      <div className="rounded-[1.2rem] bg-slate-50 px-4 py-3">
+                      <div className="obsidian-soft-card px-4 py-3">
                         Placement：{result.files.placement?.fileName ?? "未上传"}
                       </div>
-                      <div className="rounded-[1.2rem] bg-slate-50 px-4 py-3">
+                      <div className="obsidian-soft-card px-4 py-3">
                         Bulk 身份：{result.files.bulkIdentity?.fileName ?? "未上传"}
                       </div>
-                      <div className="rounded-[1.2rem] bg-slate-50 px-4 py-3">
+                      <div className="obsidian-soft-card px-4 py-3">
                         Ready / Review：{readyExportCount} / {result.reviewItems.length}
                       </div>
                     </div>
                   </article>
 
-                  <article className="rounded-[1.5rem] border border-slate-200 bg-white p-5 lg:col-span-2">
+                  <article className="obsidian-card p-5 lg:col-span-2">
                     <p className="section-kicker">操作日志</p>
                     <div className="mt-4 space-y-3">
                       {activityLog.length > 0 ? (
                         activityLog.map((entry, index) => (
                           <div
                             key={`${entry.at}-${index}`}
-                            className="rounded-[1.2rem] bg-slate-50 px-4 py-3"
+                            className="obsidian-soft-card px-4 py-3"
                           >
-                            <p className="text-sm font-semibold text-slate-950">{entry.label}</p>
-                            <p className="mt-1 text-sm text-slate-600">{entry.detail}</p>
-                            <p className="mt-1 text-xs text-slate-400">{entry.at}</p>
+                            <p className="text-sm font-semibold text-[#f7f0e6]">{entry.label}</p>
+                            <p className="mt-1 text-sm text-[#c5b9aa]">{entry.detail}</p>
+                            <p className="mt-1 text-xs text-[#998e82]">{entry.at}</p>
                           </div>
                         ))
                       ) : (
-                        <div className="rounded-[1.2rem] bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
+                        <div className="obsidian-empty-state px-4 py-3 text-sm leading-7">
                           运行分析后会在这里记录建议生成、批量采纳、忽略和备注动作。
                         </div>
                       )}
                     </div>
                   </article>
 
-                  <article className="rounded-[1.5rem] border border-slate-200 bg-white p-5 lg:col-span-2">
+                  <article className="obsidian-card p-5 lg:col-span-2">
                     <p className="section-kicker">诊断与覆盖率</p>
                     <div className="mt-4 grid gap-5 lg:grid-cols-2">
                       <div className="space-y-3">
                         {buildFileDiagnostics(result).map((item) => (
                           <div
                             key={item.key}
-                            className="rounded-[1.2rem] bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                            className="obsidian-soft-card px-4 py-3 text-sm text-[#c5b9aa]"
                           >
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="font-semibold text-slate-950">{item.label}</p>
+                              <p className="font-semibold text-[#f7f0e6]">{item.label}</p>
                               <StatusPill tone={item.tone}>{item.status}</StatusPill>
                             </div>
                             <p className="mt-2 break-all">{item.fileName}</p>
-                            <p className="mt-1 text-xs text-slate-400">
+                            <p className="mt-1 text-xs text-[#998e82]">
                               Sheet {item.sheetName} / {item.rowCount} 行
                             </p>
                             <p className="mt-2 leading-6">{item.detail}</p>
                             {item.warning ? (
-                              <p className="mt-2 rounded-xl bg-white px-3 py-2 text-xs leading-6 text-amber-700">
+                              <p className="obsidian-inline-note mt-2 px-3 py-2 text-xs leading-6 text-[#f1cf8c]">
                                 {item.warning}
                               </p>
                             ) : null}
@@ -1093,10 +1094,10 @@ export function AdOptimizerWorkbench() {
                         {buildCoverageCards(result, lifecycleMap).map((item) => (
                           <div
                             key={item.key}
-                            className="rounded-[1.2rem] bg-slate-50 px-4 py-3 text-sm text-slate-600"
+                            className="obsidian-soft-card px-4 py-3 text-sm text-[#c5b9aa]"
                           >
-                            <p className="font-semibold text-slate-950">{item.label}</p>
-                            <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                            <p className="font-semibold text-[#f7f0e6]">{item.label}</p>
+                            <p className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#f7f0e6]">
                               {item.value}
                             </p>
                             <p className="mt-2 leading-6">{item.detail}</p>
@@ -1117,25 +1118,25 @@ export function AdOptimizerWorkbench() {
 
 function UploadCard({ title, description, hint, file, onChange }: UploadCardProps) {
   return (
-    <label className="rounded-[1.7rem] border border-slate-200 bg-white p-5 shadow-[0_14px_35px_rgba(16,32,51,0.05)]">
+    <label className="obsidian-card block p-5">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="section-kicker">{title}</p>
-          <h3 className="mt-3 text-xl font-semibold text-slate-950">{description}</h3>
+          <h3 className="mt-3 text-xl font-semibold text-[#f7f0e6]">{description}</h3>
         </div>
-        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-white">
+        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[rgba(246,182,63,0.24)] bg-[rgba(246,182,63,0.14)] text-[#f6b63f]">
           <Upload className="h-5 w-5" />
         </div>
       </div>
-      <p className="mt-4 text-sm leading-7 text-slate-500">{hint}</p>
-      <div className="mt-5 rounded-[1.3rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-4">
+      <p className="mt-4 text-sm leading-7 text-[#b9ab9c]">{hint}</p>
+      <div className="obsidian-empty-state mt-5 px-4 py-4">
         <input
           type="file"
           accept=".xlsx,.xls,.csv"
           onChange={(event) => onChange(event.target.files?.[0] ?? null)}
-          className="block w-full text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+          className="block w-full text-sm text-[#dfd2c3] file:mr-4 file:rounded-full file:border-0 file:bg-[rgba(246,182,63,0.18)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#f7f0e6]"
         />
-        <p className="mt-3 text-sm text-slate-500">
+        <p className="mt-3 text-sm text-[#998e82]">
           {file ? `已选择：${file.name}` : "尚未选择文件"}
         </p>
       </div>
@@ -1145,10 +1146,10 @@ function UploadCard({ title, description, hint, file, onChange }: UploadCardProp
 
 function SummaryCard({ label, value, help }: { label: string; value: string; help: string }) {
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-white px-5 py-5">
+    <div className="obsidian-card px-5 py-5">
       <p className="section-kicker">{label}</p>
-      <h3 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">{value}</h3>
-      <p className="mt-2 text-sm leading-7 text-slate-500">{help}</p>
+      <h3 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[#f7f0e6]">{value}</h3>
+      <p className="mt-2 text-sm leading-7 text-[#b9ab9c]">{help}</p>
     </div>
   );
 }
@@ -1163,10 +1164,10 @@ function InfoTile({
   description: string;
 }) {
   return (
-    <div className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4">
+    <div className="obsidian-soft-card px-4 py-4">
       <p className="section-kicker">{index}</p>
-      <p className="mt-3 text-lg font-semibold text-slate-950">{title}</p>
-      <p className="mt-2 text-sm leading-7 text-slate-500">{description}</p>
+      <p className="mt-3 text-lg font-semibold text-[#f7f0e6]">{title}</p>
+      <p className="mt-2 text-sm leading-7 text-[#b9ab9c]">{description}</p>
     </div>
   );
 }
@@ -1181,13 +1182,13 @@ function IntegerField({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4">
+    <label className="obsidian-soft-card px-4 py-4">
       <span className="section-kicker">{label}</span>
       <Input
         type="number"
         value={value}
         onChange={(event) => onChange(Number(event.target.value || 0))}
-        className="mt-3 h-11 rounded-2xl border-slate-200 bg-white px-4"
+        className="mt-3"
       />
     </label>
   );
@@ -1207,7 +1208,7 @@ function PercentField({
   nullable?: boolean;
 }) {
   return (
-    <label className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4">
+    <label className="obsidian-soft-card px-4 py-4">
       <span className="section-kicker">{label}</span>
       <Input
         type="number"
@@ -1221,7 +1222,7 @@ function PercentField({
           }
           onChange(Number(nextValue || 0) / 100);
         }}
-        className="mt-3 h-11 rounded-2xl border-slate-200 bg-white px-4"
+        className="mt-3"
       />
     </label>
   );
@@ -1240,8 +1241,10 @@ function ToggleChip({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-        active ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600"
+      className={`obsidian-meta-pill border px-4 py-2 text-sm font-semibold transition ${
+        active
+          ? "border-[rgba(246,182,63,0.3)] bg-[rgba(246,182,63,0.16)] text-[#f7f0e6]"
+          : "border-white/10 bg-[rgba(255,255,255,0.04)] text-[#b9ab9c]"
       }`}
     >
       {label}
@@ -1258,12 +1261,12 @@ function StatusPill({
 }) {
   const toneClass =
     tone === "high"
-      ? "bg-rose-100 text-rose-700"
+      ? "border-rose-400/20 bg-rose-500/12 text-rose-100"
       : tone === "medium"
-        ? "bg-amber-100 text-amber-700"
-        : "bg-slate-100 text-slate-600";
+        ? "border-[rgba(246,182,63,0.24)] bg-[rgba(246,182,63,0.14)] text-[#f1cf8c]"
+        : "border-white/10 bg-[rgba(255,255,255,0.06)] text-[#c5b9aa]";
   return (
-    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${toneClass}`}>
+    <span className={`obsidian-meta-pill ${toneClass}`}>
       {children}
     </span>
   );
@@ -1279,7 +1282,7 @@ function DataTable({
   emptyText: string;
 }) {
   return (
-    <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
+    <div className="overflow-hidden rounded-[1.5rem]">
       <Table>
         <TableHeader>
           <TableRow>
@@ -1301,7 +1304,7 @@ function DataTable({
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={headers.length} className="py-8 text-center text-slate-500">
+              <TableCell colSpan={headers.length} className="py-8 text-center text-[#998e82]">
                 {emptyText}
               </TableCell>
             </TableRow>

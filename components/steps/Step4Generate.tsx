@@ -68,7 +68,10 @@ function LengthBadge({
   const exceeded = current > limit;
 
   return (
-    <Badge variant={exceeded ? "destructive" : "outline"} className="mt-1">
+    <Badge
+      variant={exceeded ? "destructive" : "outline"}
+      className={exceeded ? "mt-1" : "obsidian-meta-pill mt-1 normal-case tracking-[0.14em]"}
+    >
       {current}/{limit}
     </Badge>
   );
@@ -84,13 +87,13 @@ function SourceSummaryCard({
   badge: string;
 }) {
   return (
-    <div className="rounded-2xl border bg-white/85 p-4">
+    <div className="obsidian-soft-card p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm font-semibold">{title}</p>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <p className="text-sm text-stone-300/80">{description}</p>
         </div>
-        <Badge variant="outline">{badge}</Badge>
+        <Badge variant="outline" className="obsidian-meta-pill normal-case tracking-[0.14em]">{badge}</Badge>
       </div>
     </div>
   );
@@ -125,7 +128,7 @@ function CompliancePanel({
             <ShieldAlert className="h-5 w-5 text-red-500" />
           )}
           <CardTitle className="text-base">合规检查</CardTitle>
-          <Badge variant="outline">{versionName}</Badge>
+          <Badge variant="outline" className="obsidian-meta-pill normal-case tracking-[0.14em]">{versionName}</Badge>
           {totalViolations > 0 ? (
             <Badge variant="destructive">{totalViolations} 项问题</Badge>
           ) : null}
@@ -142,7 +145,7 @@ function CompliancePanel({
                 <Badge
                   key={result.field}
                   variant="outline"
-                  className="border-green-200 bg-green-50 text-green-700"
+                  className="border-emerald-400/25 bg-emerald-500/14 text-emerald-100"
                 >
                   {fieldNames[result.field] || result.field} 已通过
                 </Badge>
@@ -156,7 +159,7 @@ function CompliancePanel({
               {result.violations.map((violation, index) => (
                 <div
                   key={`${result.field}-${index}`}
-                  className="flex items-start gap-2 rounded bg-red-50 p-3 text-sm"
+                  className="obsidian-inline-note flex items-start gap-2 rounded-[1.2rem] border-rose-400/20 bg-rose-500/10 p-3 text-sm"
                 >
                   <AlertTriangle
                     className={[
@@ -170,8 +173,8 @@ function CompliancePanel({
                   />
                   <div>
                     <span className="font-mono font-semibold">{`"${violation.word}"`}</span>
-                    <span className="ml-2 text-muted-foreground">- {violation.reason}</span>
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <span className="ml-2 text-stone-300/80">- {violation.reason}</span>
+                    <p className="mt-1 text-xs text-stone-300/70">
                       上下文: {violation.context}
                     </p>
                   </div>
@@ -415,12 +418,12 @@ export function Step4Generate() {
   if (!hasGenerationInputs) {
     return (
       <div className="space-y-6">
-        <Card className="border-dashed">
+        <Card className="obsidian-empty-state border-dashed">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-            <FileText className="h-10 w-10 text-muted-foreground" />
+            <FileText className="h-10 w-10 text-stone-300/80" />
             <div className="space-y-1">
               <p className="text-base font-medium">三源文案生成所需输入还不完整</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-stone-300/80">
                 请先补充产品输入、VOC、关键词数据或 Step 2 的多源分析结果。
               </p>
             </div>
@@ -438,7 +441,7 @@ export function Step4Generate() {
     return (
       <div className="flex flex-col items-center justify-center gap-3 py-20">
         <Loader2 className="h-8 w-8 animate-spin text-[#FF9900]" />
-        <p className="text-sm text-muted-foreground">
+        <p className="text-sm text-stone-300/80">
           {lightMode
             ? "AI 正在以轻量模式生成三源文案..."
             : "AI 正在融合 COSMO、VOC 与关键词数据生成文案..."}
@@ -479,12 +482,12 @@ export function Step4Generate() {
   if (hasGeneratedOnce && listingVersions.length === 0) {
     return (
       <div className="space-y-6">
-        <Card className="border-dashed">
+        <Card className="obsidian-empty-state border-dashed">
           <CardContent className="flex flex-col items-center justify-center gap-4 py-16 text-center">
-            <FileText className="h-10 w-10 text-muted-foreground" />
+            <FileText className="h-10 w-10 text-stone-300/80" />
             <div className="space-y-1">
               <p className="text-base font-medium">这次没有生成出可展示的文案版本</p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-stone-300/80">
                 可以重试生成，或返回上一步补充 VOC / 关键词 / 多源分析输入。
               </p>
             </div>
@@ -523,7 +526,7 @@ export function Step4Generate() {
             <CardDescription>
               将 COSMO 算法导向、VOC 诊断和关键词数据整合为可编辑的 Listing 文案版本。
             </CardDescription>
-            <div className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+            <div className="obsidian-inline-note rounded-lg border-dashed px-3 py-2 text-sm text-stone-300/80">
               轻量模式会减少输入样本并压缩输出长度，适合网关易超时的环境。
             </div>
           </div>
@@ -590,7 +593,7 @@ export function Step4Generate() {
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <p className="text-sm font-medium">产品信息</p>
-              <div className="space-y-1 text-sm text-muted-foreground">
+              <div className="space-y-1 text-sm text-stone-300/80">
                 <p>品牌：{productProfile.brandName || "未填写"}</p>
                 <p>产品：{productProfile.productName || "未填写"}</p>
                 <p>品类：{productProfile.productCategory || "未填写"}</p>
@@ -602,7 +605,7 @@ export function Step4Generate() {
                 <Lightbulb className="h-4 w-4 text-amber-500" />
                 差异化卖点
               </p>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-stone-300/80">
                 {coreSellingPoints || "暂无额外卖点说明"}
               </p>
             </div>
@@ -670,7 +673,7 @@ export function Step4Generate() {
               <CardContent className="space-y-3">
                 {version.bulletPoints.map((bulletPoint, index) => (
                   <div key={`${version.versionName}-bullet-${index}`}>
-                    <label className="mb-1 block text-xs text-muted-foreground">
+                    <label className="mb-1 block text-xs text-stone-400/80">
                       Bullet {index + 1}
                     </label>
                     <Textarea

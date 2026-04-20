@@ -489,7 +489,7 @@ export function Step1Analysis() {
   return (
     <div className="space-y-6">
       <Card>
-        <CardHeader className="border-b border-slate-200/80 bg-slate-50/70">
+        <CardHeader className="border-b border-white/10 bg-white/[0.03]">
           <CardTitle>Step 1: 产品信息输入</CardTitle>
           <CardDescription>
             先整理产品信息、图片和辅助数据，再进入卖家精灵 + ABA + Rufus 的多源分析流程。
@@ -497,7 +497,7 @@ export function Step1Analysis() {
         </CardHeader>
 
         <CardContent className="space-y-6 p-6">
-          <section className="space-y-4 rounded-2xl border border-slate-200 p-5">
+          <section className="obsidian-soft-card space-y-4 p-5">
             <div className="space-y-1">
               <Label className="text-sm font-semibold">产品白底图</Label>
               <p className="text-xs text-muted-foreground">
@@ -511,7 +511,7 @@ export function Step1Analysis() {
               maxImages={5}
             />
 
-            <div className="flex items-start gap-2 text-xs text-emerald-700">
+            <div className="obsidian-inline-note flex items-start gap-2 border-emerald-400/18 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
               <ShieldCheck className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
               <p>数据安全：本次上传仅用于当前分析，流程完成后不做长期存储。</p>
             </div>
@@ -530,7 +530,7 @@ export function Step1Analysis() {
                 type="button"
                 onClick={handleAnalyzeImages}
                 disabled={analyzing || localProductImages.length === 0}
-                className="bg-[#FF9900] hover:bg-[#FF9900]/90"
+                className="obsidian-action"
               >
                 {analyzing ? (
                   <>
@@ -686,7 +686,7 @@ export function Step1Analysis() {
             </div>
           </section>
 
-          <section className="space-y-4 rounded-2xl border border-slate-200 p-5">
+          <section className="obsidian-soft-card space-y-4 p-5">
             <div className="space-y-1">
               <CardTitle className="text-base">辅助数据文件</CardTitle>
               <CardDescription>
@@ -695,9 +695,9 @@ export function Step1Analysis() {
             </div>
 
             <div className="grid gap-4 lg:grid-cols-2">
-              <div className="space-y-3 rounded-2xl border border-dashed border-slate-300 p-4">
+              <div className="obsidian-soft-card space-y-3 border-dashed p-4">
                 <Label className="text-sm font-semibold">ABA 搜索词报告 (CSV)</Label>
-                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl bg-slate-50 px-4 py-8 text-center hover:bg-slate-100">
+                <label className="obsidian-empty-state flex cursor-pointer flex-col items-center justify-center gap-2 px-4 py-8 text-center hover:bg-white/[0.05]">
                   <input
                     type="file"
                     accept=".csv,text/csv"
@@ -707,7 +707,7 @@ export function Step1Analysis() {
                   {abaUploading ? (
                     <Loader2 className="h-6 w-6 animate-spin text-[#FF9900]" />
                   ) : (
-                    <FileSpreadsheet className="h-6 w-6 text-slate-500" />
+                    <FileSpreadsheet className="h-6 w-6 text-stone-300/80" />
                   )}
                   <p className="text-sm font-medium">
                     {abaUploading ? "正在读取 ABA 报告..." : "点击上传 ABA CSV"}
@@ -715,13 +715,13 @@ export function Step1Analysis() {
                 </label>
 
                 {abaError ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <div className="obsidian-inline-note rounded-lg border-rose-400/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
                     {abaError}
                   </div>
                 ) : null}
 
                 {localAbaReport ? (
-                  <div className="space-y-2 rounded-xl border border-emerald-200 bg-emerald-50/70 p-3">
+                  <div className="obsidian-soft-card space-y-2 border-emerald-400/18 bg-emerald-500/10 p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium text-emerald-900">
@@ -752,9 +752,9 @@ export function Step1Analysis() {
                 ) : null}
               </div>
 
-              <div className="space-y-3 rounded-2xl border border-dashed border-slate-300 p-4">
+              <div className="obsidian-soft-card space-y-3 border-dashed p-4">
                 <Label className="text-sm font-semibold">Rufus 问答截图</Label>
-                <label className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-xl bg-slate-50 px-4 py-8 text-center hover:bg-slate-100">
+                <label className="obsidian-empty-state flex cursor-pointer flex-col items-center justify-center gap-2 px-4 py-8 text-center hover:bg-white/[0.05]">
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
@@ -765,7 +765,7 @@ export function Step1Analysis() {
                   {rufusUploading ? (
                     <Loader2 className="h-6 w-6 animate-spin text-[#FF9900]" />
                   ) : (
-                    <Upload className="h-6 w-6 text-slate-500" />
+                    <Upload className="h-6 w-6 text-stone-300/80" />
                   )}
                   <p className="text-sm font-medium">
                     {rufusUploading ? "正在处理截图..." : "点击上传 Rufus 截图"}
@@ -773,7 +773,7 @@ export function Step1Analysis() {
                 </label>
 
                 {rufusError ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  <div className="obsidian-inline-note rounded-lg border-rose-400/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
                     {rufusError}
                   </div>
                 ) : null}
@@ -781,8 +781,8 @@ export function Step1Analysis() {
                 {localRufusScreenshots.length > 0 ? (
                   <div className="grid grid-cols-2 gap-3">
                     {localRufusScreenshots.map((item) => (
-                      <div key={item.id} className="overflow-hidden rounded-xl border">
-                        <div className="relative aspect-[4/3] bg-slate-100">
+                      <div key={item.id} className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.03]">
+                        <div className="relative aspect-[4/3] bg-white/[0.03]">
                           <Image
                             src={item.preview}
                             alt={item.name}
@@ -805,7 +805,7 @@ export function Step1Analysis() {
                             <X className="h-3.5 w-3.5" />
                           </Button>
                         </div>
-                        <div className="truncate px-3 py-2 text-xs text-muted-foreground">
+                        <div className="truncate px-3 py-2 text-xs text-stone-300/80">
                           {item.name}
                         </div>
                       </div>
@@ -874,7 +874,7 @@ export function Step1Analysis() {
           ) : null}
 
           {formError ? (
-            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="obsidian-inline-note rounded-lg border-rose-400/20 bg-rose-500/10 px-3 py-2 text-sm text-rose-100">
               {formError}
             </div>
           ) : null}
@@ -886,7 +886,7 @@ export function Step1Analysis() {
           type="button"
           onClick={handleNext}
           disabled={!canProceed}
-          className="bg-[#FF9900] hover:bg-[#FF9900]/90"
+          className="obsidian-action"
         >
           下一步：数据分析
           <ArrowRight className="ml-2 h-4 w-4" />

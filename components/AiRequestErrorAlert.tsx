@@ -87,49 +87,66 @@ export function AiRequestErrorAlert({
   const Icon = meta.icon;
 
   return (
-    <Card className={cn("border-red-200 bg-red-50/80", className)}>
+    <Card
+      className={cn(
+        "obsidian-soft-card border-rose-400/25 bg-[linear-gradient(145deg,rgba(80,28,34,0.52),rgba(28,22,24,0.96))] text-[#f8efe7]",
+        className
+      )}
+    >
       <CardContent className="space-y-4 pt-6">
         <div className="flex items-start gap-3">
-          <div className="rounded-full bg-white p-2 text-red-600 shadow-sm">
+          <div className="obsidian-meta-pill bg-rose-500/16 p-2 text-rose-100 shadow-none">
             <Icon className="h-4 w-4" />
           </div>
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="font-semibold text-red-900">{heading}</p>
-              <Badge variant={meta.badgeVariant}>{meta.badge}</Badge>
-              {error.code ? <Badge variant="outline">code: {error.code}</Badge> : null}
+              <p className="font-semibold text-[#f8efe7]">{heading}</p>
+              <Badge
+                variant={meta.badgeVariant}
+                className="obsidian-meta-pill border-rose-300/18 bg-rose-500/12 text-rose-100"
+              >
+                {meta.badge}
+              </Badge>
+              {error.code ? (
+                <Badge
+                  variant="outline"
+                  className="obsidian-meta-pill border-white/10 bg-white/[0.04] text-stone-200/85"
+                >
+                  code: {error.code}
+                </Badge>
+              ) : null}
             </div>
-            <p className="text-sm text-red-900/90">{meta.title}</p>
-            <p className="text-sm text-red-800/90">{error.message}</p>
+            <p className="text-sm text-rose-50/90">{meta.title}</p>
+            <p className="text-sm text-rose-100/80">{error.message}</p>
           </div>
         </div>
 
-        <div className="rounded-lg border border-red-100 bg-white/75 p-3 text-sm text-slate-700">
+        <div className="obsidian-inline-note rounded-lg border-rose-300/18 bg-white/[0.03] p-3 text-sm text-stone-200/80">
           <p>{meta.description}</p>
           <p className="mt-2">{meta.suggestion}</p>
         </div>
 
-        <div className="grid gap-2 rounded-lg border border-red-100 bg-white/60 p-3 text-xs text-slate-600 sm:grid-cols-2">
+        <div className="obsidian-code-panel grid gap-2 rounded-lg p-3 text-xs text-stone-300/80 sm:grid-cols-2">
           <div>
-            <span className="font-medium text-slate-700">Protocol:</span>{" "}
+            <span className="font-medium text-[#f3e8d2]">Protocol:</span>{" "}
             <span className="font-mono break-all">
               {runtimeConfig.provider.trim() || "Auto"}
             </span>
           </div>
           <div>
-            <span className="font-medium text-slate-700">Model:</span>{" "}
+            <span className="font-medium text-[#f3e8d2]">Model:</span>{" "}
             <span className="font-mono break-all">
               {runtimeConfig.model.trim() || "Server default"}
             </span>
           </div>
           <div className="sm:col-span-2">
-            <span className="font-medium text-slate-700">Base URL:</span>{" "}
+            <span className="font-medium text-[#f3e8d2]">Base URL:</span>{" "}
             <span className="font-mono break-all">
               {formatRuntimeBaseUrl(runtimeConfig.baseUrl)}
             </span>
           </div>
           <div className="sm:col-span-2">
-            <span className="font-medium text-slate-700">Credential source:</span>{" "}
+            <span className="font-medium text-[#f3e8d2]">Credential source:</span>{" "}
             <span>{runtimeConfig.apiKey.trim() ? "Runtime key provided" : "Server env fallback"}</span>
           </div>
         </div>

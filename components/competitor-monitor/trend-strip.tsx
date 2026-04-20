@@ -25,11 +25,8 @@ export function CompetitorMonitorTrendStrip<T extends { date: string }>({
   return (
     <div className="grid gap-3">
       {data.map((point) => (
-        <div
-          key={String(point.date)}
-          className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4"
-        >
-          <p className="text-sm font-semibold text-slate-950">
+        <div key={String(point.date)} className="obsidian-soft-card px-4 py-4">
+          <p className="text-sm font-semibold text-[#f7f0e6]">
             {formatCompetitorMonitorDate(String(point.date))}
           </p>
           <div className="mt-4 grid gap-3">
@@ -57,10 +54,10 @@ export function CompetitorMonitorTrendStrip<T extends { date: string }>({
               return (
                 <div key={item.key}>
                   <div className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-slate-500">{item.label}</span>
-                    <span className="font-semibold text-slate-950">{value}</span>
+                    <span className="text-[#a99a89]">{item.label}</span>
+                    <span className="font-semibold text-[#f7f0e6]">{value}</span>
                   </div>
-                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/8">
                     <div
                       className={`h-full rounded-full ${item.colorClass}`}
                       style={{ width: `${width}%` }}

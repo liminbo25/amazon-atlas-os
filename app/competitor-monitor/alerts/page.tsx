@@ -37,19 +37,19 @@ export default async function CompetitorMonitorAlertsPage({
       >
         <form
           action={competitorMonitorRoutes.alerts}
-          className="grid gap-3 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 xl:grid-cols-[1fr_180px_160px_180px_auto]"
+          className="obsidian-filter-bar grid gap-3 p-4 xl:grid-cols-[1fr_180px_160px_180px_auto]"
         >
           <input
             type="search"
             name="query"
             defaultValue={data.filters.query}
             placeholder="Search alert, market, ASIN..."
-            className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-slate-950"
+            className="obsidian-native-field"
           />
           <select
             name="marketId"
             defaultValue={data.filters.marketId}
-            className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-slate-950"
+            className="obsidian-native-select"
           >
             <option value="all">All markets</option>
             {marketOptions.data.items.map((market) => (
@@ -61,7 +61,7 @@ export default async function CompetitorMonitorAlertsPage({
           <select
             name="severity"
             defaultValue={data.filters.severity}
-            className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-slate-950"
+            className="obsidian-native-select"
           >
             <option value="all">All severity</option>
             <option value="critical">Critical</option>
@@ -71,16 +71,13 @@ export default async function CompetitorMonitorAlertsPage({
           <select
             name="status"
             defaultValue={data.filters.status}
-            className="h-11 rounded-2xl border border-slate-200 bg-white px-4 text-sm text-slate-700 outline-none transition focus:border-slate-950"
+            className="obsidian-native-select"
           >
             <option value="open">Open only</option>
             <option value="all">All status</option>
             <option value="resolved">Resolved</option>
           </select>
-          <button
-            type="submit"
-            className="inline-flex h-11 items-center justify-center rounded-full bg-slate-950 px-5 text-sm font-semibold text-white transition hover:bg-slate-800"
-          >
+          <button type="submit" className="obsidian-action h-11">
             Apply filters
           </button>
         </form>

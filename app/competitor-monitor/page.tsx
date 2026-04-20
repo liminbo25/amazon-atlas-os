@@ -42,32 +42,38 @@ export default async function CompetitorMonitorDashboardPage() {
           )}.`}
         >
           <div className="grid gap-4 sm:grid-cols-3">
-            <div className="rounded-[1.4rem] border border-slate-200 bg-white/85 px-4 py-4">
-              <p className="section-kicker">API namespace</p>
-              <p className="mt-2 text-lg font-semibold text-slate-950">
+            <div className="obsidian-soft-card px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#a99a89]">
+                API namespace
+              </p>
+              <p className="mt-2 text-lg font-semibold text-[#f7f0e6]">
                 /api/competitor-monitor/*
               </p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
+              <p className="mt-2 text-sm leading-7 text-[#c5b9aa]">
                 Dashboard, markets, ASIN detail, alerts, and sync routes remain
                 under the real backend contract.
               </p>
             </div>
-            <div className="rounded-[1.4rem] border border-slate-200 bg-white/85 px-4 py-4">
-              <p className="section-kicker">Storage</p>
-              <p className="mt-2 text-lg font-semibold text-slate-950">
+            <div className="obsidian-soft-card px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#a99a89]">
+                Storage
+              </p>
+              <p className="mt-2 text-lg font-semibold text-[#f7f0e6]">
                 Repository + sync services
               </p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
+              <p className="mt-2 text-sm leading-7 text-[#c5b9aa]">
                 UI pages read through an adapter layer instead of importing mock
                 payloads or parallel types.
               </p>
             </div>
-            <div className="rounded-[1.4rem] border border-slate-200 bg-white/85 px-4 py-4">
-              <p className="section-kicker">Alerts</p>
-              <p className="mt-2 text-lg font-semibold text-slate-950">
+            <div className="obsidian-soft-card px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#a99a89]">
+                Alerts
+              </p>
+              <p className="mt-2 text-lg font-semibold text-[#f7f0e6]">
                 Real snapshot diffs
               </p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
+              <p className="mt-2 text-sm leading-7 text-[#c5b9aa]">
                 Price, rating, review, and BSR changes surface directly from the
                 alert service instead of mocked thresholds.
               </p>
@@ -82,7 +88,7 @@ export default async function CompetitorMonitorDashboardPage() {
           action={
             <Link
               href={competitorMonitorRoutes.alerts}
-              className="inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+              className="obsidian-action-secondary px-4 py-2"
             >
               Open alert center
             </Link>
@@ -102,42 +108,39 @@ export default async function CompetitorMonitorDashboardPage() {
       >
         <div className="grid gap-4 xl:grid-cols-3">
           {data.markets.map((market) => (
-            <article
-              key={market.marketId}
-              className="rounded-[1.6rem] border border-slate-200 bg-white/85 p-5 shadow-[0_16px_36px_rgba(16,32,51,0.05)]"
-            >
+            <article key={market.marketId} className="obsidian-card p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="section-kicker">
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#a99a89]">
                     {market.countryCode} / {market.region}
                   </p>
-                  <h3 className="mt-2 text-xl font-semibold text-slate-950">
+                  <h3 className="mt-2 text-xl font-semibold text-[#f7f0e6]">
                     {market.marketName}
                   </h3>
                 </div>
                 <CompetitorMonitorStatusBadge kind="health" value={market.health} />
               </div>
 
-              <dl className="mt-5 grid gap-3 text-sm text-slate-600">
+              <dl className="mt-5 grid gap-3 text-sm text-[#c5b9aa]">
                 <div className="flex items-center justify-between gap-3">
                   <dt>Tracked ASINs</dt>
-                  <dd className="font-semibold text-slate-950">{market.asinCount}</dd>
+                  <dd className="font-semibold text-[#f7f0e6]">{market.asinCount}</dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt>Sync coverage</dt>
-                  <dd className="font-semibold text-slate-950">
+                  <dd className="font-semibold text-[#f7f0e6]">
                     {market.coverageRate.toFixed(0)}%
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt>Open alerts</dt>
-                  <dd className="font-semibold text-slate-950">
+                  <dd className="font-semibold text-[#f7f0e6]">
                     {market.activeAlertCount}
                   </dd>
                 </div>
                 <div className="flex items-center justify-between gap-3">
                   <dt>Avg price</dt>
-                  <dd className="font-semibold text-slate-950">
+                  <dd className="font-semibold text-[#f7f0e6]">
                     {market.averagePrice !== null
                       ? formatCompetitorMonitorCurrency(
                           market.averagePrice,
@@ -148,18 +151,18 @@ export default async function CompetitorMonitorDashboardPage() {
                 </div>
               </dl>
 
-              <p className="mt-5 rounded-[1.3rem] bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
+              <p className="obsidian-inline-note mt-5 px-4 py-3 text-sm leading-7">
                 {market.description}
               </p>
 
               <div className="mt-5 flex items-center justify-between gap-3">
                 <Link
                   href={competitorMonitorRoutes.marketDetail(market.marketId)}
-                  className="text-sm font-semibold text-slate-950 hover:text-slate-700"
+                  className="text-sm font-semibold text-[#f7f0e6] transition hover:text-[#f6b63f]"
                 >
                   View market detail
                 </Link>
-                <span className="text-sm text-slate-500">
+                <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                   {market.heroAsin ?? "No hero ASIN yet"}
                 </span>
               </div>
@@ -174,54 +177,63 @@ export default async function CompetitorMonitorDashboardPage() {
         description="These rows are ranked from the real market detail payloads, using alert load first and recency second."
       >
         {data.priorityAsins.length > 0 ? (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ASIN</TableHead>
-                <TableHead>Market</TableHead>
-                <TableHead>Health</TableHead>
-                <TableHead>Price</TableHead>
-                <TableHead>Rating</TableHead>
-                <TableHead>Reviews</TableHead>
-                <TableHead>Alerts</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.priorityAsins.map((asin) => (
-                <TableRow key={`${asin.marketId}-${asin.asin}`}>
-                  <TableCell>
-                    <Link
-                      href={competitorMonitorRoutes.asinDetail(asin.asin)}
-                      className="font-semibold text-slate-950 hover:text-slate-700"
-                    >
-                      {asin.asin}
-                    </Link>
-                    <p className="mt-1 max-w-[22rem] text-xs whitespace-normal text-slate-500">
-                      {asin.title}
-                    </p>
-                  </TableCell>
-                  <TableCell>{asin.marketName}</TableCell>
-                  <TableCell>
-                    <CompetitorMonitorStatusBadge kind="health" value={asin.health} />
-                  </TableCell>
-                  <TableCell>
-                    {asin.price !== null
-                      ? formatCompetitorMonitorCurrency(asin.price, asin.currency)
-                      : "Pending"}
-                  </TableCell>
-                  <TableCell>
-                    {asin.rating !== null ? asin.rating.toFixed(1) : "Pending"}
-                  </TableCell>
-                  <TableCell>
-                    {formatCompetitorMonitorCompactNumber(asin.reviewCount)}
-                  </TableCell>
-                  <TableCell>{asin.alertCount}</TableCell>
+          <div className="obsidian-soft-card overflow-hidden px-3 py-3">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead className="px-4 text-[#a99a89]">ASIN</TableHead>
+                  <TableHead className="px-4 text-[#a99a89]">Market</TableHead>
+                  <TableHead className="px-4 text-[#a99a89]">Health</TableHead>
+                  <TableHead className="px-4 text-[#a99a89]">Price</TableHead>
+                  <TableHead className="px-4 text-[#a99a89]">Rating</TableHead>
+                  <TableHead className="px-4 text-[#a99a89]">Reviews</TableHead>
+                  <TableHead className="px-4 text-[#a99a89]">Alerts</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {data.priorityAsins.map((asin) => (
+                  <TableRow
+                    key={`${asin.marketId}-${asin.asin}`}
+                    className="border-white/8 hover:bg-white/[0.03]"
+                  >
+                    <TableCell className="px-4 py-4">
+                      <Link
+                        href={competitorMonitorRoutes.asinDetail(asin.asin)}
+                        className="font-semibold text-[#f7f0e6] transition hover:text-[#f6b63f]"
+                      >
+                        {asin.asin}
+                      </Link>
+                      <p className="mt-1 max-w-[22rem] text-xs whitespace-normal text-[#a99a89]">
+                        {asin.title}
+                      </p>
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {asin.marketName}
+                    </TableCell>
+                    <TableCell className="px-4 py-4">
+                      <CompetitorMonitorStatusBadge kind="health" value={asin.health} />
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {asin.price !== null
+                        ? formatCompetitorMonitorCurrency(asin.price, asin.currency)
+                        : "Pending"}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {asin.rating !== null ? asin.rating.toFixed(1) : "Pending"}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {formatCompetitorMonitorCompactNumber(asin.reviewCount)}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {asin.alertCount}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         ) : (
-          <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-sm leading-7 text-slate-500">
+          <div className="obsidian-empty-state px-5 py-8 text-sm leading-7">
             No tracked ASIN rows are ready to rank yet. Run a sync after markets
             are configured to populate this table.
           </div>

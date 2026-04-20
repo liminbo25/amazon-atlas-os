@@ -217,12 +217,12 @@ export default function MultiImageUploader({
       {(title || description) && (
         <div className="mb-4 space-y-1">
           {title ? (
-            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-slate-500">
+            <h3 className="text-sm font-semibold uppercase tracking-[0.2em] text-stone-400">
               {title}
             </h3>
           ) : null}
           {description ? (
-            <p className="max-w-xl text-sm leading-6 text-slate-600">{description}</p>
+            <p className="max-w-xl text-sm leading-6 text-stone-300/80">{description}</p>
           ) : null}
         </div>
       )}
@@ -241,10 +241,10 @@ export default function MultiImageUploader({
             openFilePicker();
           }
         }}
-        className={`group relative flex min-h-56 w-full flex-col items-center justify-center overflow-hidden rounded-[1.75rem] border border-dashed px-6 py-8 text-center transition ${
+        className={`obsidian-card group relative flex min-h-56 w-full flex-col items-center justify-center overflow-hidden border border-dashed px-6 py-8 text-center transition ${
           isDragging
-            ? "border-amber-500 bg-amber-50 shadow-[0_18px_42px_rgba(180,83,9,0.18)]"
-            : "border-slate-300/70 bg-white/80 hover:border-slate-500 hover:bg-white"
+            ? "border-[rgba(196,138,86,0.75)] bg-[rgba(196,138,86,0.12)] shadow-[0_18px_42px_rgba(180,83,9,0.18)]"
+            : "hover:border-[rgba(196,138,86,0.35)]"
         } ${isUploading ? "cursor-progress" : "cursor-pointer"}`}
       >
         <input
@@ -256,9 +256,9 @@ export default function MultiImageUploader({
           className="hidden"
         />
 
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.15),_transparent_55%)] opacity-0 transition group-hover:opacity-100" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(196,138,86,0.15),_transparent_55%)] opacity-0 transition group-hover:opacity-100" />
 
-        <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-slate-200 bg-slate-950 text-white">
+        <div className="relative flex h-16 w-16 items-center justify-center rounded-full border border-[rgba(196,138,86,0.25)] bg-black/30 text-[#f3e8d2]">
           <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path
               strokeLinecap="round"
@@ -269,33 +269,33 @@ export default function MultiImageUploader({
           </svg>
         </div>
 
-        <p className="relative mt-5 text-lg font-semibold text-slate-950">
+        <p className="relative mt-5 text-lg font-semibold text-[#f3e8d2]">
           {isUploading ? "正在上传原图..." : "拖拽图片到这里，或点击选择"}
         </p>
-        <p className="relative mt-2 max-w-md text-sm leading-6 text-slate-500">
+        <p className="relative mt-2 max-w-md text-sm leading-6 text-stone-300/75">
           支持 JPG、PNG、WebP。现在会直接上传原图到 Vercel Blob，不再做前端压缩。
           {maxImages ? ` 最多上传 ${maxImages} 张。` : " 可继续追加多张图片。"}
         </p>
 
-        <div className="relative mt-6 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />
+        <div className="obsidian-meta-pill relative mt-6 inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-stone-200/80">
+          <span className="h-2 w-2 rounded-full bg-[rgba(196,138,86,0.95)]" />
           已选择 {images.length} 张
         </div>
       </div>
 
       {uploadProgressLabel ? (
-        <p className="mt-3 rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-700">
+        <p className="obsidian-inline-note mt-3 border-sky-400/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
           {uploadProgressLabel}
         </p>
       ) : null}
 
       {uploadError ? (
-        <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+        <p className="obsidian-inline-note mt-3 border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
           {uploadError}
         </p>
       ) : null}
 
-      <p className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+        <p className="obsidian-inline-note mt-3 px-4 py-3 text-sm leading-6 text-stone-300/80">
         单张上限约 {formatBytes(MAX_UPLOAD_BYTES)}。如果上传特别慢，优先裁掉无关背景，而不是先压缩面料细节。
       </p>
 
@@ -304,9 +304,9 @@ export default function MultiImageUploader({
           {images.map((image, index) => (
             <div
               key={`${image.slice(0, 48)}-${index}`}
-              className="group overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)]"
+              className="obsidian-soft-card group overflow-hidden"
             >
-              <div className="relative aspect-[4/5] bg-slate-100">
+              <div className="relative aspect-[4/5] bg-black/20">
                 <img src={image} alt={`${title} ${index + 1}`} className="h-full w-full object-cover" />
                 <button
                   type="button"
@@ -314,7 +314,7 @@ export default function MultiImageUploader({
                     event.stopPropagation();
                     removeImage(index);
                   }}
-                  className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-slate-950/80 text-white opacity-0 transition group-hover:opacity-100"
+                  className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/50 text-white opacity-0 transition group-hover:opacity-100"
                 >
                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path
@@ -329,21 +329,21 @@ export default function MultiImageUploader({
 
               <div className="space-y-3 px-4 py-3 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-slate-700">图片 {index + 1}</span>
+                  <span className="font-medium text-[#f7f0e6]">图片 {index + 1}</span>
                   {maxImages ? (
-                    <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
+                    <span className="obsidian-meta-pill px-2.5 py-1 text-xs font-semibold text-stone-200/80">
                       {index + 1}/{maxImages}
                     </span>
                   ) : null}
                 </div>
 
-                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs leading-6 text-emerald-700">
+                <div className="obsidian-inline-note px-3 py-2 text-xs leading-6 text-stone-300/80">
                   原图已上传到 Blob，可直接用于 URL 版换装链路。
                 </div>
               </div>
 
               {renderImageFooter ? (
-                <div className="border-t border-slate-200 px-4 py-4">
+                <div className="border-t border-white/10 px-4 py-4">
                   {renderImageFooter({ image, index })}
                 </div>
               ) : null}

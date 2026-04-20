@@ -194,32 +194,32 @@ function formatConfidence(value: number) {
 function statusTone(status: string) {
   switch (status) {
     case "online":
-      return "bg-emerald-100 text-emerald-700";
+      return "obsidian-meta-pill border-emerald-400/20 bg-emerald-500/12 text-emerald-100";
     case "offline":
-      return "bg-rose-100 text-rose-700";
+      return "obsidian-meta-pill border-rose-400/20 bg-rose-500/12 text-rose-100";
     case "checking":
-      return "bg-amber-100 text-amber-700";
+      return "obsidian-meta-pill border-amber-400/20 bg-amber-500/12 text-amber-100";
     case "unconfigured":
-      return "bg-slate-100 text-slate-700";
+      return "obsidian-meta-pill bg-[rgba(255,255,255,0.04)] text-[#d7cabd]";
     default:
-      return "bg-slate-100 text-slate-700";
+      return "obsidian-meta-pill bg-[rgba(255,255,255,0.04)] text-[#d7cabd]";
   }
 }
 
 function stageTone(stage: string) {
   switch (stage) {
     case "stop":
-      return "bg-rose-100 text-rose-700";
+      return "obsidian-meta-pill border-rose-400/20 bg-rose-500/12 text-rose-100";
     case "pain":
-      return "bg-amber-100 text-amber-700";
+      return "obsidian-meta-pill border-amber-400/20 bg-amber-500/12 text-amber-100";
     case "solution":
-      return "bg-sky-100 text-sky-700";
+      return "obsidian-meta-pill border-sky-400/20 bg-sky-500/12 text-sky-100";
     case "trust":
-      return "bg-emerald-100 text-emerald-700";
+      return "obsidian-meta-pill border-emerald-400/20 bg-emerald-500/12 text-emerald-100";
     case "buy":
-      return "bg-violet-100 text-violet-700";
+      return "obsidian-meta-pill border-violet-400/20 bg-violet-500/12 text-violet-100";
     default:
-      return "bg-slate-100 text-slate-700";
+      return "obsidian-meta-pill bg-[rgba(255,255,255,0.04)] text-[#d7cabd]";
   }
 }
 
@@ -691,19 +691,19 @@ export function VideoWorkbench() {
 
   return (
     <section className="page-shell mt-8 space-y-6">
-      <article className="glass-panel p-6 sm:p-7">
+      <article className="obsidian-workbench p-6 sm:p-7">
         <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
           <div className="max-w-3xl">
             <p className="section-kicker">视频 API 状态</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-slate-950">
+            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[#f3e8d2]">
               视频模块保留真实业务能力，但前端已经统一进门户。
             </h2>
-            <p className="mt-3 text-sm leading-7 text-slate-600">
+            <p className="mt-3 text-sm leading-7 text-stone-300/80">
               当前页面默认对接项目内 Next.js API 路由，既能做本地视频拆解和脚本生成，也能保留后续视频模型任务编排入口。
             </p>
           </div>
 
-          <div className="min-w-[18rem] rounded-[1.6rem] border border-slate-200 bg-white/85 p-5">
+          <div className="obsidian-soft-card min-w-[18rem] p-5">
             <div className="flex items-center justify-between gap-3">
               <span className="section-kicker">Runtime</span>
               <span
@@ -714,10 +714,10 @@ export function VideoWorkbench() {
                 {backendStatus}
               </span>
             </div>
-            <p className="mt-3 text-sm leading-7 text-slate-600">
+            <p className="mt-3 text-sm leading-7 text-stone-300/80">
               {backendMessage}
             </p>
-            <p className="mt-3 text-xs leading-6 text-slate-500">
+            <p className="mt-3 text-xs leading-6 text-stone-400/80">
               {useLegacyVideoApi
                 ? `Legacy API: ${videoApiLabel}`
                 : "Default API: Next.js /api/video-studio"}
@@ -726,7 +726,7 @@ export function VideoWorkbench() {
         </div>
 
         {useLegacyVideoApi ? (
-          <div className="mt-6 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-600">
+          <div className="obsidian-inline-note mt-6 rounded-[1.5rem] border-dashed px-5 py-4 text-sm leading-7 text-stone-300/80">
             当前检测到 legacy 视频后端地址，页面会继续优先使用
             `NEXT_PUBLIC_VIDEO_API_BASE_URL`。移除该变量后，将默认走项目内
             Next.js API 路由。
@@ -741,11 +741,11 @@ export function VideoWorkbench() {
 
       <div className="grid gap-6 xl:grid-cols-[1.08fr_0.92fr]">
         <div className="space-y-6">
-          <article className="glass-panel p-6 sm:p-7">
+          <article className="obsidian-workbench p-6 sm:p-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="section-kicker">视频拆解</p>
-                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
                   上传本地视频，拿到结构块、关键帧和原字幕。
                 </h3>
               </div>
@@ -755,8 +755,8 @@ export function VideoWorkbench() {
                 disabled={isAnalyzing}
                 className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition ${
                   isAnalyzing
-                    ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                    : "bg-slate-950 text-white hover:bg-slate-800"
+                    ? "obsidian-action-secondary cursor-not-allowed opacity-60"
+                    : "obsidian-action"
                 }`}
               >
                 {isAnalyzing ? "分析中..." : "开始拆解"}
@@ -764,20 +764,20 @@ export function VideoWorkbench() {
             </div>
 
             <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_0.45fr_0.45fr]">
-              <label className="rounded-[1.5rem] border border-slate-200 bg-white/90 px-4 py-4">
+              <label className="obsidian-soft-card px-4 py-4">
                 <span className="section-kicker">视频文件</span>
                 <input
                   type="file"
                   accept="video/*"
                   onChange={(event) => setVideoFile(event.target.files?.[0] ?? null)}
-                  className="mt-4 block w-full text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                  className="obsidian-native-field mt-4 block w-full cursor-pointer text-sm text-stone-300/80 file:mr-4 file:rounded-full file:border-0 file:bg-[rgba(196,138,86,0.18)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#f3e8d2]"
                 />
-                <p className="mt-3 text-xs leading-6 text-slate-500">
+                <p className="mt-3 text-xs leading-6 text-stone-400/80">
                   {videoFile ? videoFile.name : "支持 mp4 / mov / webm 等常见格式"}
                 </p>
               </label>
 
-              <label className="rounded-[1.5rem] border border-slate-200 bg-white/90 px-4 py-4">
+              <label className="obsidian-soft-card px-4 py-4">
                 <span className="section-kicker">抽帧间隔</span>
                 <input
                   type="number"
@@ -785,11 +785,11 @@ export function VideoWorkbench() {
                   max={600}
                   value={analysisInterval}
                   onChange={(event) => setAnalysisInterval(event.target.valueAsNumber || 110)}
-                  className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-950"
+                  className="obsidian-native-field mt-4"
                 />
               </label>
 
-              <label className="rounded-[1.5rem] border border-slate-200 bg-white/90 px-4 py-4">
+              <label className="obsidian-soft-card px-4 py-4">
                 <span className="section-kicker">最大帧数</span>
                 <input
                   type="number"
@@ -797,33 +797,33 @@ export function VideoWorkbench() {
                   max={48}
                   value={analysisFrames}
                   onChange={(event) => setAnalysisFrames(event.target.valueAsNumber || 6)}
-                  className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-950"
+                  className="obsidian-native-field mt-4"
                 />
               </label>
             </div>
 
-            <p className="mt-5 rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
+            <p className="obsidian-inline-note mt-5 px-4 py-3 text-sm leading-7 text-stone-300/80">
               {analysisMessage}
             </p>
 
             {manifest ? (
               <div className="mt-6 space-y-6">
                 <div className="grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
+                  <div className="obsidian-soft-card px-4 py-4">
                     <p className="section-kicker">视频时长</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-950">
+                    <p className="mt-3 text-3xl font-semibold text-[#f3e8d2]">
                       {formatSeconds(manifest.durationSeconds)}
                     </p>
                   </div>
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
+                  <div className="obsidian-soft-card px-4 py-4">
                     <p className="section-kicker">抽帧数量</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-950">
+                    <p className="mt-3 text-3xl font-semibold text-[#f3e8d2]">
                       {manifest.frames.length}
                     </p>
                   </div>
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
+                  <div className="obsidian-soft-card px-4 py-4">
                     <p className="section-kicker">结构块</p>
-                    <p className="mt-3 text-3xl font-semibold text-slate-950">
+                    <p className="mt-3 text-3xl font-semibold text-[#f3e8d2]">
                       {manifest.structureBlocks.length}
                     </p>
                   </div>
@@ -834,7 +834,7 @@ export function VideoWorkbench() {
                     {manifest.frames.map((frame) => (
                       <article
                         key={`${frame.index}-${frame.timestampSeconds}`}
-                        className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white"
+                        className="obsidian-soft-card overflow-hidden"
                       >
                         {frame.src ? (
                           <img
@@ -843,15 +843,15 @@ export function VideoWorkbench() {
                             className="aspect-video w-full object-cover"
                           />
                         ) : (
-                          <div className="flex aspect-video items-center justify-center bg-slate-100 text-sm text-slate-500">
+                          <div className="obsidian-empty-state flex aspect-video items-center justify-center text-sm text-stone-400/80">
                             No preview
                           </div>
                         )}
                         <div className="px-4 py-4">
-                          <p className="text-sm font-semibold text-slate-950">
+                          <p className="text-sm font-semibold text-[#f3e8d2]">
                             Frame {frame.index + 1}
                           </p>
-                          <p className="mt-1 text-sm text-slate-500">
+                          <p className="mt-1 text-sm text-stone-400/80">
                             {formatSeconds(frame.timestampSeconds)}
                           </p>
                         </div>
@@ -865,7 +865,7 @@ export function VideoWorkbench() {
                     {manifest.structureBlocks.map((block) => (
                       <article
                         key={block.id || `${block.stage}-${block.startSeconds}`}
-                        className="rounded-[1.5rem] border border-slate-200 bg-white px-5 py-5"
+                        className="obsidian-soft-card px-5 py-5"
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div>
@@ -877,20 +877,20 @@ export function VideoWorkbench() {
                               >
                                 {block.stageLabel || block.stage}
                               </span>
-                              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                              <span className="text-xs font-semibold uppercase tracking-[0.18em] text-stone-400/80">
                                 {formatSeconds(block.startSeconds)} - {formatSeconds(block.endSeconds)}
                               </span>
                             </div>
-                            <h4 className="mt-3 text-lg font-semibold text-slate-950">
+                            <h4 className="mt-3 text-lg font-semibold text-[#f3e8d2]">
                               {block.title}
                             </h4>
                           </div>
 
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                          <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                             {formatConfidence(block.confidence)}
                           </span>
                         </div>
-                        <p className="mt-3 text-sm leading-7 text-slate-600">
+                        <p className="mt-3 text-sm leading-7 text-stone-300/80">
                           {block.summary}
                         </p>
                       </article>
@@ -898,24 +898,24 @@ export function VideoWorkbench() {
                   </div>
                 ) : null}
 
-                <label className="rounded-[1.5rem] border border-slate-200 bg-white px-5 py-5">
+                <label className="obsidian-soft-card px-5 py-5">
                   <span className="section-kicker">字幕 / 原文</span>
                   <textarea
                     rows={12}
                     value={copyForm.transcript}
                     onChange={(event) => updateCopyForm("transcript", event.target.value)}
-                    className="mt-4 w-full rounded-[1.3rem] border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-700 outline-none focus:border-slate-950"
+                    className="obsidian-native-textarea mt-4"
                   />
                 </label>
               </div>
             ) : null}
           </article>
 
-          <article className="glass-panel p-6 sm:p-7">
+          <article className="obsidian-workbench p-6 sm:p-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="section-kicker">脚本改写</p>
-                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
                   基于拆解结果生成新脚本、角度和视频 Prompt。
                 </h3>
               </div>
@@ -925,8 +925,8 @@ export function VideoWorkbench() {
                 disabled={isGeneratingCopy || !manifestRaw}
                 className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition ${
                   isGeneratingCopy || !manifestRaw
-                    ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                    : "bg-amber-300 text-slate-950 hover:bg-amber-200"
+                    ? "obsidian-action-secondary cursor-not-allowed opacity-60"
+                    : "obsidian-action"
                 }`}
               >
                 {isGeneratingCopy ? "生成中..." : "生成改写方案"}
@@ -934,45 +934,45 @@ export function VideoWorkbench() {
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
-              <label className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
+              <label className="obsidian-soft-card px-4 py-4">
                 <span className="section-kicker">产品名称</span>
                 <input
                   value={copyForm.productName}
                   onChange={(event) => updateCopyForm("productName", event.target.value)}
-                  className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-950"
+                  className="obsidian-native-field mt-4"
                 />
               </label>
-              <label className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4">
+              <label className="obsidian-soft-card px-4 py-4">
                 <span className="section-kicker">品类</span>
                 <input
                   value={copyForm.category}
                   onChange={(event) => updateCopyForm("category", event.target.value)}
-                  className="mt-4 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none focus:border-slate-950"
+                  className="obsidian-native-field mt-4"
                 />
               </label>
-              <label className="rounded-[1.5rem] border border-slate-200 bg-white px-4 py-4 md:col-span-2">
+              <label className="obsidian-soft-card px-4 py-4 md:col-span-2">
                 <span className="section-kicker">核心卖点</span>
                 <textarea
                   rows={4}
                   value={copyForm.sellingPoints}
                   onChange={(event) => updateCopyForm("sellingPoints", event.target.value)}
-                  className="mt-4 w-full rounded-[1.3rem] border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-700 outline-none focus:border-slate-950"
+                  className="obsidian-native-textarea mt-4"
                 />
               </label>
             </div>
 
-            <p className="mt-5 rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
+            <p className="obsidian-inline-note mt-5 px-4 py-3 text-sm leading-7 text-stone-300/80">
               {copyMessage}
             </p>
 
             {copyPlan ? (
               <div className="mt-6 space-y-6">
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white px-5 py-5">
+                <div className="obsidian-soft-card px-5 py-5">
                   <p className="section-kicker">策略总结</p>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
+                  <p className="mt-3 text-sm leading-7 text-stone-300/80">
                     {copyPlan.summary}
                   </p>
-                  <div className="mt-5 rounded-[1.3rem] bg-slate-950 px-4 py-4 text-sm leading-7 text-white/80">
+                  <div className="obsidian-code-panel mt-5 rounded-[1.3rem] px-4 py-4 text-sm leading-7 text-stone-100/90">
                     <pre className="whitespace-pre-wrap">{copyPlan.prompt}</pre>
                   </div>
                 </div>
@@ -980,24 +980,24 @@ export function VideoWorkbench() {
                 {copyPlan.scriptDrafts.map((draftItem) => (
                   <article
                     key={draftItem.id}
-                    className="rounded-[1.5rem] border border-slate-200 bg-white px-5 py-5"
+                    className="obsidian-soft-card px-5 py-5"
                   >
                     <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                       <div>
                         <p className="section-kicker">{draftItem.caption || "Script draft"}</p>
-                        <h4 className="mt-2 text-xl font-semibold text-slate-950">
+                        <h4 className="mt-2 text-xl font-semibold text-[#f3e8d2]">
                           {draftItem.headline}
                         </h4>
-                        <p className="mt-2 text-sm leading-7 text-slate-600">
+                        <p className="mt-2 text-sm leading-7 text-stone-300/80">
                           {draftItem.summary}
                         </p>
                       </div>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                      <span className="obsidian-meta-pill px-3 py-1 text-xs font-semibold text-stone-200/80">
                         {draftItem.angleName}
                       </span>
                     </div>
 
-                    <pre className="mt-5 overflow-x-auto whitespace-pre-wrap rounded-[1.3rem] bg-slate-950 px-4 py-4 text-sm leading-7 text-white/80">
+                    <pre className="obsidian-code-panel mt-5 overflow-x-auto whitespace-pre-wrap rounded-[1.3rem] px-4 py-4 text-sm leading-7 text-stone-100/90">
                       {draftItem.fullScript}
                     </pre>
                   </article>
@@ -1005,7 +1005,7 @@ export function VideoWorkbench() {
               </div>
             ) : null}
 
-            <div className="mt-6 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600">
+            <div className="obsidian-inline-note mt-6 rounded-[1.5rem] border-dashed px-4 py-4 text-sm leading-7 text-stone-300/80">
               {deferredTranscript
                 ? `当前字幕预览：${deferredTranscript.slice(0, 180)}${deferredTranscript.length > 180 ? "..." : ""}`
                 : "拆解后字幕会自动同步到脚本改写区。"}
@@ -1014,9 +1014,9 @@ export function VideoWorkbench() {
         </div>
 
         <div className="space-y-6">
-          <article className="glass-panel p-6 sm:p-7">
+          <article className="obsidian-workbench p-6 sm:p-7">
             <p className="section-kicker">模型选择</p>
-            <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+            <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
               当前视频生成任务支持的模型能力。
             </h3>
 
@@ -1028,8 +1028,8 @@ export function VideoWorkbench() {
                   onClick={() => handleSelectModel(model.id)}
                   className={`rounded-[1.5rem] border px-5 py-5 text-left transition ${
                     selectedModel?.id === model.id
-                      ? "border-slate-950 bg-slate-950 text-white"
-                      : "border-slate-200 bg-white hover:border-slate-400"
+                      ? "obsidian-card border-[rgba(196,138,86,0.35)] text-white"
+                      : "obsidian-soft-card hover:border-[rgba(196,138,86,0.28)]"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -1042,14 +1042,14 @@ export function VideoWorkbench() {
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${
                         selectedModel?.id === model.id
-                          ? "bg-white/10 text-white"
-                          : "bg-slate-100 text-slate-600"
+                          ? "obsidian-meta-pill bg-white/10 text-white"
+                          : "obsidian-meta-pill text-stone-200/80"
                       }`}
                     >
                       {model.statusLabel}
                     </span>
                   </div>
-                  <p className={`mt-3 text-sm leading-7 ${selectedModel?.id === model.id ? "text-white/70" : "text-slate-600"}`}>
+                  <p className={`mt-3 text-sm leading-7 ${selectedModel?.id === model.id ? "text-white/70" : "text-stone-300/80"}`}>
                     {model.description}
                   </p>
                 </button>
@@ -1057,11 +1057,11 @@ export function VideoWorkbench() {
             </div>
           </article>
 
-          <article className="glass-panel p-6 sm:p-7">
+          <article className="obsidian-workbench p-6 sm:p-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="section-kicker">任务配置</p>
-                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
                   用统一前端直接创建视频生成任务。
                 </h3>
               </div>
@@ -1071,8 +1071,8 @@ export function VideoWorkbench() {
                 disabled={isSubmittingTask || !selectedModel}
                 className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition ${
                   isSubmittingTask || !selectedModel
-                    ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                    : "bg-slate-950 text-white hover:bg-slate-800"
+                    ? "obsidian-action-secondary cursor-not-allowed opacity-60"
+                    : "obsidian-action"
                 }`}
               >
                 {isSubmittingTask ? "创建中..." : "创建任务"}
@@ -1089,13 +1089,13 @@ export function VideoWorkbench() {
                       onClick={() => updateDraft("inputMode", mode.mode)}
                       className={`flex items-center justify-between rounded-[1.3rem] border px-4 py-3 text-left transition ${
                         draft.inputMode === mode.mode
-                          ? "border-slate-950 bg-slate-950 text-white"
-                          : "border-slate-200 bg-white text-slate-700"
+                          ? "obsidian-card border-[rgba(196,138,86,0.35)] text-white"
+                          : "obsidian-soft-card text-stone-300/80"
                       }`}
                     >
                       <div>
                         <p className="text-sm font-semibold">{mode.label}</p>
-                        <p className={`mt-1 text-sm ${draft.inputMode === mode.mode ? "text-white/70" : "text-slate-500"}`}>
+                        <p className={`mt-1 text-sm ${draft.inputMode === mode.mode ? "text-white/70" : "text-stone-400/80"}`}>
                           {mode.description}
                         </p>
                       </div>
@@ -1112,7 +1112,7 @@ export function VideoWorkbench() {
                     rows={6}
                     value={draft.prompt}
                     onChange={(event) => updateDraft("prompt", event.target.value)}
-                    className="mt-3 w-full rounded-[1.3rem] border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-700 outline-none focus:border-slate-950"
+                    className="obsidian-native-textarea mt-3"
                   />
                 </label>
 
@@ -1121,16 +1121,16 @@ export function VideoWorkbench() {
                     {selectedMode.assetSlots.map((slot) => (
                       <label
                         key={slot.id}
-                        className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4"
+                        className="obsidian-soft-card px-4 py-4"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <p className="section-kicker">{slot.label}</p>
-                            <p className="mt-2 text-sm leading-7 text-slate-600">
+                            <p className="mt-2 text-sm leading-7 text-stone-300/80">
                               {slot.description}
                             </p>
                           </div>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                          <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                             {slot.optional ? "可选" : "必填"}
                           </span>
                         </div>
@@ -1139,7 +1139,7 @@ export function VideoWorkbench() {
                           accept={slot.accept}
                           multiple={slot.multiple}
                           onChange={(event) => updateSlotFiles(slot.id, event.target.files)}
-                          className="mt-4 block w-full text-sm text-slate-600 file:mr-4 file:rounded-full file:border-0 file:bg-slate-950 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
+                          className="obsidian-native-field mt-4 block w-full cursor-pointer text-sm text-stone-300/80 file:mr-4 file:rounded-full file:border-0 file:bg-[rgba(196,138,86,0.18)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#f3e8d2]"
                         />
                       </label>
                     ))}
@@ -1147,7 +1147,7 @@ export function VideoWorkbench() {
                 ) : null}
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4">
+                  <label className="obsidian-soft-card px-4 py-4">
                     <span className="section-kicker">画幅比例</span>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {selectedModel.supportedAspectRatios.map((ratio) => (
@@ -1157,8 +1157,8 @@ export function VideoWorkbench() {
                           onClick={() => updateDraft("aspectRatio", ratio)}
                           className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                             draft.aspectRatio === ratio
-                              ? "bg-slate-950 text-white"
-                              : "bg-slate-100 text-slate-600"
+                              ? "obsidian-action text-[#f7f0e6]"
+                              : "obsidian-meta-pill bg-[rgba(255,255,255,0.04)] text-[#c5b9aa]"
                           }`}
                         >
                           {ratio}
@@ -1167,7 +1167,7 @@ export function VideoWorkbench() {
                     </div>
                   </label>
 
-                  <label className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4">
+                  <label className="obsidian-soft-card px-4 py-4">
                     <span className="section-kicker">时长</span>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {durationOptions.map((option) => (
@@ -1177,8 +1177,8 @@ export function VideoWorkbench() {
                           onClick={() => updateDraft("durationSeconds", option)}
                           className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
                             draft.durationSeconds === option
-                              ? "bg-slate-950 text-white"
-                              : "bg-slate-100 text-slate-600"
+                              ? "obsidian-action text-[#f7f0e6]"
+                              : "obsidian-meta-pill bg-[rgba(255,255,255,0.04)] text-[#c5b9aa]"
                           }`}
                         >
                           {option}s
@@ -1212,11 +1212,11 @@ export function VideoWorkbench() {
                     return (
                       <label
                         key={parameter.key}
-                        className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4"
+                        className="obsidian-soft-card px-4 py-4"
                       >
                         <div className="flex items-center justify-between gap-3">
                           <span className="section-kicker">{parameter.label}</span>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                          <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                             {currentValue}
                           </span>
                         </div>
@@ -1232,7 +1232,7 @@ export function VideoWorkbench() {
                               Number(event.target.value) as VideoGenerationDraft[typeof draftKey],
                             )
                           }
-                          className="mt-4 w-full accent-slate-950"
+                          className="mt-4 w-full accent-[#c48a56]"
                         />
                       </label>
                     );
@@ -1241,18 +1241,18 @@ export function VideoWorkbench() {
                   return null;
                 })}
 
-                <p className="rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-600">
+                <p className="obsidian-inline-note rounded-[1.4rem] px-4 py-3 text-sm leading-7 text-stone-300/80">
                   {taskMessage}
                 </p>
               </div>
             ) : null}
           </article>
 
-          <article className="glass-panel p-6 sm:p-7">
+          <article className="obsidian-workbench p-6 sm:p-7">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <p className="section-kicker">任务状态</p>
-                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
                   创建后在这里查看参数快照与结果占位。
                 </h3>
               </div>
@@ -1263,8 +1263,8 @@ export function VideoWorkbench() {
                   disabled={isRefreshingTask}
                   className={`inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition ${
                     isRefreshingTask
-                      ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                      : "bg-slate-950 text-white hover:bg-slate-800"
+                      ? "obsidian-action-secondary cursor-not-allowed opacity-60"
+                      : "obsidian-action-secondary"
                   }`}
                 >
                   {isRefreshingTask ? "刷新中..." : "刷新状态"}
@@ -1274,30 +1274,30 @@ export function VideoWorkbench() {
 
             {latestTask ? (
               <div className="mt-6 space-y-5">
-                <div className="rounded-[1.5rem] border border-slate-200 bg-white px-5 py-5">
+                <div className="obsidian-soft-card px-5 py-5">
                   <p className="section-kicker">{latestTask.provider}</p>
-                  <h4 className="mt-2 text-xl font-semibold text-slate-950">
+                  <h4 className="mt-2 text-xl font-semibold text-[#f3e8d2]">
                     {latestTask.modelName}
                   </h4>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                  <p className="mt-2 text-sm leading-7 text-stone-300/80">
                     {latestTask.statusDetail}
                   </p>
-                  <div className="mt-5 grid gap-3 text-sm text-slate-600">
+                  <div className="mt-5 grid gap-3 text-sm text-stone-300/80">
                     <p>任务 ID：{latestTask.taskId}</p>
                     <p>输入模式：{modeLabels[latestTask.inputMode]}</p>
                     <p>创建时间：{formatDateTime(latestTask.createdAt)}</p>
                   </div>
                 </div>
 
-                <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-5">
+                <div className="obsidian-empty-state px-5 py-5">
                   <p className="section-kicker">结果占位</p>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">
+                  <p className="mt-3 text-sm leading-7 text-stone-300/80">
                     {latestTask.result.placeholderMessage || "等待真实视频结果。"}
                   </p>
                 </div>
               </div>
             ) : (
-              <div className="mt-6 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-6 text-sm leading-7 text-slate-600">
+              <div className="obsidian-empty-state mt-6 px-5 py-6 text-sm leading-7">
                 当前还没有视频生成任务。选择模型并创建一次任务后，这里会展示状态、素材和参数快照。
               </div>
             )}

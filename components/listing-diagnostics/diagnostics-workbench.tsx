@@ -146,7 +146,7 @@ export function DiagnosticsWorkbench() {
   }
 
   return (
-    <section className="page-shell mt-8 space-y-6 pb-12">
+    <section className="page-shell mt-8 space-y-8 pb-12">
       <DiagnosticsForm
         targetAsin={targetAsin}
         marketplace={marketplace}

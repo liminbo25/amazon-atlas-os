@@ -144,7 +144,7 @@ export default async function CompetitorMonitorMarketDetailPage({
               ]}
             />
           ) : (
-            <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-sm leading-7 text-slate-500">
+            <div className="obsidian-empty-state px-5 py-8 text-sm leading-7">
               No synced snapshots are available yet for this market.
             </div>
           )}
@@ -156,30 +156,36 @@ export default async function CompetitorMonitorMarketDetailPage({
           description="Context fields come straight from the real market record plus derived sync diagnostics."
         >
           <div className="grid gap-4">
-            <div className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4">
-              <p className="section-kicker">Marketplace</p>
-              <p className="mt-2 text-lg font-semibold text-slate-950">
+            <div className="obsidian-soft-card px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#a99a89]">
+                Marketplace
+              </p>
+              <p className="mt-2 text-lg font-semibold text-[#f7f0e6]">
                 Amazon {market.marketplace}
               </p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
+              <p className="mt-2 text-sm leading-7 text-[#c5b9aa]">
                 {market.countryCode} / {market.region}
               </p>
             </div>
-            <div className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4">
-              <p className="section-kicker">Last sync</p>
-              <p className="mt-2 text-lg font-semibold text-slate-950">
+            <div className="obsidian-soft-card px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#a99a89]">
+                Last sync
+              </p>
+              <p className="mt-2 text-lg font-semibold text-[#f7f0e6]">
                 {market.lastSyncedAt
                   ? formatCompetitorMonitorDateTime(market.lastSyncedAt)
                   : "Not synced yet"}
               </p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
+              <p className="mt-2 text-sm leading-7 text-[#c5b9aa]">
                 Coverage is currently {market.coverageRate.toFixed(0)}% across the
                 configured ASIN set.
               </p>
             </div>
-            <div className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4">
-              <p className="section-kicker">Description</p>
-              <p className="mt-2 text-sm leading-7 text-slate-600">
+            <div className="obsidian-inline-note px-4 py-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#a99a89]">
+                Description
+              </p>
+              <p className="mt-2 text-sm leading-7 text-[#dfd2c3]">
                 {market.description}
               </p>
             </div>
@@ -192,60 +198,73 @@ export default async function CompetitorMonitorMarketDetailPage({
         title="Monitored rows inside this market"
         description="The table keeps the original deep-link workflow while showing the fields that actually exist in the backend contract."
       >
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ASIN</TableHead>
-              <TableHead>Health</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Rating</TableHead>
-              <TableHead>Reviews</TableHead>
-              <TableHead>Monthly sales</TableHead>
-              <TableHead>Alerts</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {market.trackedAsins.length > 0 ? (
-              market.trackedAsins.map((asin) => (
-                <TableRow key={asin.asin}>
-                  <TableCell>
-                    <Link
-                      href={competitorMonitorRoutes.asinDetail(asin.asin)}
-                      className="font-semibold text-slate-950 hover:text-slate-700"
-                    >
-                      {asin.asin}
-                    </Link>
-                    <p className="mt-1 max-w-[22rem] text-xs whitespace-normal text-slate-500">
-                      {asin.title}
-                    </p>
-                  </TableCell>
-                  <TableCell>
-                    <CompetitorMonitorStatusBadge kind="health" value={asin.health} />
-                  </TableCell>
-                  <TableCell>
-                    {asin.price !== null
-                      ? formatCompetitorMonitorCurrency(asin.price, market.currency)
-                      : "Pending"}
-                  </TableCell>
-                  <TableCell>{asin.rating !== null ? asin.rating.toFixed(1) : "Pending"}</TableCell>
-                  <TableCell>{formatCompetitorMonitorCompactNumber(asin.reviewCount)}</TableCell>
-                  <TableCell>
-                    {asin.monthlySales !== null
-                      ? formatCompetitorMonitorCompactNumber(asin.monthlySales)
-                      : "Pending"}
-                  </TableCell>
-                  <TableCell>{asin.alertCount}</TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-slate-500">
-                  No ASINs are attached to this market yet.
-                </TableCell>
+        <div className="obsidian-soft-card overflow-hidden px-3 py-3">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-white/10 hover:bg-transparent">
+                <TableHead className="px-4 text-[#a99a89]">ASIN</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Health</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Price</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Rating</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Reviews</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Monthly sales</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Alerts</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {market.trackedAsins.length > 0 ? (
+                market.trackedAsins.map((asin) => (
+                  <TableRow
+                    key={asin.asin}
+                    className="border-white/8 hover:bg-white/[0.03]"
+                  >
+                    <TableCell className="px-4 py-4">
+                      <Link
+                        href={competitorMonitorRoutes.asinDetail(asin.asin)}
+                        className="font-semibold text-[#f7f0e6] transition hover:text-[#f6b63f]"
+                      >
+                        {asin.asin}
+                      </Link>
+                      <p className="mt-1 max-w-[22rem] text-xs whitespace-normal text-[#a99a89]">
+                        {asin.title}
+                      </p>
+                    </TableCell>
+                    <TableCell className="px-4 py-4">
+                      <CompetitorMonitorStatusBadge kind="health" value={asin.health} />
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {asin.price !== null
+                        ? formatCompetitorMonitorCurrency(asin.price, market.currency)
+                        : "Pending"}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {asin.rating !== null ? asin.rating.toFixed(1) : "Pending"}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {formatCompetitorMonitorCompactNumber(asin.reviewCount)}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {asin.monthlySales !== null
+                        ? formatCompetitorMonitorCompactNumber(asin.monthlySales)
+                        : "Pending"}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {asin.alertCount}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow className="border-white/8 hover:bg-transparent">
+                  <TableCell colSpan={7} className="px-4 py-8">
+                    <div className="obsidian-empty-state px-5 py-6 text-center text-sm leading-7">
+                      No ASINs are attached to this market yet.
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </CompetitorMonitorSectionCard>
 
       <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
@@ -256,10 +275,7 @@ export default async function CompetitorMonitorMarketDetailPage({
         >
           <div className="grid gap-3">
             {market.notes.map((note) => (
-              <div
-                key={note}
-                className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-600"
-              >
+              <div key={note} className="obsidian-inline-note px-4 py-4 text-sm leading-7">
                 {note}
               </div>
             ))}

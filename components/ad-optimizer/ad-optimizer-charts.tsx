@@ -39,9 +39,9 @@ export function AdOptimizerCharts({
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1.05fr_0.95fr]">
-      <article className="rounded-[1.7rem] border border-slate-200 bg-white p-5">
+      <article className="obsidian-card p-5">
         <p className="section-kicker">建议分布</p>
-        <h3 className="mt-3 text-xl font-semibold text-slate-950">
+        <h3 className="mt-3 text-xl font-semibold text-[#f7f0e6]">
           各类动作的 ready / review 占比
         </h3>
         <MeasuredChartFrame
@@ -61,9 +61,9 @@ export function AdOptimizerCharts({
         </MeasuredChartFrame>
       </article>
 
-      <article className="rounded-[1.7rem] border border-slate-200 bg-white p-5">
+      <article className="obsidian-card p-5">
         <p className="section-kicker">Campaign 风险面</p>
-        <h3 className="mt-3 text-xl font-semibold text-slate-950">
+        <h3 className="mt-3 text-xl font-semibold text-[#f7f0e6]">
           重点 campaign 的治理 / placement / 预算动作数
         </h3>
         <MeasuredChartFrame
@@ -89,7 +89,7 @@ export function AdOptimizerCharts({
 
 function EmptyChart({ text }: { text: string }) {
   return (
-    <div className="flex h-full items-center justify-center rounded-[1.3rem] border border-dashed border-slate-300 bg-slate-50 text-sm text-slate-500">
+    <div className="obsidian-empty-state flex h-full items-center justify-center px-4 text-center text-sm">
       {text}
     </div>
   );

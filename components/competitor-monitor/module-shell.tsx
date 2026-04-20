@@ -20,21 +20,29 @@ export function CompetitorMonitorShell({
       />
 
       <section className="page-shell mt-8">
-        <div className="glass-panel p-5 sm:p-6">
+        <div className="obsidian-workbench p-5 sm:p-6">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             <div className="space-y-3">
-              <div>
+              <div className="obsidian-soft-card p-4">
                 <p className="section-kicker">Module contract</p>
-                <p className="mt-2 text-base font-semibold text-slate-950">
-                  Page routes live under <code>{competitorMonitorRoutes.dashboard}</code>
+                <p className="mt-2 text-base font-semibold text-[#f7f0e6]">
+                  Page routes live under{" "}
+                  <code className="rounded-full border border-white/10 bg-[rgba(255,255,255,0.05)] px-2.5 py-1 text-sm text-[#f3e5d2]">
+                    {competitorMonitorRoutes.dashboard}
+                  </code>
                 </p>
               </div>
-              <p className="max-w-3xl text-sm leading-7 text-slate-600">
-                The frontend still consumes a single <code>competitor-monitor</code>{" "}
+              <p className="obsidian-inline-note max-w-3xl px-4 py-3 text-sm leading-7 text-[#dfd2c3]">
+                The frontend still consumes a single{" "}
+                <code className="rounded-full border border-[rgba(246,182,63,0.18)] bg-[rgba(246,182,63,0.08)] px-2.5 py-1 text-xs text-[#f3e5d2]">
+                  competitor-monitor
+                </code>{" "}
                 namespace. Real API paths live under{" "}
-                <code>{competitorMonitorApiRoutes.dashboard}</code>, and the UI now
-                adapts to the backend contract through a dedicated view-model layer
-                instead of shipping mock service types.
+                <code className="rounded-full border border-white/10 bg-[rgba(255,255,255,0.05)] px-2.5 py-1 text-xs text-[#f3e5d2]">
+                  {competitorMonitorApiRoutes.dashboard}
+                </code>
+                , and the UI now adapts to the backend contract through a dedicated
+                view-model layer instead of shipping mock service types.
               </p>
             </div>
             <CompetitorMonitorModuleNav />

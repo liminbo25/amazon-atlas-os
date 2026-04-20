@@ -172,7 +172,7 @@ export default async function CompetitorMonitorAsinDetailPage({
               ]}
             />
           ) : (
-            <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-5 py-8 text-sm leading-7 text-slate-500">
+            <div className="obsidian-empty-state px-5 py-8 text-sm leading-7">
               Snapshot history is still empty for this ASIN.
             </div>
           )}
@@ -188,13 +188,13 @@ export default async function CompetitorMonitorAsinDetailPage({
               detail.bulletHighlights.map((item) => (
                 <div
                   key={item}
-                  className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4 text-sm leading-7 text-slate-600"
+                  className="obsidian-inline-note px-4 py-4 text-sm leading-7"
                 >
                   {item}
                 </div>
               ))
             ) : (
-              <div className="rounded-[1.4rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-500">
+              <div className="obsidian-empty-state px-4 py-4 text-sm leading-7">
                 No bullet highlights were captured in the latest snapshot.
               </div>
             )}
@@ -205,10 +205,12 @@ export default async function CompetitorMonitorAsinDetailPage({
               {detail.attributeItems.map((item) => (
                 <div
                   key={`${item.label}-${item.value}`}
-                  className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4"
+                  className="obsidian-soft-card px-4 py-4"
                 >
-                  <p className="section-kicker">{item.label}</p>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">{item.value}</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#a99a89]">
+                    {item.label}
+                  </p>
+                  <p className="mt-2 text-sm leading-7 text-[#dfd2c3]">{item.value}</p>
                 </div>
               ))}
             </div>
@@ -222,42 +224,50 @@ export default async function CompetitorMonitorAsinDetailPage({
           title="Latest tracked keyword coverage"
           description="Keyword rows come directly from the latest stored snapshot instead of a mock ranking contract."
         >
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Keyword</TableHead>
-                <TableHead>Organic</TableHead>
-                <TableHead>Sponsored</TableHead>
-                <TableHead>Search volume</TableHead>
-                <TableHead>Conversion share</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {detail.keywordSnapshots.length > 0 ? (
-                detail.keywordSnapshots.map((keyword) => (
-                  <TableRow key={keyword.keyword}>
-                    <TableCell className="font-medium text-slate-950">
-                      {keyword.keyword}
-                    </TableCell>
-                    <TableCell>{keyword.organicRank}</TableCell>
-                    <TableCell>{keyword.sponsoredRank ?? "-"}</TableCell>
-                    <TableCell>
-                      {formatCompetitorMonitorCompactNumber(keyword.searchVolume)}
-                    </TableCell>
-                    <TableCell>
-                      {formatCompetitorMonitorPercent(keyword.conversionShare * 100)}
+          <div className="obsidian-soft-card overflow-hidden px-3 py-3">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-white/10 hover:bg-transparent">
+                  <TableHead className="px-4 text-[#a99a89]">Keyword</TableHead>
+                  <TableHead className="px-4 text-[#a99a89]">Organic</TableHead>
+                  <TableHead className="px-4 text-[#a99a89]">Sponsored</TableHead>
+                  <TableHead className="px-4 text-[#a99a89]">Search volume</TableHead>
+                  <TableHead className="px-4 text-[#a99a89]">Conversion share</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {detail.keywordSnapshots.length > 0 ? (
+                  detail.keywordSnapshots.map((keyword) => (
+                    <TableRow key={keyword.keyword} className="border-white/8 hover:bg-white/[0.03]">
+                      <TableCell className="px-4 py-4 font-medium text-[#f7f0e6]">
+                        {keyword.keyword}
+                      </TableCell>
+                      <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                        {keyword.organicRank}
+                      </TableCell>
+                      <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                        {keyword.sponsoredRank ?? "-"}
+                      </TableCell>
+                      <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                        {formatCompetitorMonitorCompactNumber(keyword.searchVolume)}
+                      </TableCell>
+                      <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                        {formatCompetitorMonitorPercent(keyword.conversionShare * 100)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow className="border-white/8 hover:bg-transparent">
+                    <TableCell colSpan={5} className="px-4 py-8">
+                      <div className="obsidian-empty-state px-5 py-6 text-center text-sm leading-7">
+                        No keywords were captured for the latest snapshot.
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="py-8 text-center text-slate-500">
-                    No keywords were captured for the latest snapshot.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CompetitorMonitorSectionCard>
 
         <CompetitorMonitorSectionCard
@@ -268,25 +278,22 @@ export default async function CompetitorMonitorAsinDetailPage({
           <div className="grid gap-3">
             {detail.recentChanges.length > 0 ? (
               detail.recentChanges.map((change) => (
-                <div
-                  key={change.id}
-                  className="rounded-[1.4rem] border border-slate-200 bg-white px-4 py-4"
-                >
+                <div key={change.id} className="obsidian-soft-card px-4 py-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
-                    <p className="text-sm font-semibold text-slate-950">
+                    <p className="text-sm font-semibold text-[#f7f0e6]">
                       {change.type}
                     </p>
-                    <span className="text-sm text-slate-500">
+                    <span className="text-sm text-[#a99a89]">
                       {formatCompetitorMonitorDateTime(change.happenedAt)}
                     </span>
                   </div>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
+                  <p className="mt-2 text-sm leading-7 text-[#c5b9aa]">
                     {change.summary}
                   </p>
                 </div>
               ))
             ) : (
-              <div className="rounded-[1.4rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-500">
+              <div className="obsidian-empty-state px-4 py-4 text-sm leading-7">
                 No change notes are available yet for this ASIN.
               </div>
             )}
@@ -299,62 +306,73 @@ export default async function CompetitorMonitorAsinDetailPage({
         title="Other tracked ASINs in the same monitored markets"
         description="Comparable rows are derived from the real market memberships instead of a separate mock dataset."
       >
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>ASIN</TableHead>
-              <TableHead>Market</TableHead>
-              <TableHead>Title</TableHead>
-              <TableHead>Price</TableHead>
-              <TableHead>Rating</TableHead>
-              <TableHead>Monthly sales</TableHead>
-              <TableHead>Alerts</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {detail.comparableAsins.length > 0 ? (
-              detail.comparableAsins.map((comparable) => (
-                <TableRow key={`${comparable.marketId}-${comparable.asin}`}>
-                  <TableCell className="font-medium text-slate-950">
-                    <Link
-                      href={competitorMonitorRoutes.asinDetail(comparable.asin)}
-                      className="hover:text-slate-700"
-                    >
-                      {comparable.asin}
-                    </Link>
-                  </TableCell>
-                  <TableCell>{comparable.marketName}</TableCell>
-                  <TableCell className="max-w-[24rem] whitespace-normal text-slate-600">
-                    {comparable.title}
-                  </TableCell>
-                  <TableCell>
-                    {comparable.price !== null
-                      ? formatCompetitorMonitorCurrency(
-                          comparable.price,
-                          detail.currency
-                        )
-                      : "Pending"}
-                  </TableCell>
-                  <TableCell>
-                    {comparable.rating !== null ? comparable.rating.toFixed(1) : "Pending"}
-                  </TableCell>
-                  <TableCell>
-                    {comparable.monthlySales !== null
-                      ? formatCompetitorMonitorCompactNumber(comparable.monthlySales)
-                      : "Pending"}
-                  </TableCell>
-                  <TableCell>{comparable.alertCount}</TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={7} className="py-8 text-center text-slate-500">
-                  No comparable ASINs are linked to this row yet.
-                </TableCell>
+        <div className="obsidian-soft-card overflow-hidden px-3 py-3">
+          <Table>
+            <TableHeader>
+              <TableRow className="border-white/10 hover:bg-transparent">
+                <TableHead className="px-4 text-[#a99a89]">ASIN</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Market</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Title</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Price</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Rating</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Monthly sales</TableHead>
+                <TableHead className="px-4 text-[#a99a89]">Alerts</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {detail.comparableAsins.length > 0 ? (
+                detail.comparableAsins.map((comparable) => (
+                  <TableRow
+                    key={`${comparable.marketId}-${comparable.asin}`}
+                    className="border-white/8 hover:bg-white/[0.03]"
+                  >
+                    <TableCell className="px-4 py-4 font-medium text-[#f7f0e6]">
+                      <Link
+                        href={competitorMonitorRoutes.asinDetail(comparable.asin)}
+                        className="transition hover:text-[#f6b63f]"
+                      >
+                        {comparable.asin}
+                      </Link>
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {comparable.marketName}
+                    </TableCell>
+                    <TableCell className="max-w-[24rem] px-4 py-4 whitespace-normal text-[#c5b9aa]">
+                      {comparable.title}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {comparable.price !== null
+                        ? formatCompetitorMonitorCurrency(
+                            comparable.price,
+                            detail.currency
+                          )
+                        : "Pending"}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {comparable.rating !== null ? comparable.rating.toFixed(1) : "Pending"}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {comparable.monthlySales !== null
+                        ? formatCompetitorMonitorCompactNumber(comparable.monthlySales)
+                        : "Pending"}
+                    </TableCell>
+                    <TableCell className="px-4 py-4 text-[#f7f0e6]">
+                      {comparable.alertCount}
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow className="border-white/8 hover:bg-transparent">
+                  <TableCell colSpan={7} className="px-4 py-8">
+                    <div className="obsidian-empty-state px-5 py-6 text-center text-sm leading-7">
+                      No comparable ASINs are linked to this row yet.
+                    </div>
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
       </CompetitorMonitorSectionCard>
 
       <CompetitorMonitorSectionCard
@@ -368,7 +386,7 @@ export default async function CompetitorMonitorAsinDetailPage({
             <Link
               key={`${detail.asin}-${market.id}`}
               href={competitorMonitorRoutes.marketDetail(market.id)}
-              className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-200"
+              className="obsidian-meta-pill transition hover:border-[rgba(246,182,63,0.3)] hover:text-[#f7f0e6]"
             >
               {market.name}
             </Link>

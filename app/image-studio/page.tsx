@@ -343,14 +343,14 @@ function getStatusLabel(status: AsyncStatus) {
 function getStatusPillClass(status: AsyncStatus) {
   switch (status) {
     case "processing":
-      return "bg-amber-100 text-amber-700";
+      return "border border-amber-400/25 bg-amber-500/14 text-amber-100";
     case "success":
-      return "bg-emerald-100 text-emerald-700";
+      return "border border-emerald-400/25 bg-emerald-500/14 text-emerald-100";
     case "error":
-      return "bg-rose-100 text-rose-700";
+      return "border border-rose-400/25 bg-rose-500/14 text-rose-100";
     case "idle":
     default:
-      return "bg-slate-100 text-slate-500";
+      return "obsidian-meta-pill bg-[rgba(255,255,255,0.04)] text-[#d7cabd]";
   }
 }
 
@@ -548,7 +548,7 @@ function PreviewTile({
   emptyDescription,
   description,
   error,
-  backgroundClassName = "bg-white",
+  backgroundClassName = "bg-[rgba(255,255,255,0.05)]",
   onPreview,
 }: PreviewTileProps) {
   if (image && isValidImageSource(image)) {
@@ -556,16 +556,16 @@ function PreviewTile({
       <button
         type="button"
         onClick={onPreview}
-        className={`${backgroundClassName} p-4 text-left transition hover:bg-slate-50`}
+        className="obsidian-soft-card p-4 text-left transition hover:bg-white/[0.08]"
       >
-        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+        <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[#a99a89]">
           {title}
         </p>
-        <div className="aspect-[4/5] overflow-hidden rounded-[1.25rem] bg-white">
+        <div className={`aspect-[4/5] overflow-hidden rounded-[1.25rem] ${backgroundClassName}`}>
           <img src={image} alt={alt} className="h-full w-full object-cover" />
         </div>
         {description ? (
-          <p className="mt-3 text-sm leading-6 text-slate-500">{description}</p>
+          <p className="mt-3 text-sm leading-6 text-[#c5b9aa]">{description}</p>
         ) : null}
       </button>
     );
@@ -581,23 +581,25 @@ function PreviewTile({
     status === "processing" ? "请稍候，完成后会自动显示在这里。" : emptyDescription;
 
   return (
-    <div className={`${backgroundClassName} p-4`}>
-      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+    <div className="obsidian-soft-card p-4">
+      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.24em] text-[#a99a89]">
         {title}
       </p>
-      <div className="flex aspect-[4/5] items-center justify-center rounded-[1.25rem] border border-dashed border-slate-300 bg-white px-5 text-center">
+      <div
+        className={`obsidian-empty-state flex aspect-[4/5] items-center justify-center rounded-[1.25rem] px-5 text-center ${backgroundClassName}`}
+      >
         <div>
-          <p className="text-base font-semibold text-slate-900">{placeholderTitle}</p>
-          <p className="mt-2 text-sm leading-6 text-slate-500">
+          <p className="text-base font-semibold text-[#f7f0e6]">{placeholderTitle}</p>
+          <p className="mt-2 text-sm leading-6 text-[#c5b9aa]">
             {placeholderDescription}
           </p>
         </div>
       </div>
       {description ? (
-        <p className="mt-3 text-sm leading-6 text-slate-500">{description}</p>
+        <p className="mt-3 text-sm leading-6 text-[#c5b9aa]">{description}</p>
       ) : null}
       {error ? (
-        <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-700">
+        <p className="mt-3 rounded-2xl border border-rose-400/25 bg-rose-500/14 px-3 py-2 text-sm leading-6 text-rose-100">
           {error}
         </p>
       ) : null}
@@ -1566,7 +1568,7 @@ export default function ImageStudioPage() {
           <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(39,39,42,0.92))] p-6 text-white shadow-[0_32px_90px_rgba(15,23,42,0.24)] sm:p-8">
             <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-3xl space-y-5">
-                <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/75">
+                <div className="obsidian-meta-pill gap-3 px-4 py-2 text-sm text-white/75">
                   <span className="h-2 w-2 rounded-full bg-emerald-400" />
                   三种换装模式 + 白底图 + 高清增强
                 </div>
@@ -1590,15 +1592,15 @@ export default function ImageStudioPage() {
                     disabled={!hasUploads || isProcessing}
                     className={`inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition ${
                       !hasUploads || isProcessing
-                        ? "cursor-not-allowed bg-white/10 text-white/40"
-                        : "bg-amber-300 text-slate-950 hover:bg-amber-200"
+                        ? "cursor-not-allowed bg-[rgba(255,255,255,0.06)] text-white/35"
+                        : "obsidian-action text-[#f7f0e6]"
                     }`}
                   >
                     {isProcessing ? "当前批次生成中..." : "开始当前模式生成"}
                   </button>
                   <Link
                     href="/"
-                    className="inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                    className="obsidian-action-secondary px-6 py-3"
                   >
                     返回首页
                   </Link>
@@ -1636,20 +1638,20 @@ export default function ImageStudioPage() {
 
           <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
             <div className="space-y-6">
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              <article className="obsidian-workbench p-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                       生成模式
                     </p>
-                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
                       先明确本轮怎么组合任务
                     </h2>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-stone-300/80">
                       模式切换后，上传限制、提示文案和任务数量都会同步变化。
                     </p>
                   </div>
-                  <span className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
+                  <span className="obsidian-meta-pill px-4 py-2 text-sm font-semibold">
                     预计 {plannedTaskCount} 张
                   </span>
                 </div>
@@ -1666,8 +1668,8 @@ export default function ImageStudioPage() {
                         onClick={() => setGenerationMode(mode)}
                         className={`rounded-[1.5rem] border px-5 py-5 text-left transition ${
                           isActive
-                            ? "border-slate-950 bg-slate-950 text-white"
-                            : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-400 hover:bg-white"
+                            ? "obsidian-card border-[rgba(196,138,86,0.35)] text-white"
+                            : "obsidian-soft-card text-stone-300/80 hover:border-[rgba(196,138,86,0.24)]"
                         }`}
                       >
                         <p className="text-xs font-semibold uppercase tracking-[0.22em] opacity-70">
@@ -1686,18 +1688,18 @@ export default function ImageStudioPage() {
                   })}
                 </div>
 
-                <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600">
+                <div className="obsidian-inline-note mt-5 px-4 py-4 text-sm leading-7">
                   {estimateMessage}
                 </div>
 
                 {plannedTaskCount >= 20 ? (
-                  <div className="mt-4 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-7 text-amber-800">
+                  <div className="obsidian-inline-note mt-4 rounded-[1.5rem] border-amber-400/20 bg-amber-500/10 px-4 py-4 text-sm leading-7 text-amber-100">
                     当前任务量较大，将连续生成 {plannedTaskCount} 张结果。建议先确认服装图、模特图和备注都已准备好再开始。
                   </div>
                 ) : null}
               </article>
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              <article className="obsidian-workbench p-6">
                 <MultiImageUploader
                   images={clothingImages}
                   onImagesChange={setClothingImages}
@@ -1708,7 +1710,7 @@ export default function ImageStudioPage() {
                   renderImageFooter={({ index }) => (
                     <div className="space-y-3">
                       <label className="block">
-                        <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        <span className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                           服装备注
                         </span>
                         <textarea
@@ -1724,10 +1726,10 @@ export default function ImageStudioPage() {
                             )
                           }
                           placeholder="可填写长度、版型、露肤范围、搭配要求等，例如：保持袖长，不要改花纹。"
-                          className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-slate-950"
+                          className="obsidian-native-textarea mt-2"
                         />
                       </label>
-                      <p className="text-xs leading-6 text-slate-500">
+                      <p className="text-xs leading-6 text-stone-400/80">
                         这段备注会跟着当前服装图进入请求，在三种模式下都有效。
                       </p>
                     </div>
@@ -1735,7 +1737,7 @@ export default function ImageStudioPage() {
                 />
               </article>
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              <article className="obsidian-workbench p-6">
                 <MultiImageUploader
                   images={modelImages}
                   onImagesChange={setModelImages}
@@ -1746,7 +1748,7 @@ export default function ImageStudioPage() {
                 />
               </article>
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              <article className="obsidian-workbench p-6">
                 <MultiImageUploader
                   images={standaloneImages}
                   onImagesChange={setStandaloneImages}
@@ -1785,8 +1787,8 @@ export default function ImageStudioPage() {
                             disabled={item.whiteBackground.status === "processing"}
                             className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
                               item.whiteBackground.status === "processing"
-                                ? "cursor-not-allowed bg-amber-100 text-amber-700"
-                                : "bg-amber-300 text-slate-950 hover:bg-amber-200"
+                                ? "cursor-not-allowed bg-amber-500/12 text-amber-100"
+                                : "obsidian-action text-[#f7f0e6]"
                             }`}
                           >
                             {getWhiteBackgroundButtonLabel(item.whiteBackground)}
@@ -1797,8 +1799,8 @@ export default function ImageStudioPage() {
                             disabled={item.enhanced.status === "processing" || !canEnhance}
                             className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
                               item.enhanced.status === "processing" || !canEnhance
-                                ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                                : "bg-slate-950 text-white hover:bg-slate-800"
+                                ? "cursor-not-allowed bg-white/8 text-[#8b7e72]"
+                                : "obsidian-action-secondary"
                             }`}
                           >
                             {getEnhanceButtonLabel(item.enhanced, canEnhance)}
@@ -1806,12 +1808,12 @@ export default function ImageStudioPage() {
                         </div>
 
                         {item.whiteBackground.error ? (
-                          <p className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-700">
+                          <p className="obsidian-inline-note rounded-2xl border-rose-400/20 bg-rose-500/10 px-3 py-2 text-sm leading-6 text-rose-100">
                             白底处理失败：{item.whiteBackground.error}
                           </p>
                         ) : null}
                         {item.enhanced.error ? (
-                          <p className="rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-700">
+                          <p className="obsidian-inline-note rounded-2xl border-rose-400/20 bg-rose-500/10 px-3 py-2 text-sm leading-6 text-rose-100">
                             增强处理失败：{item.enhanced.error}
                           </p>
                         ) : null}
@@ -1820,36 +1822,36 @@ export default function ImageStudioPage() {
                   }}
                 />
 
-                <div className="mt-5 flex flex-wrap gap-3 text-sm text-slate-600">
-                  <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+                <div className="mt-5 flex flex-wrap gap-3 text-sm text-stone-300/80">
+                  <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                     独立白底图 {standaloneWhiteCount}
                   </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+                  <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                     独立增强图 {standaloneEnhancedCount}
                   </span>
                 </div>
               </article>
 
               {hasStandaloneOutputCards ? (
-                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+                <article className="obsidian-workbench p-6">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                         独立处理结果
                       </p>
-                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
                         白底图和增强图现在单独展示
                       </h2>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <p className="mt-2 text-sm leading-6 text-stone-300/80">
                         不走换装流程的结果会固定保留在这里，处理完成后可以直接预览和下载。
                       </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-3 text-sm text-slate-600">
-                      <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+                    <div className="flex flex-wrap gap-3 text-sm text-stone-300/80">
+                      <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                         独立白底图 {standaloneWhiteCount}
                       </span>
-                      <span className="rounded-full bg-slate-100 px-3 py-1 font-semibold text-slate-700">
+                      <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                         独立增强图 {standaloneEnhancedCount}
                       </span>
                     </div>
@@ -1862,11 +1864,11 @@ export default function ImageStudioPage() {
                       return (
                         <article
                           key={`standalone-result-${index}-${image.slice(0, 24)}`}
-                          className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50"
+                          className="obsidian-soft-card overflow-hidden"
                         >
-                          <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-4">
+                          <div className="flex flex-col gap-3 border-b border-white/10 bg-white/[0.03] px-4 py-4">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                                 图片 {index + 1}
                               </p>
                               <span
@@ -1895,7 +1897,7 @@ export default function ImageStudioPage() {
                                       buildStandaloneFilename(index, "white-background", "png")
                                     )
                                   }
-                                  className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                                  className="obsidian-action-secondary px-4 py-2"
                                 >
                                   下载白底图
                                 </button>
@@ -1914,7 +1916,7 @@ export default function ImageStudioPage() {
                                       )
                                     )
                                   }
-                                  className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                                  className="obsidian-action-secondary px-4 py-2"
                                 >
                                   下载增强图
                                 </button>
@@ -1922,7 +1924,7 @@ export default function ImageStudioPage() {
                             </div>
                           </div>
 
-                          <div className="grid gap-px bg-slate-200 md:grid-cols-3">
+                          <div className="grid gap-px bg-white/8 md:grid-cols-3">
                             <PreviewTile
                               title="原图"
                               image={image}
@@ -1947,7 +1949,7 @@ export default function ImageStudioPage() {
                                   ? `已重试 ${item.whiteBackground.retryCount} 次`
                                   : "白底完成后会保留在这里，方便继续预览和下载。"
                               }
-                              backgroundClassName="bg-slate-50"
+                              backgroundClassName="bg-white/[0.03]"
                               error={item.whiteBackground.error}
                               onPreview={
                                 item.whiteBackground.image
@@ -1998,84 +2000,84 @@ export default function ImageStudioPage() {
             </div>
 
             <aside className="space-y-6">
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              <article className="obsidian-workbench p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                       批次状态
                     </p>
-                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                    <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
                       {isProcessing ? "换装处理中" : "等待开始"}
                     </h2>
                   </div>
-                  <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white">
+                  <span className="obsidian-meta-pill px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em]">
                     {progress}%
                   </span>
                 </div>
 
-                <div className="mt-6 h-3 overflow-hidden rounded-full bg-slate-100">
+                <div className="mt-6 h-3 overflow-hidden rounded-full bg-white/8">
                   <div
                     className="h-full rounded-full bg-[linear-gradient(90deg,_#f59e0b,_#ea580c)] transition-all"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
 
-                <dl className="mt-6 space-y-3 text-sm text-slate-600">
+                <dl className="mt-6 space-y-3 text-sm text-stone-300/80">
                   <div className="flex items-center justify-between">
                     <dt>当前模式</dt>
-                    <dd className="font-semibold text-slate-950">
+                    <dd className="font-semibold text-[#f3e8d2]">
                       {selectedModeOption.shortTitle}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt>当前预计任务</dt>
-                    <dd className="font-semibold text-slate-950">{plannedTaskCount}</dd>
+                    <dd className="font-semibold text-[#f3e8d2]">{plannedTaskCount}</dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt>最近批次任务</dt>
-                    <dd className="font-semibold text-slate-950">
+                    <dd className="font-semibold text-[#f3e8d2]">
                       {processedTasks.length}
                     </dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt>已处理</dt>
-                    <dd className="font-semibold text-slate-950">{processedCount}</dd>
+                    <dd className="font-semibold text-[#f3e8d2]">{processedCount}</dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt>换装成功</dt>
-                    <dd className="font-semibold text-slate-950">{successfulCount}</dd>
+                    <dd className="font-semibold text-[#f3e8d2]">{successfulCount}</dd>
                   </div>
                   <div className="flex items-center justify-between">
                     <dt>失败待重试</dt>
-                    <dd className="font-semibold text-slate-950">{failedCount}</dd>
+                    <dd className="font-semibold text-[#f3e8d2]">{failedCount}</dd>
                   </div>
                 </dl>
 
                 {error ? (
-                  <div className="mt-6 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
+                  <div className="obsidian-inline-note mt-6 rounded-[1.5rem] border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm leading-6 text-rose-100">
                     {error}
                   </div>
                 ) : null}
               </article>
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              <article className="obsidian-workbench p-6">
                 <div className="flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                         换装后端
                       </p>
-                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
                         {tryOnBackendLabel}
                       </h2>
                     </div>
                     <span
                       className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
                         isTryOnConfigured === null
-                          ? "bg-slate-100 text-slate-500"
+                          ? "obsidian-meta-pill bg-white/[0.04] text-stone-300/80"
                           : tryOnBackendReady
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-amber-100 text-amber-700"
+                            ? "obsidian-meta-pill border-emerald-400/20 bg-emerald-500/12 text-emerald-100"
+                            : "obsidian-meta-pill border-amber-400/20 bg-amber-500/12 text-amber-100"
                       }`}
                     >
                       {isTryOnConfigured === null
@@ -2086,33 +2088,33 @@ export default function ImageStudioPage() {
                     </span>
                   </div>
 
-                  <p className="text-sm leading-6 text-slate-600">
+                  <p className="text-sm leading-6 text-stone-300/80">
                     {tryOnConfigMessage || "正在检查换装后端配置。"}
                   </p>
 
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                  <div className="obsidian-inline-note px-4 py-3 text-sm leading-6">
                     当前配置：{tryOnBackendSummary}
                   </div>
 
                   {!tryOnBackendReady ? (
-                    <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
+                    <div className="obsidian-inline-note rounded-[1.5rem] border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
                       明天拿到 `FASHN_API_KEY` 后，只要填进 `.env.local` 或 Vercel 环境变量并重启，换装会自动切到 FASHN Try-On Max。
                     </div>
                   ) : null}
                 </div>
               </article>
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              <article className="obsidian-workbench p-6">
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                         结果后处理
                       </p>
-                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
                         白底图与高清增强
                       </h2>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <p className="mt-2 text-sm leading-6 text-stone-300/80">
                         换白底继续复用 `/api/gemini`，变清晰继续复用 `/api/upscale`。
                       </p>
                     </div>
@@ -2124,8 +2126,8 @@ export default function ImageStudioPage() {
                         disabled={successfulCount === 0 || isProcessing || isWhiteningAll}
                         className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
                           successfulCount === 0 || isProcessing || isWhiteningAll
-                            ? "cursor-not-allowed bg-amber-100 text-amber-700"
-                            : "bg-amber-300 text-slate-950 hover:bg-amber-200"
+                            ? "cursor-not-allowed bg-amber-500/12 text-amber-100"
+                            : "obsidian-action text-[#f7f0e6]"
                         }`}
                       >
                         {isWhiteningAll ? "整批换白底中..." : "整批一键换白底"}
@@ -2144,8 +2146,8 @@ export default function ImageStudioPage() {
                           isProcessing ||
                           isUpscalingAll ||
                           !canEnhance
-                            ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                            : "bg-slate-950 text-white hover:bg-slate-800"
+                            ? "cursor-not-allowed bg-white/8 text-[#8b7e72]"
+                            : "obsidian-action-secondary"
                         }`}
                       >
                         {isUpscalingAll ? "整批变清晰中..." : "整批一键变清晰"}
@@ -2154,32 +2156,32 @@ export default function ImageStudioPage() {
                   </div>
 
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    <div className="obsidian-soft-card p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                         白底图进度
                       </p>
-                      <p className="mt-3 text-3xl font-semibold text-slate-950">
+                      <p className="mt-3 text-3xl font-semibold text-[#f3e8d2]">
                         {whiteBackgroundCount}
-                        <span className="ml-2 text-sm font-medium text-slate-500">
+                        <span className="ml-2 text-sm font-medium text-stone-400/80">
                           / {successfulCount}
                         </span>
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <p className="mt-2 text-sm leading-6 text-stone-300/80">
                         待处理 {pendingWhiteCount} 张。
                       </p>
                     </div>
 
-                    <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    <div className="obsidian-soft-card p-4">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                         增强图进度
                       </p>
-                      <p className="mt-3 text-3xl font-semibold text-slate-950">
+                      <p className="mt-3 text-3xl font-semibold text-[#f3e8d2]">
                         {enhancedCount}
-                        <span className="ml-2 text-sm font-medium text-slate-500">
+                        <span className="ml-2 text-sm font-medium text-stone-400/80">
                           / {successfulCount}
                         </span>
                       </p>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <p className="mt-2 text-sm leading-6 text-stone-300/80">
                         待处理 {pendingEnhanceCount} 张。
                       </p>
                     </div>
@@ -2189,10 +2191,10 @@ export default function ImageStudioPage() {
                     <span
                       className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
                         isUpscaleConfigured === null
-                          ? "bg-slate-100 text-slate-500"
+                          ? "obsidian-meta-pill bg-white/[0.04] text-stone-300/80"
                           : canEnhance
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-amber-100 text-amber-700"
+                            ? "obsidian-meta-pill border-emerald-400/20 bg-emerald-500/12 text-emerald-100"
+                            : "obsidian-meta-pill border-amber-400/20 bg-amber-500/12 text-amber-100"
                       }`}
                     >
                       {isUpscaleConfigured === null
@@ -2201,18 +2203,18 @@ export default function ImageStudioPage() {
                           ? "Replicate 已就绪"
                           : "缺少 Token"}
                     </span>
-                    <p className="text-sm leading-6 text-slate-600">
+                    <p className="text-sm leading-6 text-stone-300/80">
                       {upscaleConfigMessage || "正在检查 Replicate 配置。"}
                     </p>
                   </div>
 
-                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                  <div className="obsidian-inline-note px-4 py-3 text-sm leading-6">
                     当前增强参数：{enhancementSummary}
                   </div>
 
                   <div className="space-y-4">
                     <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                         增强模式
                       </p>
                       <div className="mt-3 grid grid-cols-2 gap-2">
@@ -2223,8 +2225,8 @@ export default function ImageStudioPage() {
                             onClick={() => updateUpscaleSettings("upscaleMode", mode)}
                             className={`rounded-2xl border px-4 py-3 text-sm font-semibold capitalize transition ${
                               upscaleSettings.upscaleMode === mode
-                                ? "border-slate-950 bg-slate-950 text-white"
-                                : "border-slate-200 bg-white text-slate-600 hover:border-slate-400"
+                                ? "obsidian-card border-[rgba(196,138,86,0.35)] text-white"
+                                : "obsidian-soft-card text-stone-300/80 hover:border-[rgba(196,138,86,0.24)]"
                             }`}
                           >
                             {mode === "target" ? "按目标分辨率" : "按放大倍数"}
@@ -2235,9 +2237,9 @@ export default function ImageStudioPage() {
 
                     {upscaleSettings.upscaleMode === "target" ? (
                       <label className="block">
-                        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                           <span>目标分辨率</span>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                          <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                             {upscaleSettings.target} MP
                           </span>
                         </div>
@@ -2250,14 +2252,14 @@ export default function ImageStudioPage() {
                           onChange={(event) =>
                             updateUpscaleSettings("target", event.target.valueAsNumber)
                           }
-                          className="mt-3 w-full accent-slate-950"
+                          className="mt-3 w-full accent-[#c48a56]"
                         />
                       </label>
                     ) : (
                       <label className="block">
-                        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                           <span>放大倍数</span>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                          <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                             {formatFactor(upscaleSettings.factor)}x
                           </span>
                         </div>
@@ -2270,14 +2272,14 @@ export default function ImageStudioPage() {
                           onChange={(event) =>
                             updateUpscaleSettings("factor", event.target.valueAsNumber)
                           }
-                          className="mt-3 w-full accent-slate-950"
+                          className="mt-3 w-full accent-[#c48a56]"
                         />
                       </label>
                     )}
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="block">
-                        <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        <span className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                           输出格式
                         </span>
                         <select
@@ -2288,7 +2290,7 @@ export default function ImageStudioPage() {
                               event.target.value as UpscaleOutputFormat
                             )
                           }
-                          className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-950"
+                          className="obsidian-native-select mt-3 w-full"
                         >
                           {formatOptions.map((format) => (
                             <option key={format} value={format}>
@@ -2299,9 +2301,9 @@ export default function ImageStudioPage() {
                       </label>
 
                       <label className="block">
-                        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                           <span>输出质量</span>
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-slate-700">
+                          <span className="obsidian-meta-pill normal-case tracking-[0.12em]">
                             {upscaleSettings.outputQuality}
                           </span>
                         </div>
@@ -2317,18 +2319,18 @@ export default function ImageStudioPage() {
                               event.target.valueAsNumber
                             )
                           }
-                          className="mt-3 w-full accent-slate-950"
+                          className="mt-3 w-full accent-[#c48a56]"
                         />
                       </label>
                     </div>
 
                     <div className="grid gap-3">
-                      <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <label className="obsidian-soft-card flex items-center justify-between rounded-2xl px-4 py-3">
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">
+                          <p className="text-sm font-semibold text-[#f3e8d2]">
                             细节增强
                           </p>
-                          <p className="mt-1 text-sm leading-6 text-slate-500">
+                          <p className="mt-1 text-sm leading-6 text-stone-400/80">
                             更强调衣服纹理、边缘和局部清晰度。
                           </p>
                         </div>
@@ -2341,16 +2343,16 @@ export default function ImageStudioPage() {
                               event.target.checked
                             )
                           }
-                          className="h-5 w-5 accent-slate-950"
+                          className="h-5 w-5 accent-[#c48a56]"
                         />
                       </label>
 
-                      <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                      <label className="obsidian-soft-card flex items-center justify-between rounded-2xl px-4 py-3">
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">
+                          <p className="text-sm font-semibold text-[#f3e8d2]">
                             真实感增强
                           </p>
-                          <p className="mt-1 text-sm leading-6 text-slate-500">
+                          <p className="mt-1 text-sm leading-6 text-stone-400/80">
                             更偏向真实摄影质感，适合最终出图。
                           </p>
                         </div>
@@ -2363,7 +2365,7 @@ export default function ImageStudioPage() {
                               event.target.checked
                             )
                           }
-                          className="h-5 w-5 accent-slate-950"
+                          className="h-5 w-5 accent-[#c48a56]"
                         />
                       </label>
                     </div>
@@ -2371,11 +2373,11 @@ export default function ImageStudioPage() {
                 </div>
               </article>
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+              <article className="obsidian-workbench p-6">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                   使用提示
                 </p>
-                <ul className="mt-4 space-y-3 text-sm leading-7 text-slate-600">
+                <ul className="mt-4 space-y-3 text-sm leading-7 text-stone-300/80">
                   {quickNotes.map((note) => (
                     <li key={note} className="flex items-start gap-3">
                       <span className="mt-2 h-2 w-2 rounded-full bg-amber-500" />
@@ -2386,8 +2388,8 @@ export default function ImageStudioPage() {
               </article>
 
               {generationMode === "multi-clothing-single-model" && modelImages[0] ? (
-                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-                  <div className="aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-100">
+                <article className="obsidian-card p-4">
+                  <div className="aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.03]">
                     <img
                       src={modelImages[0]}
                       alt="当前固定模特图"
@@ -2396,10 +2398,10 @@ export default function ImageStudioPage() {
                     />
                   </div>
                   <div className="px-2 pb-2 pt-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                       当前固定模特图
                     </p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-stone-300/80">
                       当前批次会让所有服装图都复用这张模特图。
                     </p>
                   </div>
@@ -2407,8 +2409,8 @@ export default function ImageStudioPage() {
               ) : null}
 
               {generationMode === "single-clothing-multi-model" && clothingImages[0] ? (
-                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-                  <div className="aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-100">
+                <article className="obsidian-card p-4">
+                  <div className="aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.03]">
                     <img
                       src={clothingImages[0]}
                       alt="当前固定服装图"
@@ -2417,10 +2419,10 @@ export default function ImageStudioPage() {
                     />
                   </div>
                   <div className="px-2 pb-2 pt-4">
-                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                       当前固定服装图
                     </p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                    <p className="mt-2 text-sm leading-6 text-stone-300/80">
                       当前批次会让所有模特图都复用这张服装图。
                     </p>
                   </div>
@@ -2429,17 +2431,17 @@ export default function ImageStudioPage() {
             </aside>
           </section>
 
-          <section className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+          <section className="obsidian-workbench p-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                   换装结果
                 </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-[#f3e8d2]">
                   服装图、模特图、原换装图、白底图、增强图
                 </h2>
               </div>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-stone-400/80">
                 {hasResultCards
                   ? `最近批次模式：${resultModeLabel}。共 ${processedTasks.length} 张结果卡片，其中 ${successfulCount} 张换装成功，${whiteBackgroundCount} 张白底图，${enhancedCount} 张增强图。`
                   : "开始生成后，这里会按当前任务组合展示每张结果对应的服装图、模特图、模式、原换装图、白底图和增强图。"}
@@ -2447,9 +2449,9 @@ export default function ImageStudioPage() {
             </div>
 
             {!hasResultCards ? (
-              <div className="mt-6 rounded-[1.75rem] border border-dashed border-slate-300 bg-slate-50/80 px-6 py-12 text-center">
-                <p className="text-lg font-semibold text-slate-900">还没有结果</p>
-                <p className="mt-2 text-sm leading-7 text-slate-500">
+              <div className="obsidian-empty-state mt-6 rounded-[1.75rem] px-6 py-12 text-center">
+                <p className="text-lg font-semibold text-[#f3e8d2]">还没有结果</p>
+                <p className="mt-2 text-sm leading-7 text-stone-300/80">
                   先选择模式，再上传服装图和模特图，点击“开始当前模式生成”后，这里会按组合关系显示每张卡片。
                 </p>
               </div>
@@ -2458,16 +2460,16 @@ export default function ImageStudioPage() {
                 {processedTasks.map((item, index) => (
                   <article
                     key={item.id}
-                    className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_16px_44px_rgba(15,23,42,0.06)]"
+                    className="obsidian-card overflow-hidden"
                   >
-                    <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4">
+                    <div className="flex flex-col gap-4 border-b border-white/10 bg-white/[0.02] px-5 py-4">
                       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                         <div className="space-y-3">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-stone-400/80">
                               结果 {index + 1}
                             </p>
-                            <span className="inline-flex items-center rounded-full bg-slate-950 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
+                            <span className="obsidian-meta-pill">
                               {getGenerationModeShortLabel(item.mode)}
                             </span>
                             <span
@@ -2493,27 +2495,27 @@ export default function ImageStudioPage() {
                             </span>
                           </div>
 
-                          <p className="text-sm leading-6 text-slate-600">
+                          <p className="text-sm leading-6 text-stone-300/80">
                             当前模式：{getGenerationModeLabel(item.mode)}
                           </p>
-                          <p className="text-sm leading-6 text-slate-600">
+                          <p className="text-sm leading-6 text-stone-300/80">
                             对应组合：服装 {item.clothingIndex + 1} / {item.clothingTotal}
                             ，模特 {item.modelIndex + 1} / {item.modelTotal}
                           </p>
-                          <p className="text-sm leading-6 text-slate-600">
+                          <p className="text-sm leading-6 text-stone-300/80">
                             服装备注：
-                            <span className="font-medium text-slate-900">
+                            <span className="font-medium text-[#f3e8d2]">
                               {" "}
                               {item.garmentNote || "未填写，按默认逻辑生成。"}
                             </span>
                           </p>
                           {item.tryOn.retryCount > 0 ? (
-                            <p className="text-sm leading-6 text-slate-500">
+                            <p className="text-sm leading-6 text-stone-400/80">
                               本卡片已重试换装 {item.tryOn.retryCount} 次。
                             </p>
                           ) : null}
                           {item.tryOn.status === "processing" && item.tryOn.detail ? (
-                            <p className="text-sm leading-6 text-slate-500">
+                            <p className="text-sm leading-6 text-stone-400/80">
                               {item.tryOn.detail}
                             </p>
                           ) : null}
@@ -2524,7 +2526,7 @@ export default function ImageStudioPage() {
                             <button
                               type="button"
                               onClick={() => void handleRetryResult(index)}
-                              className="inline-flex items-center justify-center rounded-full bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
+                              className="obsidian-action px-4 py-2 text-[#f7f0e6]"
                             >
                               重试当前组合
                             </button>
@@ -2544,8 +2546,8 @@ export default function ImageStudioPage() {
                               !item.tryOn.image ||
                               item.whiteBackground.status === "processing" ||
                               isWhiteningAll
-                                ? "cursor-not-allowed bg-amber-100 text-amber-700"
-                                : "bg-amber-300 text-slate-950 hover:bg-amber-200"
+                                ? "cursor-not-allowed bg-amber-500/12 text-amber-100"
+                                : "obsidian-action text-[#f7f0e6]"
                             }`}
                           >
                             {getWhiteBackgroundButtonLabel(item.whiteBackground)}
@@ -2567,8 +2569,8 @@ export default function ImageStudioPage() {
                               item.enhanced.status === "processing" ||
                               isUpscalingAll ||
                               !canEnhance
-                                ? "cursor-not-allowed bg-slate-100 text-slate-400"
-                                : "bg-slate-950 text-white hover:bg-slate-800"
+                                ? "cursor-not-allowed bg-white/8 text-[#8b7e72]"
+                                : "obsidian-action-secondary"
                             }`}
                           >
                             {getEnhanceButtonLabel(item.enhanced, canEnhance)}
@@ -2587,7 +2589,7 @@ export default function ImageStudioPage() {
                                   )
                                 )
                               }
-                              className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                              className="obsidian-action-secondary px-4 py-2"
                             >
                               下载换装图
                             </button>
@@ -2602,7 +2604,7 @@ export default function ImageStudioPage() {
                                   buildTaskFilename(item, "white-background", "png")
                                 )
                               }
-                              className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                              className="obsidian-action-secondary px-4 py-2"
                             >
                               下载白底图
                             </button>
@@ -2621,7 +2623,7 @@ export default function ImageStudioPage() {
                                   )
                                 )
                               }
-                              className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                              className="obsidian-action-secondary px-4 py-2"
                             >
                               下载增强图
                             </button>
@@ -2630,13 +2632,13 @@ export default function ImageStudioPage() {
                       </div>
 
                       {item.tryOn.error ? (
-                        <div className="rounded-[1.5rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
+                        <div className="obsidian-inline-note rounded-[1.5rem] border-rose-400/20 bg-rose-500/10 px-4 py-3 text-sm leading-6 text-rose-100">
                           {item.tryOn.error}
                         </div>
                       ) : null}
                     </div>
 
-                    <div className="grid gap-px bg-slate-200 md:grid-cols-2 xl:grid-cols-5">
+                    <div className="grid gap-px bg-white/8 md:grid-cols-2 xl:grid-cols-5">
                       <PreviewTile
                         title="服装图"
                         image={item.clothingImage}
@@ -2645,7 +2647,7 @@ export default function ImageStudioPage() {
                         emptyTitle="暂无服装图"
                         emptyDescription="当前卡片没有可展示的服装图。"
                         description={`服装 ${item.clothingIndex + 1} / ${item.clothingTotal}`}
-                        backgroundClassName="bg-slate-50"
+                        backgroundClassName="bg-white/[0.03]"
                         onPreview={() =>
                           openPreview(item.clothingImage, `结果 ${index + 1} 服装图`)
                         }
@@ -2673,7 +2675,7 @@ export default function ImageStudioPage() {
                         emptyTitle="还没有换装结果"
                         emptyDescription="这张图片尚未生成成功，可点击上方按钮重试当前组合。"
                         description="这张图是后续白底图和增强图的原始来源。"
-                        backgroundClassName="bg-slate-50"
+                        backgroundClassName="bg-white/[0.03]"
                         error={item.tryOn.status === "error" ? item.tryOn.error : null}
                         onPreview={
                           item.tryOn.image
@@ -2727,7 +2729,7 @@ export default function ImageStudioPage() {
                               ? `已重试 ${item.enhanced.retryCount} 次`
                               : "增强成功后会保留独立输出格式与下载入口。"
                         }
-                        backgroundClassName="bg-slate-50"
+                        backgroundClassName="bg-white/[0.03]"
                         error={item.enhanced.error}
                         onPreview={
                           item.enhanced.image
@@ -2756,7 +2758,7 @@ export default function ImageStudioPage() {
               <button
                 type="button"
                 onClick={() => setPreviewImage(null)}
-                className="absolute right-5 top-5 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+                className="obsidian-action-secondary absolute right-5 top-5 z-10 inline-flex h-10 w-10 items-center justify-center rounded-full p-0 text-white transition hover:bg-white/12"
               >
                 <svg
                   className="h-5 w-5"

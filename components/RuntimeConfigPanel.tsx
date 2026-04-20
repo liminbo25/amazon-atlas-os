@@ -199,22 +199,30 @@ export function RuntimeConfigPanel() {
   };
 
   return (
-    <Card className="border-dashed border-slate-300 bg-slate-50/70">
+    <Card className="obsidian-card border-dashed border-white/10 text-[#f3e8d2]">
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-full bg-white p-2 text-slate-700 shadow-sm">
+            <div className="obsidian-meta-pill p-2 text-[#f3e8d2] shadow-none">
               <Settings2 className="h-4 w-4" />
             </div>
-            <CardTitle>AI Runtime Settings</CardTitle>
-            <Badge variant="outline">
+            <CardTitle className="text-[#f3e8d2]">AI Runtime Settings</CardTitle>
+            <Badge
+              variant="outline"
+              className="obsidian-meta-pill border-white/10 text-stone-200/80"
+            >
               {customizedCount > 0
                 ? `Customized ${customizedCount}/${runtimeSections.length}`
                 : "Using server defaults"}
             </Badge>
-            <Badge variant="secondary">Stored in this browser</Badge>
+            <Badge
+              variant="secondary"
+              className="obsidian-meta-pill border-white/10 bg-white/[0.04] text-stone-200/80"
+            >
+              Stored in this browser
+            </Badge>
           </div>
-          <CardDescription>
+          <CardDescription className="text-stone-300/75">
             Configure provider, base URL, model, and optional API key for image analysis,
             VOC analysis, and listing generation. Values are sent with Step 1, 3, and 4
             requests and persisted in local storage.
@@ -227,6 +235,7 @@ export function RuntimeConfigPanel() {
             variant="outline"
             size="sm"
             onClick={() => setIsOpen((value) => !value)}
+            className="obsidian-action-secondary"
           >
             {isOpen ? (
               <>
@@ -245,6 +254,7 @@ export function RuntimeConfigPanel() {
             variant="ghost"
             size="sm"
             onClick={handleReset}
+            className="obsidian-action-secondary"
           >
             <RotateCcw className="mr-1 h-4 w-4" />
             Reset
@@ -254,7 +264,7 @@ export function RuntimeConfigPanel() {
 
       <CardContent className="space-y-4">
         {localhostMismatchSections.length > 0 ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+          <div className="obsidian-inline-note rounded-lg border-amber-400/20 bg-amber-500/10 px-4 py-3 text-sm leading-6 text-amber-100">
             当前页面运行在远程站点，但你把
             {" "}
             {localhostMismatchSections.map((section) => section.title).join(" / ")}
@@ -266,7 +276,11 @@ export function RuntimeConfigPanel() {
 
         <div className="flex flex-wrap gap-2">
           {runtimeSections.map((section) => (
-            <Badge key={section.key} variant="outline" className="gap-1">
+            <Badge
+              key={section.key}
+              variant="outline"
+              className="obsidian-meta-pill gap-1 border-white/10 text-stone-200/80"
+            >
               <section.Icon className="h-3 w-3" />
               {section.title}: {formatRuntimeSummary(aiRuntimeSettings[section.key])}
             </Badge>
@@ -276,20 +290,28 @@ export function RuntimeConfigPanel() {
         {isOpen ? (
           <div className="grid gap-4 xl:grid-cols-3">
             {runtimeSections.map((section) => (
-              <Card key={section.key} className="border border-slate-200 bg-white/90">
+              <Card
+                key={section.key}
+                className="obsidian-soft-card border-white/10 text-[#f3e8d2]"
+              >
                 <CardHeader>
                   <div className="flex items-center gap-2">
                     <section.Icon className="h-4 w-4 text-[#FF9900]" />
-                    <CardTitle className="text-sm">{section.title}</CardTitle>
+                    <CardTitle className="text-sm text-[#f3e8d2]">{section.title}</CardTitle>
                   </div>
-                  <CardDescription className="space-y-1">
+                  <CardDescription className="space-y-1 text-stone-300/75">
                     <span>{section.description}</span>
                     <span className="block text-xs">{section.step}</span>
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor={`${section.key}-provider`}>Protocol</Label>
+                    <Label
+                      htmlFor={`${section.key}-provider`}
+                      className="text-stone-200/90"
+                    >
+                      Protocol
+                    </Label>
                     <Select
                       value={aiRuntimeSettings[section.key].provider || "auto"}
                       onValueChange={(value) =>
@@ -298,7 +320,10 @@ export function RuntimeConfigPanel() {
                         })
                       }
                     >
-                      <SelectTrigger id={`${section.key}-provider`}>
+                      <SelectTrigger
+                        id={`${section.key}-provider`}
+                        className="obsidian-native-select"
+                      >
                         <SelectValue placeholder="Select protocol" />
                       </SelectTrigger>
                       <SelectContent>
@@ -309,57 +334,74 @@ export function RuntimeConfigPanel() {
                         ))}
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-stone-400/80">
                       Auto will infer from model and base URL. Select a provider explicitly
                       if you are connecting to a custom gateway.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`${section.key}-baseUrl`}>API Base URL</Label>
+                    <Label
+                      htmlFor={`${section.key}-baseUrl`}
+                      className="text-stone-200/90"
+                    >
+                      API Base URL
+                    </Label>
                     <Input
                       id={`${section.key}-baseUrl`}
                       type="url"
                       placeholder={section.placeholderBaseUrl}
                       value={aiRuntimeSettings[section.key].baseUrl}
+                      className="obsidian-native-field"
                       onChange={(event) =>
                         updateServiceSettings(section.key, {
                           baseUrl: event.target.value,
                         })
                       }
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-stone-400/80">
                       Leave blank to use the server default. You can enter a root base URL
                       like `https://api.openai.com` or `https://api.anthropic.com`.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`${section.key}-model`}>Model</Label>
+                    <Label
+                      htmlFor={`${section.key}-model`}
+                      className="text-stone-200/90"
+                    >
+                      Model
+                    </Label>
                     <Input
                       id={`${section.key}-model`}
                       placeholder={section.placeholderModel}
                       value={aiRuntimeSettings[section.key].model}
+                      className="obsidian-native-field"
                       onChange={(event) =>
                         updateServiceSettings(section.key, {
                           model: event.target.value,
                         })
                       }
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-stone-400/80">
                       Use the exact model id exposed by the upstream provider.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor={`${section.key}-apiKey`}>API Key (optional)</Label>
+                    <Label
+                      htmlFor={`${section.key}-apiKey`}
+                      className="text-stone-200/90"
+                    >
+                      API Key (optional)
+                    </Label>
                     <div className="relative">
-                      <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <KeyRound className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400/80" />
                       <Input
                         id={`${section.key}-apiKey`}
                         type="password"
                         placeholder="sk-..."
-                        className="pl-9"
+                        className="obsidian-native-field pl-9"
                         value={aiRuntimeSettings[section.key].apiKey}
                         onChange={(event) =>
                           updateServiceSettings(section.key, {
@@ -368,18 +410,18 @@ export function RuntimeConfigPanel() {
                         }
                       />
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-stone-400/80">
                       Optional runtime override. If left blank, the server falls back to
                       environment variables such as `ANTHROPIC_API_KEY` or
                       `OPENAI_API_KEY`.
                     </p>
                   </div>
 
-                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+                  <div className="obsidian-code-panel rounded-lg p-3">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <p className="text-sm font-medium text-slate-800">Connection test</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-sm font-medium text-[#f3e8d2]">Connection test</p>
+                        <p className="text-xs text-stone-400/80">
                           Sends one tiny real request with the current runtime settings.
                         </p>
                       </div>
@@ -389,6 +431,7 @@ export function RuntimeConfigPanel() {
                         variant="outline"
                         disabled={testResults[section.key]?.status === "testing"}
                         onClick={() => void handleTest(section.key)}
+                        className="obsidian-action-secondary"
                       >
                         {testResults[section.key]?.status === "testing" ? (
                           <>
@@ -402,32 +445,32 @@ export function RuntimeConfigPanel() {
                     </div>
 
                     {testResults[section.key] ? (
-                      <div className="mt-3 rounded-md border bg-white px-3 py-2 text-xs">
+                      <div className="obsidian-soft-card mt-3 rounded-md px-3 py-2 text-xs">
                         <div className="flex items-start gap-2">
                           {testResults[section.key]?.status === "success" ? (
-                            <CheckCircle2 className="mt-0.5 h-4 w-4 text-green-600" />
+                            <CheckCircle2 className="mt-0.5 h-4 w-4 text-emerald-300" />
                           ) : testResults[section.key]?.status === "error" ? (
-                            <XCircle className="mt-0.5 h-4 w-4 text-red-600" />
+                            <XCircle className="mt-0.5 h-4 w-4 text-rose-300" />
                           ) : (
-                            <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-slate-500" />
+                            <Loader2 className="mt-0.5 h-4 w-4 animate-spin text-stone-400/80" />
                           )}
                           <div className="space-y-1">
                             <p
                               className={
                                 testResults[section.key]?.status === "success"
-                                  ? "font-medium text-green-700"
+                                  ? "font-medium text-emerald-200"
                                   : testResults[section.key]?.status === "error"
-                                    ? "font-medium text-red-700"
-                                    : "font-medium text-slate-700"
+                                    ? "font-medium text-rose-200"
+                                    : "font-medium text-stone-100"
                               }
                             >
                               {formatTestHeading(testResults[section.key] ?? { status: "idle" })}
                             </p>
                             {testResults[section.key]?.message ? (
-                              <p className="text-slate-700">{testResults[section.key]?.message}</p>
+                              <p className="text-stone-200/90">{testResults[section.key]?.message}</p>
                             ) : null}
                             {testResults[section.key]?.detail ? (
-                              <p className="text-muted-foreground">
+                              <p className="text-stone-400/80">
                                 {testResults[section.key]?.detail}
                               </p>
                             ) : null}
@@ -442,7 +485,7 @@ export function RuntimeConfigPanel() {
           </div>
         ) : null}
 
-        <div className="rounded-lg border border-slate-200 bg-white/80 p-3 text-xs leading-5 text-muted-foreground">
+        <div className="obsidian-inline-note rounded-lg p-3 text-xs leading-5 text-stone-300/80">
           Runtime settings are sent in both <span className="font-mono">runtime</span> and{" "}
           <span className="font-mono">runtimeConfig</span> fields so the module can be embedded
           into a larger host system without changing the request contract.

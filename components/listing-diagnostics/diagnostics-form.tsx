@@ -59,16 +59,16 @@ export function DiagnosticsForm({
   onSubmit,
 }: DiagnosticsFormProps) {
   return (
-    <Card className="border-slate-200/80 bg-white/85 shadow-[0_16px_50px_rgba(16,32,51,0.06)]">
+    <Card className="obsidian-workbench">
       <form onSubmit={onSubmit}>
-        <CardHeader className="border-b border-slate-200/80">
-          <CardTitle className="flex items-center gap-3 text-xl text-slate-950">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-white">
+        <CardHeader className="border-b border-white/10">
+          <CardTitle className="flex items-center gap-3 text-xl text-[#f7f0e6]">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-[rgba(246,182,63,0.24)] bg-[rgba(246,182,63,0.14)] text-[#f6c26a]">
               <Search className="h-4 w-4" />
             </span>
             Listing Diagnostics Workbench
           </CardTitle>
-          <p className="text-sm leading-7 text-slate-600">
+          <p className="text-sm leading-7 text-[#c5b9aa]">
             SellerSprite stays on the deterministic primary path. Optional SP-API
             verification upgrades BUYABLE and DISCOVERABLE blockers into
             verified operator-grade root causes without breaking the fallback
@@ -77,9 +77,11 @@ export function DiagnosticsForm({
         </CardHeader>
 
         <CardContent className="space-y-6 pt-6">
-          <div className="grid gap-4 lg:grid-cols-[1fr_180px]">
+          <div className="obsidian-filter-bar grid gap-4 p-4 lg:grid-cols-[1fr_180px]">
             <div className="space-y-2">
-              <Label htmlFor="target-asin">Target ASIN</Label>
+              <Label htmlFor="target-asin" className="text-[#dfd2c3]">
+                Target ASIN
+              </Label>
               <Input
                 id="target-asin"
                 placeholder="B0XXXXXXXX"
@@ -87,12 +89,14 @@ export function DiagnosticsForm({
                 onChange={(event) => onTargetAsinChange(event.target.value)}
                 disabled={isSubmitting}
                 maxLength={10}
-                className="h-10"
+                className="h-11"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="marketplace">Marketplace</Label>
+              <Label htmlFor="marketplace" className="text-[#dfd2c3]">
+                Marketplace
+              </Label>
               <Select
                 value={marketplace}
                 onValueChange={(value) => {
@@ -115,11 +119,11 @@ export function DiagnosticsForm({
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="obsidian-soft-card space-y-4 p-4">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <Label>Competitor ASINs</Label>
-                <p className="mt-1 text-sm text-slate-500">
+                <Label className="text-[#dfd2c3]">Competitor ASINs</Label>
+                <p className="mt-1 text-sm text-[#998e82]">
                   Optional, but 2-3 ASINs give the benchmark and keyword proxy layers more
                   confidence.
                 </p>
@@ -140,10 +144,13 @@ export function DiagnosticsForm({
               {competitorAsins.map((asin, index) => (
                 <div
                   key={`competitor-${index}`}
-                  className="rounded-2xl border border-slate-200/80 bg-slate-50/70 p-3"
+                  className="obsidian-soft-card p-3"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <Label htmlFor={`competitor-asin-${index}`}>
+                    <Label
+                      htmlFor={`competitor-asin-${index}`}
+                      className="text-[#dfd2c3]"
+                    >
                       Competitor {index + 1}
                     </Label>
                     {competitorAsins.length > 1 ? (
@@ -167,7 +174,7 @@ export function DiagnosticsForm({
                     }
                     disabled={isSubmitting}
                     maxLength={10}
-                    className="mt-3 h-10 bg-white/90"
+                    className="mt-3 h-11"
                   />
                 </div>
               ))}
@@ -184,9 +191,9 @@ export function DiagnosticsForm({
             onReset={onSpApiReset}
           />
 
-          <div className="rounded-[1.6rem] border border-slate-200 bg-[linear-gradient(135deg,rgba(246,182,63,0.12),rgba(229,237,246,0.5))] p-4">
-            <p className="text-sm font-semibold text-slate-900">Phase 1 scope</p>
-            <p className="mt-2 text-sm leading-7 text-slate-600">
+          <div className="obsidian-inline-note p-4">
+            <p className="text-sm font-semibold text-[#f3dfb6]">Phase 1 scope</p>
+            <p className="mt-2 text-sm leading-7 text-[#dfd2c3]">
               SellerSprite remains the primary analysis path. When SP-API verification is
               enabled, the result can verify catalog and seller-account blockers,
               classify likely root causes, and rank the next operator actions
@@ -195,7 +202,7 @@ export function DiagnosticsForm({
           </div>
         </CardContent>
 
-        <CardFooter className="justify-between gap-3 border-t border-slate-200/80 bg-slate-50/65">
+        <CardFooter className="justify-between gap-3 border-t border-white/10 bg-[rgba(255,255,255,0.03)]">
           <Button
             type="button"
             variant="outline"

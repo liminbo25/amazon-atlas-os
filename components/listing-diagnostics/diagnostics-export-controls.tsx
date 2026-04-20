@@ -66,8 +66,8 @@ export function DiagnosticsExportControls({
   }
 
   return (
-    <Card className="border-slate-200/80 bg-white/90">
-      <CardHeader className="border-b border-slate-200/80">
+    <Card className="obsidian-card">
+      <CardHeader className="border-b border-white/10">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -75,10 +75,10 @@ export function DiagnosticsExportControls({
               <Badge variant="outline">{result.request.marketplace}</Badge>
               <Badge variant="outline">ASIN {result.request.targetAsin}</Badge>
             </div>
-            <CardTitle className="text-xl text-slate-950">
+            <CardTitle className="text-xl text-[#f7f0e6]">
               Download the current diagnostics run
             </CardTitle>
-            <CardDescription className="max-w-3xl text-sm leading-7 text-slate-600">
+            <CardDescription className="max-w-3xl text-sm leading-7 text-[#c5b9aa]">
               Export the current reporting layer as a Word summary, workbook, or
               structured JSON payload without rerunning the diagnostic engine. The
               exports preserve root-cause drilldown, verification labels, and the
@@ -86,8 +86,8 @@ export function DiagnosticsExportControls({
             </CardDescription>
           </div>
 
-          <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
-            <p className="font-semibold text-slate-900">Generated</p>
+          <div className="obsidian-soft-card px-4 py-3 text-sm text-[#c5b9aa]">
+            <p className="font-semibold text-[#f7f0e6]">Generated</p>
             <p className="mt-1">{formatDateTime(result.generatedAt)}</p>
           </div>
         </div>
@@ -98,8 +98,8 @@ export function DiagnosticsExportControls({
             title="Word report"
             description="Narrative report with score breakdown, root causes, action plan, benchmark summary, and evidence appendix."
             extension=".docx"
-            icon={<FileText className="h-5 w-5 text-blue-600" />}
-            iconWrapperClass="bg-blue-100"
+            icon={<FileText className="h-5 w-5 text-sky-200" />}
+            iconWrapperClass="bg-sky-500/12"
             isLoading={exporting === "docx"}
             onExport={() => {
               void handleExport("docx");
@@ -109,8 +109,8 @@ export function DiagnosticsExportControls({
             title="Excel workbook"
             description="Workbook tabs for summary, score breakdown, coverage, enriched findings, action plan, benchmark, and evidence."
             extension=".xlsx"
-            icon={<Table2 className="h-5 w-5 text-emerald-600" />}
-            iconWrapperClass="bg-emerald-100"
+            icon={<Table2 className="h-5 w-5 text-emerald-200" />}
+            iconWrapperClass="obsidian-soft-card bg-emerald-500/10"
             isLoading={exporting === "xlsx"}
             onExport={() => {
               void handleExport("xlsx");
@@ -120,8 +120,8 @@ export function DiagnosticsExportControls({
             title="JSON payload"
             description="Machine-readable payload with verification labels, root causes, findings, action plan, source coverage, and benchmark summary."
             extension=".json"
-            icon={<FileJson className="h-5 w-5 text-amber-600" />}
-            iconWrapperClass="bg-amber-100"
+            icon={<FileJson className="h-5 w-5 text-amber-200" />}
+            iconWrapperClass="bg-amber-500/12"
             isLoading={exporting === "json"}
             onExport={() => {
               void handleExport("json");
@@ -130,13 +130,13 @@ export function DiagnosticsExportControls({
         </div>
 
         {exportError ? (
-          <div className="rounded-[1.3rem] border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <div className="rounded-[1.3rem] border border-rose-400/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
             {exportError}
           </div>
         ) : null}
 
         {lastExportedFile ? (
-          <div className="rounded-[1.3rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          <div className="obsidian-inline-note rounded-[1.3rem] border-emerald-400/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100">
             Download generated: {lastExportedFile}
           </div>
         ) : null}
@@ -163,19 +163,19 @@ function ExportButton({
   onExport: () => void;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-4">
+    <div className="obsidian-soft-card p-4">
       <div className="flex items-start gap-3">
         <span
-          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${iconWrapperClass}`}
+          className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-white/10 ${iconWrapperClass}`}
         >
           {icon}
         </span>
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="font-semibold text-slate-950">{title}</p>
+            <p className="font-semibold text-[#f7f0e6]">{title}</p>
             <Badge variant="outline">{extension}</Badge>
           </div>
-          <p className="text-sm leading-6 text-slate-600">{description}</p>
+          <p className="text-sm leading-6 text-[#c5b9aa]">{description}</p>
         </div>
       </div>
 
