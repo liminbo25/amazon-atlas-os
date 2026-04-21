@@ -25,6 +25,7 @@ export interface GeminiResponse {
 
 const DEFAULT_API_BASE_URL = "https://ai.yijiarj.cn/v1";
 const DEFAULT_MODEL = "nano_banana_pro";
+const DEFAULT_GEMINI_TRYON_SIZE = "1024x1024";
 const GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS = 30_000;
 const GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS = 180_000;
 const GEMINI_UPSTREAM_MAX_ATTEMPTS = 3;
@@ -479,7 +480,7 @@ export async function POST(request: NextRequest) {
             normalizeImageForProvider(modelImage),
           ],
           n: 1,
-          size: size || "1024x1536",
+          size: size || DEFAULT_GEMINI_TRYON_SIZE,
           quality: "hd",
           style: "natural",
         },

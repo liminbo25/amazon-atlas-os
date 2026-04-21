@@ -165,6 +165,7 @@ const quickNotes = [
 ];
 
 const formatOptions: UpscaleOutputFormat[] = ["jpg", "png", "webp"];
+const GEMINI_TRYON_SIZE = "1024x1024";
 
 let taskSequence = 0;
 const FASHN_POLL_INTERVAL_MS = 2500;
@@ -1064,7 +1065,7 @@ export default function ImageStudioPage() {
         modelImage,
         garmentNote,
         type: "virtual-tryon",
-        size: "1024x1536",
+        size: GEMINI_TRYON_SIZE,
       }),
     });
 
