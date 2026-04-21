@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { uploadImageSourceToBlob } from "@/lib/image-blob";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -130,10 +129,8 @@ async function runImageGeneration(options: {
   geminiApiKey: string;
   payload: Record<string, unknown>;
   fallbackSize?: string;
-  outputFolder: string;
 }) {
-  const { apiBaseUrl, geminiApiKey, payload, fallbackSize, outputFolder } =
-    options;
+  const { apiBaseUrl, geminiApiKey, payload, fallbackSize } = options;
 
   let apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, payload);
 
@@ -159,8 +156,7 @@ async function runImageGeneration(options: {
   const result = extractImageFromResponse(data);
 
   if (result) {
-    const uploadedResult = await uploadImageSourceToBlob(result, outputFolder);
-    return uploadedResult.url;
+    return result;
   }
 
   if (data.error?.message) {
@@ -284,7 +280,6 @@ export async function POST(request: NextRequest) {
           style: "natural",
         },
         fallbackSize: "1024x1024",
-        outputFolder: "image-studio/generated/try-on",
       });
 
       return NextResponse.json({
@@ -314,7 +309,6 @@ export async function POST(request: NextRequest) {
           style: "natural",
         },
         fallbackSize: "1024x1024",
-        outputFolder: "image-studio/generated/white-background",
       });
 
       return NextResponse.json({
@@ -343,7 +337,6 @@ export async function POST(request: NextRequest) {
         style: "natural",
       },
       fallbackSize: "1024x1024",
-      outputFolder: "image-studio/generated/model-swap",
     });
 
     return NextResponse.json({
