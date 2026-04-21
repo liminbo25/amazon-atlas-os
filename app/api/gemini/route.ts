@@ -1,3 +1,5 @@
+import { request as httpRequest } from "node:http";
+import { request as httpsRequest } from "node:https";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -23,6 +25,23 @@ export interface GeminiResponse {
 
 const DEFAULT_API_BASE_URL = "https://ai.yijiarj.cn/v1";
 const DEFAULT_MODEL = "nano_banana_pro";
+const GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS = 30_000;
+const GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS = 180_000;
+const GEMINI_UPSTREAM_MAX_ATTEMPTS = 3;
+const GEMINI_UPSTREAM_RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const GEMINI_UPSTREAM_RETRYABLE_ERROR_CODES = new Set([
+  "ECONNABORTED",
+  "ECONNRESET",
+  "ECONNREFUSED",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "EPIPE",
+  "ETIMEDOUT",
+  "UND_ERR_CONNECT_TIMEOUT",
+  "UND_ERR_HEADERS_TIMEOUT",
+  "UPSTREAM_CONNECT_TIMEOUT",
+  "UPSTREAM_RESPONSE_TIMEOUT",
+]);
 
 function resolveApiBaseUrl(rawBaseUrl?: string) {
   const trimmed = rawBaseUrl?.trim();
@@ -63,25 +82,210 @@ function normalizeImageForProvider(image: string) {
   return `data:image/png;base64,${base64Data}`;
 }
 
+function sleep(delayMs: number) {
+  return new Promise((resolve) => setTimeout(resolve, delayMs));
+}
+
+function createErrorWithCode(message: string, code: string) {
+  const error = new Error(message) as Error & { code?: string };
+  error.code = code;
+  return error;
+}
+
+function extractErrorCode(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return undefined;
+  }
+
+  const maybeError = error as {
+    code?: string;
+    cause?: { code?: string };
+  };
+
+  return maybeError.code ?? maybeError.cause?.code;
+}
+
+function containsModerationSignal(responseText: string) {
+  const normalized = responseText.toLowerCase();
+
+  return (
+    normalized.includes("invalid_request_error") ||
+    normalized.includes("nudity") ||
+    normalized.includes("sexual") ||
+    normalized.includes("裸露") ||
+    normalized.includes("性暗示")
+  );
+}
+
+function shouldRetryUpstreamStatus(status: number, responseText: string) {
+  if (!GEMINI_UPSTREAM_RETRYABLE_STATUS.has(status)) {
+    return false;
+  }
+
+  if (containsModerationSignal(responseText)) {
+    return false;
+  }
+
+  return true;
+}
+
+function isRetryableNetworkError(error: unknown) {
+  const code = extractErrorCode(error);
+
+  if (code && GEMINI_UPSTREAM_RETRYABLE_ERROR_CODES.has(code)) {
+    return true;
+  }
+
+  return error instanceof Error && error.message.trim().toLowerCase() === "fetch failed";
+}
+
+function formatNetworkError(error: unknown) {
+  const code = extractErrorCode(error);
+
+  if (code === "UPSTREAM_CONNECT_TIMEOUT" || code === "UND_ERR_CONNECT_TIMEOUT") {
+    return "Gemini upstream connection timed out while contacting the image provider. Please retry.";
+  }
+
+  if (code === "UPSTREAM_RESPONSE_TIMEOUT" || code === "UND_ERR_HEADERS_TIMEOUT") {
+    return "Gemini upstream took too long to return an image result. Please retry.";
+  }
+
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+
+  return "Gemini upstream request failed before a complete response was received.";
+}
+
+async function sendImageGenerationRequest(
+  apiBaseUrl: string,
+  geminiApiKey: string,
+  payload: Record<string, unknown>
+) {
+  const requestUrl = new URL(`${apiBaseUrl}/images/generations`);
+  const requestBody = JSON.stringify(payload);
+  const requestImpl =
+    requestUrl.protocol === "http:" ? httpRequest : httpsRequest;
+
+  return new Promise<{
+    ok: boolean;
+    status: number;
+    responseText: string;
+  }>((resolve, reject) => {
+    const request = requestImpl(
+      requestUrl,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(requestBody).toString(),
+          Authorization: `Bearer ${geminiApiKey}`,
+        },
+      },
+      (response) => {
+        clearTimeout(connectTimer);
+
+        let responseText = "";
+
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => {
+          responseText += chunk;
+        });
+        response.on("end", () => {
+          const status = response.statusCode ?? 500;
+
+          resolve({
+            ok: status >= 200 && status < 300,
+            status,
+            responseText,
+          });
+        });
+        response.on("error", (error) => {
+          reject(error);
+        });
+      }
+    );
+
+    const connectTimer = setTimeout(() => {
+      request.destroy(
+        createErrorWithCode(
+          `Gemini upstream connect timeout after ${GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS}ms`,
+          "UPSTREAM_CONNECT_TIMEOUT"
+        )
+      );
+    }, GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS);
+
+    request.setTimeout(GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS, () => {
+      request.destroy(
+        createErrorWithCode(
+          `Gemini upstream response timeout after ${GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS}ms`,
+          "UPSTREAM_RESPONSE_TIMEOUT"
+        )
+      );
+    });
+
+    request.on("socket", (socket) => {
+      if ((socket as { connecting?: boolean }).connecting) {
+        socket.once("connect", () => clearTimeout(connectTimer));
+        socket.once("secureConnect", () => clearTimeout(connectTimer));
+      } else {
+        clearTimeout(connectTimer);
+      }
+
+      socket.once("close", () => clearTimeout(connectTimer));
+      socket.once("error", () => clearTimeout(connectTimer));
+    });
+
+    request.on("error", (error) => {
+      clearTimeout(connectTimer);
+      reject(error);
+    });
+
+    request.write(requestBody);
+    request.end();
+  });
+}
+
 async function requestImageGeneration(
   apiBaseUrl: string,
   geminiApiKey: string,
   payload: Record<string, unknown>
 ) {
-  const response = await fetch(`${apiBaseUrl}/images/generations`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${geminiApiKey}`,
-    },
-    body: JSON.stringify(payload),
-  });
+  let lastNetworkError: unknown;
 
-  return {
-    ok: response.ok,
-    status: response.status,
-    responseText: await response.text(),
-  };
+  for (let attempt = 1; attempt <= GEMINI_UPSTREAM_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await sendImageGenerationRequest(
+        apiBaseUrl,
+        geminiApiKey,
+        payload
+      );
+
+      if (
+        shouldRetryUpstreamStatus(response.status, response.responseText) &&
+        attempt < GEMINI_UPSTREAM_MAX_ATTEMPTS
+      ) {
+        await sleep(500 * attempt);
+        continue;
+      }
+
+      return response;
+    } catch (error) {
+      lastNetworkError = error;
+
+      if (
+        isRetryableNetworkError(error) &&
+        attempt < GEMINI_UPSTREAM_MAX_ATTEMPTS
+      ) {
+        await sleep(500 * attempt);
+        continue;
+      }
+
+      throw new Error(formatNetworkError(error));
+    }
+  }
+
+  throw new Error(formatNetworkError(lastNetworkError));
 }
 
 function parseImageGenerationResponse(responseText: string) {
