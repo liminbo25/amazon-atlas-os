@@ -113,6 +113,27 @@ const REVIEW_PATTERN_PHRASES = [
   "battery life",
 ];
 
+const REVIEW_NOISE_TOKENS = new Set([
+  "amazon",
+  "arrived",
+  "came",
+  "delivery",
+  "item",
+  "items",
+  "order",
+  "ordered",
+  "package",
+  "please",
+  "return",
+  "returned",
+  "returning",
+  "seller",
+  "send",
+  "shipping",
+  "trying",
+  "used",
+]);
+
 const SCENE_HINT_TOKENS = [
   "wedding",
   "party",
@@ -162,9 +183,9 @@ export function buildLegacyDiagnosisReport(
     targetKeywords: input.targetKeywords,
     competitorKeywords: input.competitorKeywords,
   });
-  const keywordGaps = keywordDiagnostics.slice(0, 12).map(stripKeywordDiagnostic);
-  const negativeThemes = extractReviewThemes(input.targetNegativeReviews, fullCopy, 5);
-  const positiveThemes = extractReviewThemes(input.targetPositiveReviews, fullCopy, 5);
+  const keywordGaps = keywordDiagnostics.slice(0, 16).map(stripKeywordDiagnostic);
+  const negativeThemes = extractReviewThemes(input.targetNegativeReviews, fullCopy, 8);
+  const positiveThemes = extractReviewThemes(input.targetPositiveReviews, fullCopy, 8);
 
   const pillars = [
     buildSearchPillar(keywordDiagnostics),
@@ -792,7 +813,7 @@ function buildActionPlan(
   const p2 = new Set<string>();
   const watchouts = new Set<string>();
 
-  for (const keywordGap of keywordGaps.slice(0, 4)) {
+  for (const keywordGap of keywordGaps.slice(0, 6)) {
     if (keywordGap.opportunity === "critical") {
       p0.add(`优先补关键词 "${keywordGap.keyword}"，原因：${keywordGap.reason}`);
     } else if (keywordGap.opportunity === "high") {
@@ -805,18 +826,18 @@ function buildActionPlan(
   for (const pillar of pillars) {
     const ratio = pillar.score / pillar.maxScore;
     const target = ratio < 0.55 ? p0 : ratio < 0.75 ? p1 : p2;
-    for (const action of pillar.recommendedActions.slice(0, 2)) {
+    for (const action of pillar.recommendedActions.slice(0, 3)) {
       if (action.trim()) {
         target.add(action.trim());
       }
     }
   }
 
-  for (const theme of negativeThemes.filter((item) => !item.addressedInCopy).slice(0, 2)) {
+  for (const theme of negativeThemes.filter((item) => !item.addressedInCopy).slice(0, 3)) {
     p0.add(`在 bullet 或 A+ 里正面回应评论高频顾虑 "${theme.phrase}"。`);
   }
 
-  for (const theme of positiveThemes.filter((item) => !item.addressedInCopy).slice(0, 2)) {
+  for (const theme of positiveThemes.filter((item) => !item.addressedInCopy).slice(0, 3)) {
     p1.add(`把正向口碑 "${theme.phrase}" 转为更具体的价值表达和证据链。`);
   }
 
@@ -873,17 +894,31 @@ function extractReviewThemes(
       const first = tokens[index];
       const second = tokens[index + 1];
 
-      if (first && !STOP_WORDS.has(first) && first.length >= 4) {
+      if (
+        first &&
+        !STOP_WORDS.has(first) &&
+        !REVIEW_NOISE_TOKENS.has(first) &&
+        first.length >= 5
+      ) {
         phrases.add(first);
       }
 
-      if (first && second && !STOP_WORDS.has(first) && !STOP_WORDS.has(second)) {
+      if (
+        first &&
+        second &&
+        !STOP_WORDS.has(first) &&
+        !STOP_WORDS.has(second) &&
+        !REVIEW_NOISE_TOKENS.has(first) &&
+        !REVIEW_NOISE_TOKENS.has(second) &&
+        first.length >= 4 &&
+        second.length >= 4
+      ) {
         phrases.add(`${first} ${second}`);
       }
     }
 
     for (const phrase of phrases) {
-      if (phrase.length < 4) {
+      if (phrase.length < 4 || !isUsefulReviewPhrase(phrase)) {
         continue;
       }
 
@@ -896,7 +931,11 @@ function extractReviewThemes(
   }
 
   return Array.from(counts.entries())
-    .filter(([, value]) => value.count >= (reviews.length >= 8 ? 2 : 1))
+    .filter(
+      ([phrase, value]) =>
+        value.count >= (reviews.length >= 8 ? 2 : 1) ||
+        REVIEW_PATTERN_PHRASES.includes(phrase)
+    )
     .sort((left, right) => {
       if (right[1].count !== left[1].count) {
         return right[1].count - left[1].count;
@@ -1059,6 +1098,27 @@ function containsPhrase(text: string, phrase: string): boolean {
   const normalizedText = normalizePhrase(text);
   const normalizedPhrase = normalizePhrase(phrase);
   return normalizedPhrase.length > 0 && normalizedText.includes(normalizedPhrase);
+}
+
+function isUsefulReviewPhrase(phrase: string): boolean {
+  if (REVIEW_PATTERN_PHRASES.includes(phrase)) {
+    return true;
+  }
+
+  const tokens = phrase.split(" ").filter(Boolean);
+  if (tokens.length === 0) {
+    return false;
+  }
+
+  if (tokens.some((token) => REVIEW_NOISE_TOKENS.has(token))) {
+    return false;
+  }
+
+  if (tokens.length === 1) {
+    return tokens[0].length >= 5;
+  }
+
+  return tokens.every((token) => token.length >= 4);
 }
 
 function normalizePhrase(value: string): string {

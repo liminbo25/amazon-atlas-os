@@ -45,6 +45,7 @@ const FORM_STORAGE_KEY = "legacy-copy-diagnosis-form";
 const RUNTIME_STORAGE_KEY = "legacy-copy-diagnosis-runtime";
 const SELLER_SPRITE_STORAGE_KEY = "legacy-copy-diagnosis-seller-sprite";
 const DEFAULT_SELLER_SPRITE_BASE_URL = "https://mcp.sellersprite.com/mcp";
+const DEFAULT_RUNTIME_MODEL = "gpt-5.4";
 
 const DEFAULT_FORM = {
   marketplace: "US",
@@ -58,7 +59,7 @@ const DEFAULT_FORM = {
 const DEFAULT_RUNTIME: AiRuntimeServiceConfig = {
   provider: "",
   baseUrl: "",
-  model: "",
+  model: DEFAULT_RUNTIME_MODEL,
   apiKey: "",
 };
 
@@ -69,6 +70,7 @@ const DEFAULT_SELLER_SPRITE_CONFIG = {
 };
 
 const MARKET_OPTIONS = ["US", "CA", "UK", "DE", "FR", "IT", "ES", "JP"];
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 const PROVIDER_OPTIONS: Array<{ value: AiProvider | "auto"; label: string }> = [
   { value: "auto", label: "Auto" },
@@ -112,10 +114,9 @@ export function LegacyCopyDiagnosisWorkbench() {
 
     if (rawRuntime) {
       try {
-        setRuntime({
-          ...DEFAULT_RUNTIME,
-          ...(JSON.parse(rawRuntime) as AiRuntimeServiceConfig),
-        });
+        setRuntime(
+          normalizeLegacyRuntimeConfig(JSON.parse(rawRuntime) as AiRuntimeServiceConfig)
+        );
       } catch {
         // Ignore local storage corruption and fall back to defaults.
       }
@@ -165,6 +166,19 @@ export function LegacyCopyDiagnosisWorkbench() {
   }, [runtime.provider, runtime.baseUrl, runtime.model, runtime.apiKey]);
 
   const handleTestRuntime = async () => {
+    const runtimeLoopbackWarning = getRuntimeLoopbackWarning(runtime.baseUrl);
+    const effectiveRuntime = normalizeLegacyRuntimeConfig(runtime);
+
+    if (runtimeLoopbackWarning) {
+      setRuntimeTestResult({
+        status: "error",
+        message: runtimeLoopbackWarning,
+        detail:
+          "Use a local page such as http://localhost:3000/legacy-copy-diagnosis, or switch to a publicly reachable AI base URL.",
+      });
+      return;
+    }
+
     setRuntimeTesting(true);
     setRuntimeTestResult(null);
 
@@ -177,10 +191,10 @@ export function LegacyCopyDiagnosisWorkbench() {
         body: JSON.stringify({
           runtime: {
             task: "legacyCopyDiagnosis",
-            ...runtime,
+            ...effectiveRuntime,
           },
           runtimeConfig: {
-            legacyCopyDiagnosis: runtime,
+            legacyCopyDiagnosis: effectiveRuntime,
           },
         }),
       });
@@ -223,6 +237,7 @@ export function LegacyCopyDiagnosisWorkbench() {
   };
 
   const handleAnalyze = async () => {
+    const effectiveRuntime = normalizeLegacyRuntimeConfig(runtime);
     setLoading(true);
     setError(null);
 
@@ -241,10 +256,10 @@ export function LegacyCopyDiagnosisWorkbench() {
           currentSearchTerms: form.currentSearchTerms,
           runtime: {
             task: "legacyCopyDiagnosis",
-            ...runtime,
+            ...effectiveRuntime,
           },
           runtimeConfig: {
-            legacyCopyDiagnosis: runtime,
+            legacyCopyDiagnosis: effectiveRuntime,
           },
           sellerSpriteConfig: buildSellerSpriteRequestConfig(sellerSpriteConfig),
         }),
@@ -281,6 +296,8 @@ export function LegacyCopyDiagnosisWorkbench() {
       currentSearchTerms: "",
     });
   };
+
+  const runtimeLoopbackWarning = getRuntimeLoopbackWarning(runtime.baseUrl);
 
   return (
     <section className="page-shell mt-8">
@@ -568,6 +585,18 @@ export function LegacyCopyDiagnosisWorkbench() {
                         />
                       </div>
 
+                      {runtimeLoopbackWarning ? (
+                        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900 md:col-span-2">
+                          <p className="font-medium">
+                            Loopback addresses only work from your own machine.
+                          </p>
+                          <p className="mt-1">
+                            {runtimeLoopbackWarning} Open this tool from a local page, or replace
+                            the AI base URL with a publicly reachable endpoint.
+                          </p>
+                        </div>
+                      ) : null}
+
                       <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 md:col-span-2">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
@@ -694,8 +723,46 @@ export function LegacyCopyDiagnosisWorkbench() {
 }
 
 function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
+  const topBlockers = buildTopBlockers(report);
+
   return (
     <Tabs defaultValue="overview" className="space-y-4">
+      <Card className="border-slate-200/80 bg-white/90 shadow-none">
+        <CardContent className="space-y-4 pt-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="bg-slate-950 text-white hover:bg-slate-950">
+              Structured diagnosis
+            </Badge>
+            <Badge variant="outline">ASIN {report.targetAsin}</Badge>
+            <Badge variant="secondary">{report.marketplace}</Badge>
+            <Badge variant={report.ai.used ? "secondary" : "outline"}>
+              {report.ai.used ? `AI ${report.ai.model}` : "AI fallback"}
+            </Badge>
+          </div>
+
+          <div>
+            <p className="text-sm font-semibold text-slate-950">Top 3 blockers</p>
+            <p className="mt-1 text-sm leading-7 text-slate-500">
+              优先看这 3 条，它们是这次诊断里最该先动的具体问题。
+            </p>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            {topBlockers.map((item, index) => (
+              <div
+                key={`${index}-${item}`}
+                className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4"
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
+                  Blocker {index + 1}
+                </p>
+                <p className="mt-2 text-sm leading-7 text-slate-700">{item}</p>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
       <TabsList>
         <TabsTrigger value="overview">总览</TabsTrigger>
         <TabsTrigger value="pillars">支柱分</TabsTrigger>
@@ -895,27 +962,44 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
                   <DetailBlock title="Quick Wins" items={report.ai.output.quickWins} />
                   <DetailBlock title="Watchouts" items={report.ai.output.watchouts} />
                 </div>
-                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">Title Suggestion</p>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {report.ai.output.titleSuggestion}
-                  </p>
+                <RewriteCompareBlock
+                  title="Title Suggestion"
+                  current={report.resolvedTitle}
+                  suggested={report.ai.output.titleSuggestion}
+                  report={report}
+                />
+                <div className="space-y-3">
+                  {report.ai.output.bulletSuggestions.map((suggested, index) => (
+                    <RewriteCompareBlock
+                      key={`bullet-${index}-${suggested}`}
+                      title={`Bullet ${index + 1}`}
+                      current={report.resolvedBullets[index] ?? ""}
+                      suggested={suggested}
+                      report={report}
+                    />
+                  ))}
                 </div>
-                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">Bullet Suggestions</p>
-                  <SimpleList items={report.ai.output.bulletSuggestions} />
-                </div>
-                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">Search Terms Suggestion</p>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {report.ai.output.searchTermsSuggestion}
-                  </p>
-                </div>
+                <RewriteCompareBlock
+                  title="Search Terms Suggestion"
+                  current={report.resolvedSearchTerms}
+                  suggested={report.ai.output.searchTermsSuggestion}
+                  report={report}
+                />
               </>
             ) : (
+              <>
               <div className="rounded-[1.2rem] border border-dashed border-slate-300 bg-slate-50/70 p-5 text-sm leading-7 text-slate-500">
                 当前没有追加模型分析输出。规则诊断已完成；如果要让模型基于数据进一步生成优化建议与英文标题、五点、Search Terms，请填写分析模型 API 配置，或在服务端补可用模型凭证。
               </div>
+              <div className="grid gap-4 lg:grid-cols-3">
+                <DetailBlock title="Title priorities" items={buildFallbackTitleTargets(report)} />
+                <DetailBlock title="Bullet focus" items={buildFallbackBulletTargets(report)} />
+                <DetailBlock
+                  title="Search terms backlog"
+                  items={buildFallbackSearchTermTargets(report)}
+                />
+              </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -986,6 +1070,192 @@ function SimpleList({ items }: { items: string[] }) {
   );
 }
 
+type SuggestionEvidence = {
+  keywordGaps: string[];
+  reviewSignals: string[];
+  competitorSignals: string[];
+  impactLabels: string[];
+};
+
+function RewriteCompareBlock({
+  title,
+  current,
+  suggested,
+  report,
+}: {
+  title: string;
+  current: string;
+  suggested: string;
+  report: LegacyDiagnosisReport;
+}) {
+  const evidence = buildSuggestionEvidence(suggested, report);
+
+  return (
+    <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-sm font-semibold text-slate-950">{title}</p>
+        {evidence.impactLabels.map((label) => (
+          <Badge key={`${title}-${label}`} variant="outline">
+            {label}
+          </Badge>
+        ))}
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="rounded-[1rem] border border-slate-200 bg-white/70 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Current
+          </p>
+          <p className="mt-2 text-sm leading-7 text-slate-500">
+            {current || "No current copy provided."}
+          </p>
+        </div>
+
+        <div className="rounded-[1rem] border border-slate-200 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Suggested
+          </p>
+          <p className="mt-2 text-sm leading-7 text-slate-700">
+            {suggested || "No suggestion generated."}
+          </p>
+        </div>
+      </div>
+
+      <SuggestionEvidenceBadges evidence={evidence} />
+    </div>
+  );
+}
+
+function SuggestionEvidenceBadges({ evidence }: { evidence: SuggestionEvidence }) {
+  const chips = [
+    ...evidence.keywordGaps.map((item) => ({ key: `keyword-${item}`, label: `Keyword ${item}` })),
+    ...evidence.reviewSignals.map((item) => ({
+      key: `review-${item}`,
+      label: `Review ${item}`,
+    })),
+    ...evidence.competitorSignals.map((item) => ({
+      key: `competitor-${item}`,
+      label: `Competitor ${item}`,
+    })),
+  ].slice(0, 6);
+
+  if (chips.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+        Evidence anchors
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {chips.map((chip) => (
+          <Badge key={chip.key} variant="secondary">
+            {chip.label}
+          </Badge>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function buildTopBlockers(report: LegacyDiagnosisReport): string[] {
+  const blockers = [
+    ...(report.ai.output?.p0Actions ?? []),
+    ...report.actionPlan.p0,
+    ...report.keywordGaps
+      .slice(0, 2)
+      .map((gap) => `Keyword gap ${gap.keyword}: ${gap.reason}`),
+    ...report.negativeThemes
+      .filter((theme) => !theme.addressedInCopy)
+      .slice(0, 1)
+      .map((theme) => `Review objection ${theme.phrase}: ${theme.sample}`),
+  ]
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(blockers)).slice(0, 3);
+}
+
+function buildSuggestionEvidence(
+  text: string,
+  report: LegacyDiagnosisReport
+): SuggestionEvidence {
+  const keywordGaps = report.keywordGaps
+    .filter((item) => matchesSuggestionPhrase(text, item.keyword))
+    .slice(0, 3)
+    .map((item) => item.keyword);
+  const reviewSignals = [...report.negativeThemes, ...report.positiveThemes]
+    .filter((item) => matchesSuggestionPhrase(text, item.phrase))
+    .slice(0, 2)
+    .map((item) => item.phrase);
+  const competitorSignals = report.competitorSnapshots
+    .flatMap((item) =>
+      item.topKeywords
+        .filter((keyword) => matchesSuggestionPhrase(text, keyword))
+        .slice(0, 1)
+        .map((keyword) => `${item.asin}: ${keyword}`)
+    )
+    .slice(0, 2);
+
+  const impactLabels = [
+    keywordGaps.length > 0 ? "Search gap" : null,
+    reviewSignals.length > 0 ? "Review objection" : null,
+    competitorSignals.length > 0 ? "Competitor parity" : null,
+  ].filter((item): item is string => Boolean(item));
+
+  return {
+    keywordGaps,
+    reviewSignals,
+    competitorSignals,
+    impactLabels,
+  };
+}
+
+function buildFallbackTitleTargets(report: LegacyDiagnosisReport): string[] {
+  return report.keywordGaps
+    .filter((item) => !item.coverage.title)
+    .slice(0, 4)
+    .map((item) => `${item.keyword}: ${item.reason}`);
+}
+
+function buildFallbackBulletTargets(report: LegacyDiagnosisReport): string[] {
+  const items = [
+    ...report.negativeThemes
+      .filter((item) => !item.addressedInCopy)
+      .slice(0, 3)
+      .map((item) => `Answer review objection "${item.phrase}" in bullets or A+.`),
+    ...report.positiveThemes
+      .filter((item) => !item.addressedInCopy)
+      .slice(0, 2)
+      .map((item) => `Turn positive signal "${item.phrase}" into a concrete proof point.`),
+  ];
+
+  return Array.from(new Set(items)).slice(0, 5);
+}
+
+function buildFallbackSearchTermTargets(report: LegacyDiagnosisReport): string[] {
+  return report.keywordGaps
+    .filter((item) => !item.coverage.searchTerms)
+    .slice(0, 6)
+    .map((item) => `${item.keyword}: uncovered in backend search terms`);
+}
+
+function matchesSuggestionPhrase(text: string, phrase: string): boolean {
+  const normalizedText = normalizeSuggestionText(text);
+  const normalizedPhrase = normalizeSuggestionText(phrase);
+
+  return Boolean(normalizedText && normalizedPhrase && normalizedText.includes(normalizedPhrase));
+}
+
+function normalizeSuggestionText(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function splitCompetitorAsins(value: string): string[] {
   return value
     .split(/[\s,，;；]+/)
@@ -1030,6 +1300,20 @@ function toPositiveInteger(value: string): number | undefined {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
+function normalizeLegacyRuntimeConfig(
+  runtime: Partial<AiRuntimeServiceConfig> | null | undefined
+): AiRuntimeServiceConfig {
+  return {
+    provider: typeof runtime?.provider === "string" ? runtime.provider : "",
+    baseUrl: typeof runtime?.baseUrl === "string" ? runtime.baseUrl : "",
+    model:
+      typeof runtime?.model === "string" && runtime.model.trim()
+        ? runtime.model
+        : DEFAULT_RUNTIME_MODEL,
+    apiKey: typeof runtime?.apiKey === "string" ? runtime.apiKey : "",
+  };
+}
+
 type RuntimeConnectivityResult = {
   status: "success" | "error";
   message: string;
@@ -1045,6 +1329,33 @@ function formatPreviewBaseUrl(baseUrl: string): string {
     return new URL(baseUrl).host;
   } catch {
     return baseUrl.trim();
+  }
+}
+
+function getRuntimeLoopbackWarning(baseUrl: string): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  if (LOOPBACK_HOSTS.has(window.location.hostname) || !isLoopbackBaseUrl(baseUrl)) {
+    return null;
+  }
+
+  return "This page is running on a remote site, but the AI base URL points to 127.0.0.1 / localhost. Requests from the deployed server cannot reach your local proxy.";
+}
+
+function isLoopbackBaseUrl(baseUrl: string): boolean {
+  const value = baseUrl.trim();
+
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return LOOPBACK_HOSTS.has(url.hostname);
+  } catch {
+    return /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?/i.test(value);
   }
 }
 

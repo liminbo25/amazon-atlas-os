@@ -319,11 +319,11 @@ async function maybeGenerateAiRecommendations(
           config,
           operationName: "legacy copy diagnosis ai recommendations",
           systemPrompt: LEGACY_DIAGNOSIS_SYSTEM_PROMPT,
-          userPrompt: buildAiPrompt(report, attempt),
+          userPrompt: buildGroundedAiPrompt(report, attempt),
           maxTokens: 3200,
           temperature: 0,
         }),
-      parseResult: parseAiOutput,
+      parseResult: (value) => parseAiOutputGrounded(value, report),
     });
 
     return {
@@ -346,6 +346,7 @@ async function maybeGenerateAiRecommendations(
   }
 }
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 function buildAiPrompt(report: LegacyDiagnosisReport, attempt: number): string {
   const pillarSummary = report.pillars
     .map(
@@ -381,6 +382,22 @@ function buildAiPrompt(report: LegacyDiagnosisReport, attempt: number): string {
       .map((item) => `${item.phrase}(${item.count})`)
       .join(", ") || "None"}`,
   ].join("\n");
+  const reviewSamples = [
+    ...report.negativeThemes
+      .slice(0, 3)
+      .map((item) => `negative: phrase=${item.phrase}; sample=${item.sample}`),
+    ...report.positiveThemes
+      .slice(0, 2)
+      .map((item) => `positive: phrase=${item.phrase}; sample=${item.sample}`),
+  ].join("\n");
+  const targetAttributeSummary = summarizeListingAttributes(report.targetListing.attributes);
+  const pillarEvidenceSummary = report.pillars
+    .map(
+      (pillar) =>
+        `${pillar.title} evidence: ${pillar.evidence.slice(0, 3).join(" | ") || "None"}`
+    )
+    .join("\n");
+  const groundingTokens = buildGroundingTokens(report).join(", ");
 
   return `
 你要根据已有规则诊断结果，输出一份更像资深运营顾问写的“老品文案诊断优化建议”。
@@ -440,6 +457,158 @@ ${competitorSummary || "None"}
 ${getRetryPromptSuffix(attempt)}
   `.trim();
 }
+/* eslint-enable @typescript-eslint/no-unused-vars */
+
+function buildGroundedAiPrompt(
+  report: LegacyDiagnosisReport,
+  attempt: number
+): string {
+  const pillarSummary = report.pillars
+    .map(
+      (pillar) =>
+        `${pillar.title}: ${pillar.score}/${pillar.maxScore}; summary=${pillar.summary}; findings=${pillar.findings.join(
+          " | "
+        )}; actions=${pillar.recommendedActions.join(" | ")}`
+    )
+    .join("\n");
+
+  const competitorSummary = report.competitorSnapshots
+    .map(
+      (item) =>
+        `${item.asin}: title=${item.title}; price=${item.price}; rating=${item.rating}; reviews=${item.reviews}; keywordCount=${item.keywordCount}; topKeywords=${item.topKeywords.join(
+          ", "
+        )}`
+    )
+    .join("\n");
+
+  const keywordGapSummary = report.keywordGaps
+    .slice(0, 12)
+    .map(
+      (item) =>
+        `${item.keyword}: search=${item.searchVolume}; targetOrganic=${item.targetOrganicRank || "-"}; competitor=${item.bestCompetitorAsin || "-"} ${item.bestCompetitorOrganicRank || "-"}; coverage=${item.coverage.title ? "title " : ""}${item.coverage.bullets ? "bullets " : ""}${item.coverage.searchTerms ? "searchTerms " : ""}; reason=${item.reason}`
+    )
+    .join("\n");
+
+  const reviewSummary = [
+    `Negative themes: ${report.negativeThemes
+      .map((item) => `${item.phrase}(${item.count})`)
+      .join(", ") || "None"}`,
+    `Positive themes: ${report.positiveThemes
+      .map((item) => `${item.phrase}(${item.count})`)
+      .join(", ") || "None"}`,
+  ].join("\n");
+
+  const reviewSamples = [
+    ...report.negativeThemes
+      .slice(0, 5)
+      .map((item) => `negative sample: ${item.phrase} => ${item.sample}`),
+    ...report.positiveThemes
+      .slice(0, 4)
+      .map((item) => `positive sample: ${item.phrase} => ${item.sample}`),
+  ].join("\n");
+
+  const pillarEvidenceSummary = report.pillars
+    .map(
+      (pillar) =>
+        `${pillar.title} evidence: ${pillar.evidence.slice(0, 4).join(" | ") || "None"}`
+    )
+    .join("\n");
+
+  const targetAttributeSummary = summarizeListingAttributes(report.targetListing.attributes);
+  const groundingTokens = buildGroundingTokens(report).join(", ");
+  const copyGroundingTokens = buildCopyGroundingTokens(report).join(", ");
+  const targetTrafficKeywordSummary = [...report.targetKeywords]
+    .sort(
+      (left, right) =>
+        right.conversionShare - left.conversionShare || right.searchVolume - left.searchVolume
+    )
+    .slice(0, 12)
+    .map(
+      (item) =>
+        `${item.keyword}: search=${item.searchVolume}; organic=${item.organicRank || "-"}; sponsored=${item.sponsoredRank || "-"}; conversionShare=${item.conversionShare}`
+    )
+    .join("\n");
+
+  return `
+You are diagnosing one specific Amazon listing. Ground every recommendation in the supplied evidence.
+
+Context:
+- Marketplace: ${report.marketplace}
+- Target ASIN: ${report.targetAsin}
+- Score: ${report.score.total}/100 (${report.score.label})
+- Headline: ${report.score.headline}
+- Target listing facts: price=${report.targetListing.price}; rating=${report.targetListing.rating}; reviews=${report.targetListing.reviews}; bsr=${report.targetListing.bsr}; monthlySales=${report.targetListing.monthlySales}
+- Target listing attributes: ${targetAttributeSummary}
+
+Current listing copy:
+- Title: ${report.resolvedTitle || "None"}
+- Bullets:
+${report.resolvedBullets.map((item, index) => `${index + 1}. ${item}`).join("\n") || "None"}
+- Search terms: ${report.resolvedSearchTerms || "None"}
+
+Rule-based diagnosis:
+${pillarSummary}
+
+Keyword gaps:
+${keywordGapSummary || "None"}
+
+Review themes:
+${reviewSummary}
+
+Review samples:
+${reviewSamples || "None"}
+
+Traffic keyword leaderboard:
+${targetTrafficKeywordSummary || "None"}
+
+Competitor summary:
+${competitorSummary || "None"}
+
+Pillar evidence:
+${pillarEvidenceSummary}
+
+Grounding tokens:
+${groundingTokens}
+
+Copy grounding tokens:
+${copyGroundingTokens}
+
+Return exactly one JSON object with this schema:
+{
+  "executiveSummary": "简体中文，1-2段",
+  "quickWins": ["简体中文动作1", "简体中文动作2", "简体中文动作3"],
+  "titleSuggestion": "<concrete English title for this ASIN>",
+  "bulletSuggestions": [
+    "<concrete English bullet 1 for this ASIN>",
+    "<concrete English bullet 2 for this ASIN>",
+    "<concrete English bullet 3 for this ASIN>",
+    "<concrete English bullet 4 for this ASIN>",
+    "<concrete English bullet 5 for this ASIN>"
+  ],
+  "searchTermsSuggestion": "<concrete English backend search terms for this ASIN>",
+  "p0Actions": ["简体中文P0动作1", "简体中文P0动作2"],
+  "p1Actions": ["简体中文P1动作1", "简体中文P1动作2"],
+  "p2Actions": ["简体中文P2动作1", "简体中文P2动作2"],
+  "watchouts": ["简体中文风险1", "简体中文风险2"]
+}
+
+Rules:
+- executiveSummary, quickWins, p0Actions, p1Actions, p2Actions, watchouts must be in Simplified Chinese.
+- titleSuggestion, bulletSuggestions, searchTermsSuggestion must be in English.
+- Every recommendation in executiveSummary, quickWins, p0Actions, p1Actions, p2Actions, watchouts must mention at least one concrete anchor from the grounding tokens, review samples, competitor ASINs, or pillar evidence.
+- titleSuggestion must reference at least two concrete copy grounding tokens.
+- At least four bulletSuggestions must each reference at least one concrete copy grounding token.
+- searchTermsSuggestion must prioritize uncovered keyword gaps from the report instead of generic filler.
+- If there is not enough evidence for a recommendation, say that explicitly instead of giving generic advice.
+- Do not use generic filler like "提升转化", "优化关键词", "增强卖点" unless it is immediately tied to a concrete field, keyword, review phrase, title fragment, or competitor.
+- Do not invent product claims that are not present in the evidence.
+- titleSuggestion must stay within 200 characters.
+- bulletSuggestions must contain exactly 5 items.
+- searchTermsSuggestion must stay within 250 characters and avoid obvious repetition from the title.
+- Return JSON only.
+${getRetryPromptSuffix(attempt)}
+  `.trim();
+}
 
 function parseAiOutput(value: unknown): LegacyAiOutput {
   if (!isRecord(value)) {
@@ -494,4 +663,231 @@ function parseAiOutput(value: unknown): LegacyAiOutput {
       unique: true,
     }),
   };
+}
+
+function parseAiOutputGrounded(
+  value: unknown,
+  report: LegacyDiagnosisReport
+): LegacyAiOutput {
+  const output = parseAiOutput(value);
+  validateAiOutputSpecificity(output, report);
+  return output;
+}
+
+function validateAiOutputSpecificity(
+  output: LegacyAiOutput,
+  report: LegacyDiagnosisReport
+): void {
+  const serializedOutput = [
+    output.executiveSummary,
+    ...output.quickWins,
+    output.titleSuggestion,
+    ...output.bulletSuggestions,
+    output.searchTermsSuggestion,
+    ...output.p0Actions,
+    ...output.p1Actions,
+    ...output.p2Actions,
+    ...output.watchouts,
+  ]
+    .join("\n")
+    .trim();
+
+  if (!serializedOutput) {
+    /*
+    throw new RouteError("AI 杈撳嚭涓虹┖锛屾棤娉曠敤浜庤€佸搧璇婃柇銆?, {
+      status: 502,
+      code: "legacy_ai_empty",
+      retryable: true,
+    });
+  }
+
+    */
+    throw new RouteError("AI output was empty and could not be used for legacy diagnosis.", {
+      status: 502,
+      code: "legacy_ai_empty",
+      retryable: true,
+    });
+  }
+
+  const placeholderFragments = [
+    "<concrete English title",
+    "<concrete English bullet",
+    "<concrete English backend search terms",
+    "<grounded Simplified Chinese",
+    "<one grounded Simplified Chinese",
+  ];
+
+  if (placeholderFragments.some((fragment) => serializedOutput.includes(fragment))) {
+    /*
+    throw new RouteError("AI 杩斿洖浜嗘ā鏉垮寲鍗犱綅鍐呭銆?, {
+      status: 502,
+      code: "legacy_ai_placeholder_output",
+      retryable: true,
+    });
+  }
+
+    */
+    throw new RouteError("AI returned placeholder content instead of grounded copy.", {
+      status: 502,
+      code: "legacy_ai_placeholder_output",
+      retryable: true,
+    });
+  }
+
+  const groundingTokens = buildGroundingTokens(report);
+  const copyGroundingTokens = buildCopyGroundingTokens(report);
+  const groundedActionCount = [
+    ...output.quickWins,
+    ...output.p0Actions,
+    ...output.p1Actions,
+    ...output.p2Actions,
+    ...output.watchouts,
+  ].filter((item) => containsGroundingToken(item, groundingTokens)).length;
+  const uniqueGroundingHits = new Set(
+    groundingTokens.filter((token) =>
+      serializedOutput.toLowerCase().includes(token.toLowerCase())
+    )
+  );
+  const titleGroundingHits = countGroundingMatches(
+    output.titleSuggestion,
+    copyGroundingTokens
+  );
+  const groundedBullets = output.bulletSuggestions.filter(
+    (item) => countGroundingMatches(item, copyGroundingTokens) > 0
+  );
+  const searchTermGroundingHits = countGroundingMatches(
+    output.searchTermsSuggestion,
+    report.keywordGaps.slice(0, 12).map((item) => item.keyword)
+  );
+
+  if (uniqueGroundingHits.size < 3 || groundedActionCount < 3) {
+    /*
+    throw new RouteError("AI 杈撳嚭缂轰箯鍟嗗搧璇佹嵁锛岀浉鍏虫€т笉瓒炽€?, {
+      status: 502,
+      code: "legacy_ai_not_grounded",
+      retryable: true,
+      logDetails: {
+        groundingHits: Array.from(uniqueGroundingHits),
+        groundedActionCount,
+      },
+    });
+  }
+
+    */
+    throw new RouteError("AI output was not grounded enough in product-specific evidence.", {
+      status: 502,
+      code: "legacy_ai_not_grounded",
+      retryable: true,
+      logDetails: {
+        groundingHits: Array.from(uniqueGroundingHits),
+        groundedActionCount,
+      },
+    });
+  }
+
+  if (
+    titleGroundingHits < 2 ||
+    groundedBullets.length < 4 ||
+    searchTermGroundingHits < 2
+  ) {
+    throw new RouteError("AI copy suggestions are not grounded enough in listing-specific evidence.", {
+      status: 502,
+      code: "legacy_ai_copy_not_grounded",
+      retryable: true,
+      logDetails: {
+        titleGroundingHits,
+        groundedBulletCount: groundedBullets.length,
+        searchTermGroundingHits,
+      },
+    });
+  }
+}
+
+function buildGroundingTokens(report: LegacyDiagnosisReport): string[] {
+  const tokens = new Set<string>();
+
+  tokens.add(report.targetAsin);
+  report.keywordGaps.slice(0, 12).forEach((item) => tokens.add(item.keyword));
+  [...report.negativeThemes, ...report.positiveThemes]
+    .slice(0, 10)
+    .forEach((item) => tokens.add(item.phrase));
+  report.competitorSnapshots
+    .slice(0, 5)
+    .forEach((item) => {
+      tokens.add(item.asin);
+      item.topKeywords.slice(0, 3).forEach((keyword) => tokens.add(keyword));
+    });
+  report.pillars
+    .flatMap((pillar) => pillar.evidence)
+    .slice(0, 18)
+    .forEach((item) => {
+      if (item.length >= 3) {
+        tokens.add(item);
+      }
+    });
+  [...report.targetKeywords]
+    .sort(
+      (left, right) =>
+        right.conversionShare - left.conversionShare || right.searchVolume - left.searchVolume
+    )
+    .slice(0, 12)
+    .forEach((item) => tokens.add(item.keyword));
+  Object.values(report.targetListing.attributes)
+    .map((value) => value.trim())
+    .filter((value) => value.length >= 3)
+    .slice(0, 10)
+    .forEach((value) => tokens.add(value));
+
+  return Array.from(tokens)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3)
+    .slice(0, 48);
+}
+
+function buildCopyGroundingTokens(report: LegacyDiagnosisReport): string[] {
+  const tokens = new Set<string>();
+
+  report.keywordGaps.slice(0, 12).forEach((item) => tokens.add(item.keyword));
+  [...report.targetKeywords]
+    .sort(
+      (left, right) =>
+        right.conversionShare - left.conversionShare || right.searchVolume - left.searchVolume
+    )
+    .slice(0, 12)
+    .forEach((item) => tokens.add(item.keyword));
+  [...report.negativeThemes, ...report.positiveThemes]
+    .slice(0, 8)
+    .forEach((item) => tokens.add(item.phrase));
+  report.competitorSnapshots
+    .slice(0, 5)
+    .forEach((item) => {
+      item.topKeywords.slice(0, 3).forEach((keyword) => tokens.add(keyword));
+    });
+
+  return Array.from(tokens)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3)
+    .slice(0, 36);
+}
+
+function containsGroundingToken(text: string, groundingTokens: string[]): boolean {
+  const normalizedText = text.toLowerCase();
+  return groundingTokens.some((token) => normalizedText.includes(token.toLowerCase()));
+}
+
+function countGroundingMatches(text: string, groundingTokens: string[]): number {
+  const normalizedText = text.toLowerCase();
+
+  return new Set(
+    groundingTokens.filter((token) => normalizedText.includes(token.toLowerCase()))
+  ).size;
+}
+
+function summarizeListingAttributes(attributes: Record<string, string>): string {
+  const entries = Object.entries(attributes)
+    .map(([key, value]) => `${key}=${value}`)
+    .filter((entry) => entry.trim())
+    .slice(0, 8);
+
+  return entries.length > 0 ? entries.join("; ") : "None";
 }

@@ -10,18 +10,21 @@ import type { AiRuntimeServiceConfig } from "@/lib/types";
 export class ApiRequestError extends Error {
   readonly code?: string;
   readonly status?: number;
+  readonly details?: unknown;
 
   constructor(
     message: string,
     options: {
       code?: string;
       status?: number;
+      details?: unknown;
     } = {}
   ) {
     super(message);
     this.name = "ApiRequestError";
     this.code = options.code;
     this.status = options.status;
+    this.details = options.details;
   }
 }
 
@@ -31,12 +34,16 @@ export async function parseApiRequestError(
 ): Promise<ApiRequestError> {
   const rawText = await response.text();
   const payload = parseJsonRecord(rawText);
+  const detailMessage = formatApiErrorDetails(payload?.details);
+  const errorMessage =
+    typeof payload?.error === "string" ? payload.error : rawText.trim() || fallbackMessage;
 
   return new ApiRequestError(
-    typeof payload?.error === "string" ? payload.error : rawText.trim() || fallbackMessage,
+    detailMessage ? `${errorMessage} (${detailMessage})` : errorMessage,
     {
       code: typeof payload?.code === "string" ? payload.code : undefined,
       status: response.status,
+      details: payload?.details,
     }
   );
 }
@@ -50,7 +57,12 @@ export function normalizeApiRequestError(
   }
 
   if (error instanceof Error) {
-    return new ApiRequestError(error.message || fallbackMessage);
+    return new ApiRequestError(error.message || fallbackMessage, {
+      details:
+        "details" in error && typeof error.details !== "undefined"
+          ? error.details
+          : undefined,
+    });
   }
 
   return new ApiRequestError(fallbackMessage);
@@ -262,6 +274,37 @@ function normalizeRuntimePath(path: string): string {
       .replace(/\/messages$/i, "")
       .replace(/\/v1$/i, "") || "/"
   );
+}
+
+function formatApiErrorDetails(details: unknown): string | null {
+  if (!details || typeof details !== "object" || Array.isArray(details)) {
+    return null;
+  }
+
+  const record = details as Record<string, unknown>;
+  const segments: string[] = [];
+
+  if (typeof record.upstreamStatus === "number") {
+    segments.push(`upstream ${record.upstreamStatus}`);
+  }
+
+  if (typeof record.upstreamCode === "string" && record.upstreamCode.trim()) {
+    segments.push(`code ${record.upstreamCode.trim()}`);
+  }
+
+  if (typeof record.upstreamMessage === "string" && record.upstreamMessage.trim()) {
+    segments.push(record.upstreamMessage.trim());
+  }
+
+  if (typeof record.baseURL === "string" && record.baseURL.trim()) {
+    segments.push(`base ${formatRuntimeBaseUrl(record.baseURL)}`);
+  }
+
+  if (typeof record.model === "string" && record.model.trim()) {
+    segments.push(`model ${record.model.trim()}`);
+  }
+
+  return segments.length > 0 ? segments.join(" | ") : null;
 }
 
 function parseJsonRecord(value: string): Record<string, unknown> | null {

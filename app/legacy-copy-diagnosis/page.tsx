@@ -344,6 +344,15 @@ export default function LegacyCopyDiagnosisPage() {
 
       <LegacyCopyDiagnosisWorkbench />
 
+      <details className="page-shell mt-8">
+        <summary className="cursor-pointer list-none rounded-[1.5rem] border border-slate-200 bg-white/85 px-5 py-4 text-sm font-semibold text-slate-900 shadow-sm">
+          查看模块说明与诊断框架
+          <span className="ml-2 text-xs font-normal text-slate-500">
+            这部分是静态说明，不是本次商品诊断结果
+          </span>
+        </summary>
+
+        <div className="mt-6 space-y-8">
       <section className="page-shell mt-8 grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
         <article className="glass-panel p-6 sm:p-7">
           <p className="section-kicker">Module brief</p>
@@ -626,6 +635,8 @@ export default function LegacyCopyDiagnosisPage() {
           </div>
         </article>
       </section>
+        </div>
+      </details>
     </div>
   );
 }
