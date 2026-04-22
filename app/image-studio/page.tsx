@@ -909,6 +909,10 @@ export default function ImageStudioPage() {
   const activeWorkspaceOption =
     workspaceOptions.find((option) => option.value === activeWorkspace) ||
     workspaceOptions[0];
+  const showPostProcessingTools =
+    activeWorkspace === "post" ||
+    activeWorkspace === "try-on" ||
+    activeWorkspace === "results";
 
   function replaceProcessedTasks(nextTasks: ImageGenerationTask[]) {
     processedTasksRef.current = nextTasks;
@@ -2409,7 +2413,7 @@ export default function ImageStudioPage() {
                 </div>
               </article>
 
-              {activeWorkspace === "post" ? (
+              {showPostProcessingTools ? (
                 <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -2422,6 +2426,9 @@ export default function ImageStudioPage() {
                       </h2>
                       <p className="mt-2 text-sm leading-6 text-slate-600">
                         换白底继续复用 `/api/gemini`，变清晰继续复用 `/api/upscale`。
+                        {activeWorkspace !== "post"
+                          ? " 现在这组参数也会在当前工作区直接显示，不用再来回切入口。"
+                          : ""}
                       </p>
                     </div>
 
@@ -2458,6 +2465,15 @@ export default function ImageStudioPage() {
                       >
                         {isUpscalingAll ? "整批变清晰中..." : "整批一键变清晰"}
                       </button>
+                      {activeWorkspace !== "post" ? (
+                        <button
+                          type="button"
+                          onClick={() => setActiveWorkspace("post")}
+                          className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                        >
+                          进入后处理工作区
+                        </button>
+                      ) : null}
                     </div>
                   </div>
 
