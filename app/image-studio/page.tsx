@@ -913,6 +913,16 @@ export default function ImageStudioPage() {
     activeWorkspace === "post" ||
     activeWorkspace === "try-on" ||
     activeWorkspace === "results";
+  const recentResultPreviewItems = processedTasks
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.tryOn.status !== "idle")
+    .slice(-4)
+    .reverse();
+  const latestPreviewableTryOnResult =
+    processedTasks
+      .map((item, index) => ({ item, index }))
+      .filter(({ item }) => Boolean(item.tryOn.image))
+      .slice(-1)[0] ?? null;
 
   function replaceProcessedTasks(nextTasks: ImageGenerationTask[]) {
     processedTasksRef.current = nextTasks;
@@ -1971,6 +1981,239 @@ export default function ImageStudioPage() {
                 </article>
               ) : null}
 
+              {activeWorkspace === "try-on" && recentResultPreviewItems.length > 0 ? (
+                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        最近换装结果
+                      </p>
+                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                        不切工作区也能直接看图和预览
+                      </h2>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        这里会优先展示最近 {recentResultPreviewItems.length} 张换装结果，生成成功后可以直接预览、下载，或继续做白底与增强。
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {latestPreviewableTryOnResult ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            openPreview(
+                              latestPreviewableTryOnResult.item.tryOn.image!,
+                              `最近结果 ${latestPreviewableTryOnResult.index + 1} 原换装图`
+                            )
+                          }
+                          className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                        >
+                          预览最近结果
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => setActiveWorkspace("results")}
+                        className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                      >
+                        进入结果总览
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-4 xl:grid-cols-2">
+                    {recentResultPreviewItems.map(({ item, index: taskIndex }, displayIndex) => (
+                      <article
+                        key={`recent-${item.id}`}
+                        className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-[0_16px_44px_rgba(15,23,42,0.06)]"
+                      >
+                        <div className="space-y-4 border-b border-slate-200 px-5 py-4">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                              结果 {displayIndex + 1}
+                            </p>
+                            <span className="inline-flex items-center rounded-full bg-slate-950 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
+                              {getGenerationModeShortLabel(item.mode)}
+                            </span>
+                            <span
+                              className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getStatusPillClass(
+                                item.tryOn.status
+                              )}`}
+                            >
+                              换装：{getStatusLabel(item.tryOn.status)}
+                            </span>
+                          </div>
+
+                          <div className="space-y-2 text-sm leading-6 text-slate-600">
+                            <p>
+                              当前组合：服装 {item.clothingIndex + 1} / {item.clothingTotal}
+                              ，模特 {item.modelIndex + 1} / {item.modelTotal}
+                            </p>
+                            <p>当前模式：{getGenerationModeLabel(item.mode)}</p>
+                            <p>
+                              服装备注：
+                              <span className="font-medium text-slate-900">
+                                {" "}
+                                {item.garmentNote || "未填写，按默认逻辑生成。"}
+                              </span>
+                            </p>
+                            {item.tryOn.status === "processing" && item.tryOn.detail ? (
+                              <p>{item.tryOn.detail}</p>
+                            ) : null}
+                          </div>
+
+                          <div className="flex flex-wrap gap-2">
+                            {item.tryOn.image ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  openPreview(
+                                    item.tryOn.image!,
+                                    `结果 ${taskIndex + 1} 原换装图`
+                                  )
+                                }
+                                className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                              >
+                                预览换装图
+                              </button>
+                            ) : null}
+
+                            {item.tryOn.status === "error" ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleRetryResult(taskIndex)}
+                                className="inline-flex items-center justify-center rounded-full bg-amber-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
+                              >
+                                重试当前组合
+                              </button>
+                            ) : null}
+
+                            <button
+                              type="button"
+                              onClick={() => void handleWhiteBackgroundResult(taskIndex)}
+                              disabled={
+                                item.tryOn.status !== "success" ||
+                                !item.tryOn.image ||
+                                item.whiteBackground.status === "processing" ||
+                                isWhiteningAll
+                              }
+                              className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
+                                item.tryOn.status !== "success" ||
+                                !item.tryOn.image ||
+                                item.whiteBackground.status === "processing" ||
+                                isWhiteningAll
+                                  ? "cursor-not-allowed bg-amber-100 text-amber-700"
+                                  : "bg-amber-300 text-slate-950 hover:bg-amber-200"
+                              }`}
+                            >
+                              {getWhiteBackgroundButtonLabel(item.whiteBackground)}
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => void handleUpscaleResult(taskIndex)}
+                              disabled={
+                                item.tryOn.status !== "success" ||
+                                !item.tryOn.image ||
+                                item.enhanced.status === "processing" ||
+                                isUpscalingAll ||
+                                !canEnhance
+                              }
+                              className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
+                                item.tryOn.status !== "success" ||
+                                !item.tryOn.image ||
+                                item.enhanced.status === "processing" ||
+                                isUpscalingAll ||
+                                !canEnhance
+                                  ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                                  : "bg-slate-950 text-white hover:bg-slate-800"
+                              }`}
+                            >
+                              {getEnhanceButtonLabel(item.enhanced, canEnhance)}
+                            </button>
+
+                            {item.tryOn.image ? (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  void handleDownload(
+                                    item.tryOn.image!,
+                                    buildTaskFilename(
+                                      item,
+                                      "try-on",
+                                      normalizeDownloadExtension(item.tryOn.format)
+                                    )
+                                  )
+                                }
+                                className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                              >
+                                下载换装图
+                              </button>
+                            ) : null}
+                          </div>
+
+                          {item.tryOn.error ? (
+                            <div className="rounded-[1.25rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
+                              {item.tryOn.error}
+                            </div>
+                          ) : null}
+                        </div>
+
+                        <div className="grid gap-px bg-slate-200 md:grid-cols-3">
+                          <PreviewTile
+                            title="原换装图"
+                            image={item.tryOn.image}
+                            alt={`最近换装结果 ${displayIndex + 1}`}
+                            status={item.tryOn.status}
+                            emptyTitle="还没有换装结果"
+                            emptyDescription="当前组合还在处理中，或这张图生成失败。"
+                            description="生成成功后，这里可以直接点开预览。"
+                            backgroundClassName="bg-slate-50"
+                            error={item.tryOn.status === "error" ? item.tryOn.error : null}
+                            onPreview={
+                              item.tryOn.image
+                                ? () =>
+                                    openPreview(
+                                      item.tryOn.image!,
+                                      `结果 ${taskIndex + 1} 原换装图`
+                                    )
+                                : undefined
+                            }
+                          />
+
+                          <PreviewTile
+                            title="服装图"
+                            image={item.clothingImage}
+                            alt={`最近结果服装图 ${displayIndex + 1}`}
+                            status="success"
+                            emptyTitle="暂无服装图"
+                            emptyDescription="当前卡片没有可展示的服装图。"
+                            description={`服装 ${item.clothingIndex + 1} / ${item.clothingTotal}`}
+                            backgroundClassName="bg-white"
+                            onPreview={() =>
+                              openPreview(item.clothingImage, `结果 ${taskIndex + 1} 服装图`)
+                            }
+                          />
+
+                          <PreviewTile
+                            title="模特图"
+                            image={item.modelImage}
+                            alt={`最近结果模特图 ${displayIndex + 1}`}
+                            status="success"
+                            emptyTitle="暂无模特图"
+                            emptyDescription="当前卡片没有可展示的模特图。"
+                            description={`模特 ${item.modelIndex + 1} / ${item.modelTotal}`}
+                            backgroundClassName="bg-slate-50"
+                            onPreview={() =>
+                              openPreview(item.modelImage, `结果 ${taskIndex + 1} 模特图`)
+                            }
+                          />
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </article>
+              ) : null}
+
               {activeWorkspace === "post" ? (
                 <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <MultiImageUploader
@@ -2313,6 +2556,32 @@ export default function ImageStudioPage() {
                     <dd className="font-semibold text-slate-950">{failedCount}</dd>
                   </div>
                 </dl>
+
+                {hasResultCards ? (
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    {latestPreviewableTryOnResult ? (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openPreview(
+                            latestPreviewableTryOnResult.item.tryOn.image!,
+                            `最近结果 ${latestPreviewableTryOnResult.index + 1} 原换装图`
+                          )
+                        }
+                        className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                      >
+                        预览最近结果
+                      </button>
+                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setActiveWorkspace("results")}
+                      className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                    >
+                      进入结果总览
+                    </button>
+                  </div>
+                ) : null}
 
                 {error ? (
                   <div className="mt-6 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
