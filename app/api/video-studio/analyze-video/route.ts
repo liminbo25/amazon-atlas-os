@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const body = await readJsonBody(request);
-    const runtimeConfig = readAiRuntimeConfig(body);
+    const runtimeConfig = readAiRuntimeConfig(body, request);
     const videoPath = normalizeStringValue(body.video_path ?? body.videoPath);
 
     if (!videoPath) {

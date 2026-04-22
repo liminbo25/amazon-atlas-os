@@ -38,7 +38,7 @@ const LEGACY_DIAGNOSIS_SYSTEM_PROMPT = [
 export async function POST(request: Request) {
   try {
     const body = await readJsonBody(request);
-    const runtimeConfig = readAiRuntimeConfig(body);
+    const runtimeConfig = readAiRuntimeConfig(body, request);
     const payload = validateRequest(body);
     const sellerSpriteConfig = payload.sellerSpriteConfig;
 

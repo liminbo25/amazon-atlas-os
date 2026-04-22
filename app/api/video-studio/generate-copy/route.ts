@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const body = await readJsonBody(request);
-    const runtimeConfig = readAiRuntimeConfig(body);
+    const runtimeConfig = readAiRuntimeConfig(body, request);
     const form = ensureRecord(body.form, "form must be an object.", "video_copy_form_invalid");
     const manifest = ensureRecord(
       body.manifest,

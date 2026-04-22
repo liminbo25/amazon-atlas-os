@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const formData = await request.formData();
-    const runtimeConfig = readAiRuntimeConfig(readRuntimeBody(formData));
+    const runtimeConfig = readAiRuntimeConfig(readRuntimeBody(formData), request);
     const payload = await analyzeVideoUpload({ request, formData, runtimeConfig });
 
     return Response.json(payload);

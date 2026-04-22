@@ -2,6 +2,7 @@ type UnknownRecord = Record<string, unknown>;
 
 const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com";
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com";
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const DEFAULT_AI_TIMEOUT_MS = parsePositiveIntegerEnv(
   process.env.AI_REQUEST_TIMEOUT_MS,
   120_000
@@ -147,18 +148,27 @@ export async function readJsonBody(request: Request): Promise<UnknownRecord> {
   return body;
 }
 
-export function readAiRuntimeConfig(body: UnknownRecord): AiRuntimeConfig {
+export function readAiRuntimeConfig(
+  body: UnknownRecord,
+  request?: Request
+): AiRuntimeConfig {
   const runtime = extractRuntimeFields(body.runtime, "runtime");
   const runtimeTask = readRuntimeTask(body.runtime);
   const runtimeConfig = extractRuntimeConfigFields(body.runtimeConfig, runtimeTask);
 
-  return {
+  const mergedConfig = {
     provider: runtime.provider ?? runtimeConfig.provider,
     baseURL: runtime.baseURL ?? runtimeConfig.baseURL,
     model: runtime.model ?? runtimeConfig.model,
     apiKey: runtime.apiKey ?? runtimeConfig.apiKey,
     authToken: runtime.authToken ?? runtimeConfig.authToken,
   };
+
+  if (shouldIgnoreLoopbackRuntimeConfig(mergedConfig, request)) {
+    return {};
+  }
+
+  return mergedConfig;
 }
 
 export function resolveAiConfig(
@@ -1293,6 +1303,79 @@ function readOptionalString(
 function readNonEmptyEnv(name: string): string | null {
   const value = process.env[name]?.trim();
   return value ? value : null;
+}
+
+function shouldIgnoreLoopbackRuntimeConfig(
+  runtimeConfig: AiRuntimeConfig,
+  request?: Request
+): boolean {
+  if (!request || !runtimeConfig.baseURL || !isLoopbackBaseUrl(runtimeConfig.baseURL)) {
+    return false;
+  }
+
+  const requestHost = readRequestHost(request);
+  return Boolean(requestHost && !isLoopbackHost(requestHost));
+}
+
+function readRequestHost(request: Request): string | null {
+  const forwardedHost = request.headers
+    .get("x-forwarded-host")
+    ?.split(",")[0]
+    ?.trim();
+  const hostHeader = forwardedHost || request.headers.get("host")?.trim();
+
+  if (hostHeader) {
+    return normalizeHostname(hostHeader);
+  }
+
+  try {
+    return normalizeHostname(new URL(request.url).hostname);
+  } catch {
+    return null;
+  }
+}
+
+function isLoopbackBaseUrl(rawValue: string): boolean {
+  const value = rawValue.trim();
+
+  if (!value) {
+    return false;
+  }
+
+  try {
+    return isLoopbackHost(new URL(value).hostname);
+  } catch {
+    return /^(https?:\/\/)?(127\.0\.0\.1|localhost|\[::1\]|::1)(:\d+)?(\/|$)/i.test(
+      value
+    );
+  }
+}
+
+function isLoopbackHost(hostname: string): boolean {
+  return LOOPBACK_HOSTS.has(normalizeHostname(hostname));
+}
+
+function normalizeHostname(value: string): string {
+  const trimmed = value.trim().toLowerCase();
+
+  if (!trimmed) {
+    return trimmed;
+  }
+
+  if (trimmed.startsWith("[")) {
+    const closingIndex = trimmed.indexOf("]");
+
+    if (closingIndex >= 0) {
+      return trimmed.slice(1, closingIndex);
+    }
+  }
+
+  const lastColonIndex = trimmed.lastIndexOf(":");
+  if (lastColonIndex > -1 && trimmed.indexOf(":") === lastColonIndex) {
+    return trimmed.slice(0, lastColonIndex);
+  }
+
+  return trimmed;
 }
 
 function normalizeAiBaseURL(

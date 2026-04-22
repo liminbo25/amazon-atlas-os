@@ -52,7 +52,7 @@ interface GenerateCopyRequestPayload {
 export async function POST(request: Request) {
   try {
     const body = await readJsonBody(request);
-    const runtimeConfig = readAiRuntimeConfig(body);
+    const runtimeConfig = readAiRuntimeConfig(body, request);
     const payload = validateGenerateCopyRequest(body);
     const config = resolveAiConfig({
       runtimeConfig,
