@@ -6,6 +6,7 @@ import {
   type FashnRunResponse,
 } from "@/lib/fashn";
 import { isSupportedImageUrl } from "@/lib/image-blob";
+import { buildStrictTryOnPrompt } from "@/lib/tryon-prompts";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const prompt = body.garmentNote?.trim();
+    const prompt = buildStrictTryOnPrompt(body.garmentNote);
     const response = await fetch(`${config.baseUrl}/v1/run`, {
       method: "POST",
       headers: buildFashnAuthHeaders(config.apiKey),
@@ -101,7 +102,7 @@ export async function POST(request: NextRequest) {
           resolution: config.resolution,
           output_format: config.outputFormat,
           num_images: 1,
-          ...(prompt ? { prompt } : {}),
+          prompt,
         },
       }),
     });

@@ -183,13 +183,15 @@ const geminiImageModelOptions: GeminiImageModelOption[] = [
   {
     value: "nano_banana_pro",
     label: "Nano Banana Pro",
-    description: "使用 /v1/images/generations，当前默认的 Gemini 图像生成路径。",
+    description:
+      "使用 /v1/images/generations，当前更稳的 Gemini 回退路径，适合批量任务。",
     endpoint: "https://ai.yijiarj.cn/v1/images/generations",
   },
   {
     value: "image2",
     label: "Image2",
-    description: "使用 /v1/chat/completions，默认走 1024x1792，并使用更高保真的提示模板。",
+    description:
+      "使用 /v1/chat/completions，细节潜力更高，但回包格式和稳定性波动也更大。",
     endpoint: "https://api.yijiarj.cn/v1/chat/completions",
   },
 ];
@@ -197,6 +199,7 @@ const geminiImageModelOptions: GeminiImageModelOption[] = [
 let taskSequence = 0;
 const FASHN_POLL_INTERVAL_MS = 2500;
 const FASHN_MAX_POLL_ATTEMPTS = 90;
+const CLIENT_FETCH_MAX_ATTEMPTS = 3;
 
 function createTaskState(overrides: Partial<ImageTaskState> = {}): ImageTaskState {
   return {
@@ -284,6 +287,46 @@ function sleep(delayMs: number) {
   return new Promise((resolve) => window.setTimeout(resolve, delayMs));
 }
 
+function isRetryableClientFetchError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const normalizedMessage = error.message.trim().toLowerCase();
+
+  return (
+    normalizedMessage === "failed to fetch" ||
+    normalizedMessage === "networkerror when attempting to fetch resource." ||
+    error.name === "TypeError"
+  );
+}
+
+async function fetchWithRetry(
+  input: string,
+  init?: RequestInit,
+  maxAttempts = CLIENT_FETCH_MAX_ATTEMPTS
+) {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await fetch(input, init);
+    } catch (error) {
+      lastError = error;
+
+      if (!isRetryableClientFetchError(error) || attempt >= maxAttempts) {
+        throw error;
+      }
+
+      await sleep(350 * attempt);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Failed to fetch after retries.");
+}
+
 function inferImageFormatFromSource(source?: string) {
   if (!source) {
     return undefined;
@@ -345,7 +388,7 @@ function describeTryOnProviderStatus(status?: string) {
 function normalizeClientError(error: unknown, fallback: string) {
   if (error instanceof Error) {
     if (error.message === "Failed to fetch") {
-      return "请求已发出，但浏览器没有拿到完整返回。请刷新后重试，或换一张更小的图片。";
+      return "请求已发出，但浏览器在自动重试后仍没有拿到完整返回。请刷新后重试，或换一张更小的图片。";
     }
 
     return error.message;
@@ -729,7 +772,7 @@ export default function ImageStudioPage() {
 
     const loadTryOnConfig = async () => {
       try {
-        const response = await fetch("/api/fashn/tryon", {
+        const response = await fetchWithRetry("/api/fashn/tryon", {
           method: "GET",
           signal: controller.signal,
         });
@@ -750,7 +793,7 @@ export default function ImageStudioPage() {
         setTryOnConfigMessage(
           configured
             ? "FASHN Try-On Max 已就绪，换装会改走异步任务轮询。"
-            : "FASHN 还没配置，当前换装会继续使用 Gemini。"
+            : "FASHN 还没配置，当前换装会继续使用 Gemini。Gemini 回退更容易改动脸、身体和背景。"
         );
       } catch (configError) {
         if (controller.signal.aborted) {
@@ -763,7 +806,7 @@ export default function ImageStudioPage() {
         setTryOnConfigMessage(
           normalizeClientError(
             configError,
-            "暂时无法验证 FASHN 配置，当前先继续使用 Gemini。"
+            "暂时无法验证 FASHN 配置，当前先继续使用 Gemini。Gemini 回退的人物一致性会弱一些。"
           )
         );
       }
@@ -779,7 +822,7 @@ export default function ImageStudioPage() {
 
     const loadUpscaleConfig = async () => {
       try {
-        const response = await fetch("/api/upscale", {
+        const response = await fetchWithRetry("/api/upscale", {
           method: "GET",
           signal: controller.signal,
         });
@@ -969,7 +1012,7 @@ export default function ImageStudioPage() {
       let dataUrl = imageData;
 
       if (imageData.startsWith("http://") || imageData.startsWith("https://")) {
-        const response = await fetch("/api/download", {
+        const response = await fetchWithRetry("/api/download", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ imageUrl: imageData }),
@@ -1032,7 +1075,7 @@ export default function ImageStudioPage() {
     modelImage: string,
     garmentNote: string
   ) {
-    const response = await fetch("/api/fashn/tryon", {
+    const response = await fetchWithRetry("/api/fashn/tryon", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1073,9 +1116,12 @@ export default function ImageStudioPage() {
         await sleep(FASHN_POLL_INTERVAL_MS);
       }
 
-      const response = await fetch(`/api/fashn/tryon/${encodeURIComponent(jobId)}`, {
-        method: "GET",
-      });
+      const response = await fetchWithRetry(
+        `/api/fashn/tryon/${encodeURIComponent(jobId)}`,
+        {
+          method: "GET",
+        }
+      );
       const responseText = await response.text();
       let data: ImageApiResponse | null = null;
 
@@ -1138,7 +1184,7 @@ export default function ImageStudioPage() {
     }
 
     onProgress?.("FASHN 未配置，当前继续使用 Gemini 换装。");
-    const response = await fetch("/api/gemini", {
+    const response = await fetchWithRetry("/api/gemini", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1180,7 +1226,7 @@ export default function ImageStudioPage() {
   }
 
   async function requestWhiteBackgroundImage(image: string) {
-    const response = await fetch("/api/gemini", {
+    const response = await fetchWithRetry("/api/gemini", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1197,7 +1243,7 @@ export default function ImageStudioPage() {
   }
 
   async function requestUpscaledImage(image: string, settings: UpscaleSettings) {
-    const response = await fetch("/api/upscale", {
+    const response = await fetchWithRetry("/api/upscale", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2407,7 +2453,7 @@ export default function ImageStudioPage() {
 
                   {!tryOnBackendReady ? (
                     <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-                      明天拿到 `FASHN_API_KEY` 后，只要填进 `.env.local` 或 Vercel 环境变量并重启，换装会自动切到 FASHN Try-On Max。
+                      拿到 `FASHN_API_KEY` 后，只要填进 `.env.local` 或 Vercel 环境变量并重启，换装会自动切到 FASHN Try-On Max。当前 Gemini 回退更适合兜底，不适合追求高一致性的大批量换装。
                     </div>
                   ) : null}
                 </div>

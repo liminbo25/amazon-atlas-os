@@ -1,6 +1,11 @@
 import { request as httpRequest } from "node:http";
 import { request as httpsRequest } from "node:https";
 import { NextRequest, NextResponse } from "next/server";
+import { uploadImageSourceToBlob } from "@/lib/image-blob";
+import {
+  buildStrictTryOnPrompt,
+  TRY_ON_CHAT_IMAGE_LABELS,
+} from "@/lib/tryon-prompts";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -38,8 +43,8 @@ const DEFAULT_MODEL: GeminiImageModel = "nano_banana_pro";
 const DEFAULT_GEMINI_TRYON_SIZE = "1024x1024";
 const IMAGE2_GEMINI_TRYON_SIZE = "1024x1792";
 const GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS = 30_000;
-const GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS = 180_000;
-const GEMINI_UPSTREAM_MAX_ATTEMPTS = 3;
+const GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS = 90_000;
+const GEMINI_UPSTREAM_MAX_ATTEMPTS = 2;
 const GEMINI_UPSTREAM_RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const IMAGE2_SUPPORTED_SIZES = new Set([
   "1024x1024",
@@ -170,6 +175,16 @@ function normalizeSizeForModel(
   }
 
   return "1024x1024";
+}
+
+async function persistGeneratedImageResult(source: string, folder: string) {
+  try {
+    const uploadedResult = await uploadImageSourceToBlob(source, folder);
+    return uploadedResult.url;
+  } catch (error) {
+    console.warn("Failed to persist generated image result to Blob:", error);
+    return source;
+  }
 }
 
 function sleep(delayMs: number) {
@@ -421,22 +436,51 @@ function extractImageFromResponse(data: {
   return null;
 }
 
-function buildChatCompletionMessages(prompt: string, images: string[]) {
+function buildChatCompletionMessages(
+  prompt: string,
+  images: string[],
+  imageLabels?: string[]
+) {
+  const content: Array<
+    | {
+        type: "text";
+        text: string;
+      }
+    | {
+        type: "image_url";
+        image_url: {
+          url: string;
+        };
+      }
+  > = [
+    {
+      type: "text",
+      text: prompt,
+    },
+  ];
+
+  images.forEach((image, index) => {
+    const label = imageLabels?.[index]?.trim();
+
+    if (label) {
+      content.push({
+        type: "text",
+        text: label,
+      });
+    }
+
+    content.push({
+      type: "image_url",
+      image_url: {
+        url: image,
+      },
+    });
+  });
+
   return [
     {
       role: "user",
-      content: [
-        {
-          type: "text",
-          text: prompt,
-        },
-        ...images.map((image) => ({
-          type: "image_url",
-          image_url: {
-            url: image,
-          },
-        })),
-      ],
+      content,
     },
   ];
 }
@@ -451,8 +495,34 @@ function parseChatCompletionResponse(responseText: string) {
             | Array<{
                 type?: string;
                 text?: string;
+                url?: string;
+                b64_json?: string;
+                image_base64?: string;
+                image_url?: {
+                  url?: string;
+                };
               }>;
+          images?: Array<{
+            url?: string;
+            b64_json?: string;
+            image_base64?: string;
+            image_url?: {
+              url?: string;
+            };
+          }>;
         };
+      }>;
+      data?: Array<{
+        b64_json?: string;
+        url?: string;
+      }>;
+      output?: Array<{
+        type?: string;
+        url?: string;
+        b64_json?: string;
+        image_base64?: string;
+        result?: string;
+        image_url?: string;
       }>;
       error?: { message?: string };
     };
@@ -463,6 +533,69 @@ function parseChatCompletionResponse(responseText: string) {
   }
 }
 
+function normalizeExtractedImageValue(value?: string | null) {
+  const trimmed = value?.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  if (
+    trimmed.startsWith("http://") ||
+    trimmed.startsWith("https://") ||
+    trimmed.startsWith("data:image/")
+  ) {
+    return trimmed;
+  }
+
+  if (/^[A-Za-z0-9+/=\r\n]+$/.test(trimmed) && trimmed.length > 128) {
+    return `data:image/png;base64,${trimmed.replace(/\s+/g, "")}`;
+  }
+
+  return null;
+}
+
+function extractImageFromText(text: string): string | null {
+  const normalizedText = text.trim();
+
+  if (!normalizedText) {
+    return null;
+  }
+
+  const directImage = normalizeExtractedImageValue(normalizedText);
+
+  if (directImage) {
+    return directImage;
+  }
+
+  const markdownMatch = normalizedText.match(/!\[[^\]]*]\((https?:\/\/[^)\s]+)\)/i);
+
+  if (markdownMatch?.[1]) {
+    return markdownMatch[1];
+  }
+
+  const urlMatch = normalizedText.match(/https?:\/\/[^\s)]+/i);
+
+  if (urlMatch?.[0]) {
+    return urlMatch[0];
+  }
+
+  if (
+    (normalizedText.startsWith("{") && normalizedText.endsWith("}")) ||
+    (normalizedText.startsWith("[") && normalizedText.endsWith("]"))
+  ) {
+    try {
+      return extractImageFromChatCompletion(
+        JSON.parse(normalizedText) as Parameters<typeof extractImageFromChatCompletion>[0]
+      );
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
 function extractImageFromChatCompletion(data: {
   choices?: Array<{
     message?: {
@@ -471,14 +604,98 @@ function extractImageFromChatCompletion(data: {
         | Array<{
             type?: string;
             text?: string;
+            url?: string;
+            b64_json?: string;
+            image_base64?: string;
+            image_url?: {
+              url?: string;
+            };
           }>;
+      images?: Array<{
+        url?: string;
+        b64_json?: string;
+        image_base64?: string;
+        image_url?: {
+          url?: string;
+        };
+      }>;
     };
   }>;
-}) {
+  data?: Array<{
+    b64_json?: string;
+    url?: string;
+  }>;
+  output?: Array<{
+    type?: string;
+    url?: string;
+    b64_json?: string;
+    image_base64?: string;
+    result?: string;
+    image_url?: string;
+  }>;
+}): string | null {
+  const imageGenerationStyleResult = extractImageFromResponse(data);
+
+  if (imageGenerationStyleResult) {
+    return imageGenerationStyleResult;
+  }
+
+  const message = data.choices?.[0]?.message;
+  const messageImage = message?.images?.find(
+    (item) =>
+      item.url ||
+      item.image_url?.url ||
+      item.b64_json ||
+      item.image_base64
+  );
+
+  if (messageImage) {
+    return (
+      normalizeExtractedImageValue(messageImage.url) ||
+      normalizeExtractedImageValue(messageImage.image_url?.url) ||
+      normalizeExtractedImageValue(messageImage.b64_json) ||
+      normalizeExtractedImageValue(messageImage.image_base64)
+    );
+  }
+
   const content = data.choices?.[0]?.message?.content;
 
   if (!content) {
-    return null;
+    const outputImage = data.output?.find(
+      (item) =>
+        item.type?.includes("image") ||
+        item.url ||
+        item.image_url ||
+        item.b64_json ||
+        item.image_base64 ||
+        item.result
+    );
+
+    if (!outputImage) {
+      return null;
+    }
+
+    return (
+      normalizeExtractedImageValue(outputImage.url) ||
+      normalizeExtractedImageValue(outputImage.image_url) ||
+      normalizeExtractedImageValue(outputImage.b64_json) ||
+      normalizeExtractedImageValue(outputImage.image_base64) ||
+      normalizeExtractedImageValue(outputImage.result)
+    );
+  }
+
+  if (typeof content !== "string") {
+    for (const item of content) {
+      const directImage =
+        normalizeExtractedImageValue(item.url) ||
+        normalizeExtractedImageValue(item.image_url?.url) ||
+        normalizeExtractedImageValue(item.b64_json) ||
+        normalizeExtractedImageValue(item.image_base64);
+
+      if (directImage) {
+        return directImage;
+      }
+    }
   }
 
   const text =
@@ -496,14 +713,7 @@ function extractImageFromChatCompletion(data: {
     return null;
   }
 
-  const markdownMatch = text.match(/!\[[^\]]*]\((https?:\/\/[^)\s]+)\)/i);
-
-  if (markdownMatch?.[1]) {
-    return markdownMatch[1];
-  }
-
-  const urlMatch = text.match(/https?:\/\/[^\s)]+/i);
-  return urlMatch?.[0] || null;
+  return extractImageFromText(text);
 }
 
 async function runImageGeneration(options: {
@@ -511,10 +721,19 @@ async function runImageGeneration(options: {
   imageModel: GeminiImageModel;
   prompt: string;
   images: string[];
+  imageLabels?: string[];
   size: string;
   fallbackSize?: string;
 }) {
-  const { geminiApiKey, imageModel, prompt, images, size, fallbackSize } = options;
+  const {
+    geminiApiKey,
+    imageModel,
+    prompt,
+    images,
+    imageLabels,
+    size,
+    fallbackSize,
+  } = options;
   const apiBaseUrl = resolveImageApiBaseUrl(imageModel);
   const normalizedImages = images.map((image) => normalizeImageForProvider(image));
   const normalizedSize = normalizeSizeForModel(imageModel, size, fallbackSize);
@@ -526,7 +745,11 @@ async function runImageGeneration(options: {
       geminiApiKey,
       {
         model: imageModel,
-        messages: buildChatCompletionMessages(prompt, normalizedImages),
+        messages: buildChatCompletionMessages(
+          prompt,
+          normalizedImages,
+          imageLabels
+        ),
         size: normalizedSize,
       }
     );
@@ -640,57 +863,11 @@ function shouldRetryWithFallbackSize(
   return sizeSignals.some((signal) => normalized.includes(signal));
 }
 
-function buildDefaultVirtualTryOnPrompt(garmentNote?: string) {
-  const noteText = garmentNote?.trim()
-    ? `8. ADDITIONAL GARMENT NOTE: ${garmentNote.trim()}`
-    : "";
-
-  return `Virtual try-on task: transfer the exact clothing from image 1 onto the person in image 2.
-
-CRITICAL REQUIREMENTS:
-1. Preserve the exact garment from image 1 without redesigning it: pattern, color, texture, logo, trim, stitching, seams, lace motifs, mesh density, embroidery, beading, edges, and fabric appearance must remain unchanged.
-2. If the garment contains mesh, lace, tulle, sheer panels, translucent fabric, crochet, openwork, cutwork, burnout texture, or layered transparency, keep those structures exactly. Do not simplify them into plain opaque fabric.
-3. Preserve transparency and layer relationships exactly. If there is an outer sheer layer and an inner opaque lining, keep both layers visible and separate. Do not merge double-layer construction into a single flat fabric.
-4. Preserve garment geometry exactly: neckline, straps, sleeve shape, hemline, length, fit silhouette, cut lines, panel placement, and openings must stay faithful to image 1.
-5. Only replace the clothing area. Keep the person's face, body, pose, hands, legs, hair, skin tone, and scene from image 2 natural and coherent.
-6. Fit the garment realistically to the person's pose and body shape while keeping the original drape, wrinkles, tension, and material behavior. If there is any conflict, prioritize preserving garment details over inventing smoother fabric.
-7. Maintain crisp e-commerce-level detail. Do not blur, smooth out, over-beautify, overpaint, or erase fine textile detail. Do not convert lace, mesh, or net texture into chiffon, satin, silk, plastic, or generic soft fabric.
-${noteText}
-
-OUTPUT: one high-quality realistic image.`;
-}
-
-function buildImage2HighFidelityTryOnPrompt(garmentNote?: string) {
-  const noteText = garmentNote?.trim()
-    ? `10. ADDITIONAL GARMENT NOTE: ${garmentNote.trim()}`
-    : "";
-
-  return `Premium virtual try-on task: transfer the exact clothing from image 1 onto the person in image 2 and render it as a polished, luxury-grade fashion image.
-
-CRITICAL REQUIREMENTS:
-1. Preserve the exact garment from image 1 without redesigning it: pattern, color, texture, logo, trim, stitching, seams, lace motifs, mesh density, embroidery, beading, edges, and fabric appearance must remain unchanged.
-2. If the garment contains mesh, lace, tulle, sheer panels, translucent fabric, crochet, openwork, cutwork, burnout texture, or layered transparency, keep those structures exactly. Do not simplify, fill in, or smooth them into plain opaque fabric.
-3. Preserve garment geometry exactly: neckline, straps, sleeve shape, hemline, length, fit silhouette, cut lines, panel placement, and openings must stay faithful to image 1.
-4. Only replace the clothing area. Keep the person's face, body, pose, hands, legs, hair, skin tone, and scene from image 2 natural and coherent.
-5. Render premium fashion-photo quality: clean studio-grade clarity, realistic depth, crisp micro-contrast, refined skin texture, accurate textile texture, and believable material separation.
-6. Preserve realistic fabric drape, wrinkles, tension, thickness, translucency, and specular highlights so the garment feels dimensional rather than flat or painted.
-7. Keep the image sharp and high-fidelity, but do not oversoften skin, over-beautify the model, blur edges, or erase fine textile detail.
-8. Favor natural premium lighting, balanced contrast, and accurate color reproduction so the final result feels closer to a high-end campaign or polished luxury e-commerce image.
-9. Avoid a low-detail, washed-out, muddy, plastic, or overprocessed look.
-${noteText}
-
-OUTPUT: one high-quality realistic image with premium texture rendering and strong perceived sharpness.`;
-}
-
 function buildVirtualTryOnPrompt(
-  imageModel: GeminiImageModel,
+  _imageModel: GeminiImageModel,
   garmentNote?: string
 ) {
-  if (usesChatCompletionsModel(imageModel)) {
-    return buildImage2HighFidelityTryOnPrompt(garmentNote);
-  }
-
-  return buildDefaultVirtualTryOnPrompt(garmentNote);
+  return buildStrictTryOnPrompt(garmentNote);
 }
 
 function buildWhiteBackgroundPrompt() {
@@ -757,13 +934,18 @@ export async function POST(request: NextRequest) {
         imageModel,
         prompt: buildVirtualTryOnPrompt(imageModel, garmentNote),
         images: [clothingImage, modelImage],
+        imageLabels: TRY_ON_CHAT_IMAGE_LABELS,
         size: size || getDefaultTryOnSize(imageModel),
         fallbackSize: "1024x1024",
       });
+      const persistedResult = await persistGeneratedImageResult(
+        result,
+        "image-studio/generated/try-on"
+      );
 
       return NextResponse.json({
         success: true,
-        result,
+        result: persistedResult,
       });
     }
 
@@ -783,10 +965,14 @@ export async function POST(request: NextRequest) {
         size: size || "1024x1024",
         fallbackSize: "1024x1024",
       });
+      const persistedResult = await persistGeneratedImageResult(
+        result,
+        "image-studio/generated/white-background"
+      );
 
       return NextResponse.json({
         success: true,
-        result,
+        result: persistedResult,
       });
     }
 
@@ -840,10 +1026,14 @@ export async function POST(request: NextRequest) {
         size: size || "1024x1024",
         fallbackSize: "1024x1024",
       });
+      const persistedResult = await persistGeneratedImageResult(
+        result,
+        "image-studio/generated/free-generation"
+      );
 
       return NextResponse.json({
         success: true,
-        result,
+        result: persistedResult,
       });
     }
 
@@ -862,10 +1052,14 @@ export async function POST(request: NextRequest) {
       size: size || "1024x1536",
       fallbackSize: "1024x1024",
     });
+    const persistedResult = await persistGeneratedImageResult(
+      result,
+      "image-studio/generated/model-swap"
+    );
 
     return NextResponse.json({
       success: true,
-      result,
+      result: persistedResult,
     });
   } catch (error) {
     console.error("Gemini route error:", error);
