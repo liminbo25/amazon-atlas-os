@@ -22,7 +22,7 @@ const FALLBACK_RUNTIME_TEST_SERVICE: keyof typeof DEFAULT_MODEL_BY_SERVICE =
 export async function POST(request: Request) {
   try {
     const body = await readJsonBody(request);
-    const runtimeConfig = readAiRuntimeConfig(body);
+    const runtimeConfig = readAiRuntimeConfig(body, request);
     const service = readServiceName(body);
     const config = resolveAiConfig({
       runtimeConfig,

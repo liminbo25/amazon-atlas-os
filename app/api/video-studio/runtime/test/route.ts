@@ -19,7 +19,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const body = await readJsonBody(request);
-    const runtimeConfig = readAiRuntimeConfig(body);
+    const runtimeConfig = readAiRuntimeConfig(body, request);
     const service = readServiceName(body);
     const effectiveRuntimeConfig = await resolveVideoAiRuntimeConfig(runtimeConfig);
     const config = resolveAiConfig({
