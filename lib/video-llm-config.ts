@@ -11,7 +11,8 @@ import {
   type AiRuntimeConfig,
 } from "./ai-route-helpers";
 
-const DEFAULT_VIDEO_MODEL = "claude-sonnet-4-20250514";
+const DEFAULT_VIDEO_ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
+const DEFAULT_VIDEO_OPENAI_MODEL = "gpt-5.4";
 const DEFAULT_TIMEOUT_SECONDS = 120;
 const DEFAULT_ANTHROPIC_BASE_URL = "https://api.anthropic.com";
 const DEFAULT_OPENAI_BASE_URL = "https://api.openai.com";
@@ -184,7 +185,7 @@ export async function testVideoLlmConnection(): Promise<{
   const runtimeConfig = await resolveVideoAiRuntimeConfig();
   const config = resolveAiConfig({
     runtimeConfig,
-    defaultModel: DEFAULT_VIDEO_MODEL,
+    defaultModel: getVideoDefaultModel(runtimeConfig),
   });
 
   const output = await requestAiTextCompletion({
@@ -376,7 +377,7 @@ function buildPublicStatus(options: {
   try {
     const resolved = resolveAiConfig({
       runtimeConfig: options.runtimeConfig,
-      defaultModel: DEFAULT_VIDEO_MODEL,
+      defaultModel: getVideoDefaultModel(options.runtimeConfig),
     });
 
     return {
@@ -450,7 +451,7 @@ function readEnvSnapshot(): {
       exists: true,
       provider: "openai",
       baseURL: openAiBaseURL || DEFAULT_OPENAI_BASE_URL,
-      model: openAiModel || DEFAULT_VIDEO_MODEL,
+      model: openAiModel || DEFAULT_VIDEO_OPENAI_MODEL,
       secret: openAiApiKey || "",
       runtimeConfig: {
         provider: "openai",
@@ -470,7 +471,7 @@ function readEnvSnapshot(): {
       exists: hasAnthropicEnv || explicitProvider === "anthropic",
       provider: "anthropic",
       baseURL: anthropicBaseURL || DEFAULT_ANTHROPIC_BASE_URL,
-      model: anthropicModel || DEFAULT_VIDEO_MODEL,
+      model: anthropicModel || DEFAULT_VIDEO_ANTHROPIC_MODEL,
       secret: anthropicApiKey || anthropicAuthToken || "",
       runtimeConfig: {
         provider: "anthropic",
@@ -503,4 +504,65 @@ function readProviderEnv(value: string | undefined): AiProvider | null {
 function readNonEmptyEnv(name: string): string | null {
   const value = process.env[name]?.trim();
   return value ? value : null;
+}
+
+export function getVideoDefaultModel(
+  runtimeConfig: AiRuntimeConfig = {}
+): string {
+  const provider = inferVideoProvider(runtimeConfig);
+  return provider === "openai"
+    ? readNonEmptyEnv("OPENAI_MODEL") || DEFAULT_VIDEO_OPENAI_MODEL
+    : readNonEmptyEnv("ANTHROPIC_MODEL") || DEFAULT_VIDEO_ANTHROPIC_MODEL;
+}
+
+function inferVideoProvider(runtimeConfig: AiRuntimeConfig): AiProvider {
+  if (runtimeConfig.provider === "openai" || runtimeConfig.provider === "anthropic") {
+    return runtimeConfig.provider;
+  }
+
+  const explicitProvider = readProviderEnv(process.env.AI_PROVIDER);
+  if (explicitProvider) {
+    return explicitProvider;
+  }
+
+  const model = runtimeConfig.model?.trim().toLowerCase() || "";
+  const baseURL = runtimeConfig.baseURL?.trim().toLowerCase() || "";
+
+  if (model.startsWith("claude") || baseURL.includes("anthropic")) {
+    return "anthropic";
+  }
+
+  if (
+    model.startsWith("gpt") ||
+    model.startsWith("o1") ||
+    model.startsWith("o3") ||
+    model.startsWith("o4") ||
+    model.startsWith("gemini") ||
+    model.startsWith("deepseek") ||
+    model.startsWith("qwen") ||
+    model.includes("/") ||
+    baseURL.includes("openai") ||
+    baseURL.includes("/chat/completions") ||
+    baseURL.includes("/responses")
+  ) {
+    return "openai";
+  }
+
+  const hasAnthropicEnv = Boolean(
+    readNonEmptyEnv("ANTHROPIC_API_KEY") ||
+      readNonEmptyEnv("ANTHROPIC_AUTH_TOKEN") ||
+      readNonEmptyEnv("ANTHROPIC_BASE_URL") ||
+      readNonEmptyEnv("ANTHROPIC_MODEL")
+  );
+  const hasOpenAiEnv = Boolean(
+    readNonEmptyEnv("OPENAI_API_KEY") ||
+      readNonEmptyEnv("OPENAI_BASE_URL") ||
+      readNonEmptyEnv("OPENAI_MODEL")
+  );
+
+  if (hasOpenAiEnv && !hasAnthropicEnv) {
+    return "openai";
+  }
+
+  return "anthropic";
 }

@@ -23,7 +23,10 @@ import {
   type AiImageInput,
   type AiRuntimeConfig,
 } from "./ai-route-helpers";
-import { resolveVideoAiRuntimeConfig } from "./video-llm-config";
+import {
+  getVideoDefaultModel,
+  resolveVideoAiRuntimeConfig,
+} from "./video-llm-config";
 import type { CopyPlan, VideoInputMode } from "./video-studio";
 
 const execFileAsync = promisify(execFile);
@@ -35,7 +38,6 @@ const SUPPORTED_INPUT_MODES = new Set<VideoInputMode>([
   "frame_to_video",
   "multi_image_to_video",
 ]);
-const DEFAULT_VIDEO_MODEL = "claude-sonnet-4-20250514";
 const DEFAULT_TRANSCRIBE_MODEL = "whisper-1";
 const DEFAULT_VIDEO_MAX_UPLOAD_MB = 80;
 const OUTPUT_API_PREFIX = "/api/video-studio/output/";
@@ -976,7 +978,7 @@ export async function generateVideoCopyPlan({
   const effectiveRuntimeConfig = await resolveVideoAiRuntimeConfig(runtimeConfig);
   const config = resolveAiConfig({
     runtimeConfig: effectiveRuntimeConfig,
-    defaultModel: DEFAULT_VIDEO_MODEL,
+    defaultModel: getVideoDefaultModel(effectiveRuntimeConfig),
   });
   const referenceImages = await collectCopyReferenceImages(manifest);
 
@@ -1544,13 +1546,14 @@ async function transcribeVideo(
   language: string;
   note: string;
 }> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = getOpenAiTranscriptionApiKey();
   if (!apiKey) {
     return {
       text: "",
       segments: [],
       language: "unknown",
-      note: "未配置 OPENAI_API_KEY，已跳过音频转写；可以手动补充字幕后继续生成脚本。",
+      note:
+        "未配置 OPENAI_TRANSCRIBE_API_KEY 或 OPENAI_API_KEY，已跳过音频转写；可以手动补充字幕后继续生成脚本。",
     };
   }
 
@@ -1563,7 +1566,7 @@ async function transcribeVideo(
       type: contentTypeForPath(videoPath),
     });
     body.append("file", blob, fileName || "video.mp4");
-    body.append("model", process.env.OPENAI_TRANSCRIBE_MODEL || DEFAULT_TRANSCRIBE_MODEL);
+    body.append("model", getOpenAiTranscriptionModel());
     body.append("response_format", "verbose_json");
     body.append("temperature", "0");
 
@@ -1599,7 +1602,7 @@ async function transcribeVideo(
         allowEmpty: true,
         fallback: "unknown",
       }),
-      note: `已使用 ${process.env.OPENAI_TRANSCRIBE_MODEL || DEFAULT_TRANSCRIBE_MODEL} 完成音频转写。`,
+      note: `已使用 ${getOpenAiTranscriptionModel()} 完成音频转写。`,
     };
   } finally {
     clearTimeout(timeout);
@@ -1634,7 +1637,7 @@ async function analyzeFramesWithAi(options: {
   const effectiveRuntimeConfig = await resolveVideoAiRuntimeConfig(options.runtimeConfig);
   const config = resolveAiConfig({
     runtimeConfig: effectiveRuntimeConfig,
-    defaultModel: DEFAULT_VIDEO_MODEL,
+    defaultModel: getVideoDefaultModel(effectiveRuntimeConfig),
   });
 
   return requestStructuredJson<VideoVisualAnalysis>({
@@ -2798,12 +2801,33 @@ function getFfprobeBinary(): string | null {
 }
 
 function buildOpenAiAudioTranscriptionUrl(): string {
-  const baseURL = (process.env.OPENAI_BASE_URL || "https://api.openai.com")
+  const baseURL = (
+    process.env.OPENAI_TRANSCRIBE_BASE_URL ||
+    process.env.OPENAI_BASE_URL ||
+    "https://api.openai.com"
+  )
     .trim()
     .replace(/\/+$/, "")
     .replace(/\/v1$/i, "");
 
   return `${baseURL}/v1/audio/transcriptions`;
+}
+
+function getOpenAiTranscriptionApiKey(): string {
+  const explicitTranscribeKey = process.env.OPENAI_TRANSCRIBE_API_KEY?.trim();
+  if (explicitTranscribeKey) {
+    return explicitTranscribeKey;
+  }
+
+  if (process.env.OPENAI_TRANSCRIBE_BASE_URL?.trim()) {
+    return "";
+  }
+
+  return process.env.OPENAI_API_KEY?.trim() || "";
+}
+
+function getOpenAiTranscriptionModel(): string {
+  return process.env.OPENAI_TRANSCRIBE_MODEL?.trim() || DEFAULT_TRANSCRIBE_MODEL;
 }
 
 function safeFileName(source: string, fallback: string): string {

@@ -25,8 +25,12 @@
 
 - `ANTHROPIC_API_KEY`：视频关键帧分析和脚本生成可使用；也可通过 `AI_PROVIDER=openai` 和 `OPENAI_API_KEY` 使用 OpenAI 兼容模型。
 - `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL`：Anthropic 或兼容网关配置。
-- `OPENAI_API_KEY`：视频音频转写使用。
-- `OPENAI_BASE_URL`：OpenAI 兼容网关地址，默认 `https://api.openai.com`。
+- `AI_PROVIDER`：推荐设为 `openai`，让视频关键帧分析和脚本生成默认走 OpenAI-compatible 网关。
+- `OPENAI_API_KEY`：视频关键帧分析、脚本生成，以及未单独配置时的音频转写都可使用。
+- `OPENAI_BASE_URL`：OpenAI 兼容网关地址，默认 `https://api.openai.com`。如果线上要调用本机网关，必须先换成一个公网 HTTPS 桥接地址，不能直接写 `127.0.0.1`。
+- `OPENAI_MODEL`：OpenAI 兼容文本/视觉模型，推荐 `gpt-5.4`。
+- `OPENAI_TRANSCRIBE_API_KEY`：可选，单独给音频转写使用；只有未单独指定转写 base URL 时才会回退到 `OPENAI_API_KEY`。
+- `OPENAI_TRANSCRIBE_BASE_URL`：可选，单独给音频转写使用；一旦单独设置，建议同时设置 `OPENAI_TRANSCRIBE_API_KEY`。
 - `OPENAI_TRANSCRIBE_MODEL`：转写模型，默认 `whisper-1`。
 - `VIDEO_OUTPUT_ROOT`：视频上传、关键帧和任务文件保存目录；本地默认 `.video-output`，Vercel 默认写入临时目录。
 - `VIDEO_MAX_UPLOAD_MB`：单个视频上传大小上限，默认 `80`。
@@ -38,6 +42,6 @@
 ## 当前边界
 
 - 抽帧已迁移到 Node 侧 `ffmpeg-static` / `ffprobe-static`。
-- 转写已改为可选 OpenAI 音频转写；未配置 `OPENAI_API_KEY` 时不会阻塞上传分析，用户可以手动补字幕。
+- 转写已改为可选 OpenAI 音频转写；优先读取 `OPENAI_TRANSCRIBE_*`，只有未单独指定转写 base URL 时才会回退到 `OPENAI_*`。如果转写凭证仍缺失，则不会阻塞上传分析，用户可以手动补字幕。
 - Runway / Kling / Veo 等真实供应商生成还未接入，当前生成任务会保存参数和素材，并返回明确的占位状态。
 - Vercel serverless 文件系统不是长期存储；需要持久化任务和关键帧时，应接入对象存储或数据库。

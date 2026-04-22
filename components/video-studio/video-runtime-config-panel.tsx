@@ -56,8 +56,8 @@ const runtimeSections: Array<{
     title: "Frame Analysis",
     description: "Key-frame understanding used during video upload analysis",
     step: "POST /api/video-studio/upload-video",
-    placeholderBaseUrl: "https://api.anthropic.com",
-    placeholderModel: "claude-sonnet-4-20250514",
+    placeholderBaseUrl: "https://api.openai.com",
+    placeholderModel: "gpt-5.4",
     Icon: Clapperboard,
   },
   {
@@ -65,8 +65,8 @@ const runtimeSections: Array<{
     title: "Copy Generation",
     description: "Script rewrite and AI video prompt generation",
     step: "POST /api/video-studio/generate-copy",
-    placeholderBaseUrl: "https://api.anthropic.com",
-    placeholderModel: "claude-sonnet-4-20250514",
+    placeholderBaseUrl: "https://api.openai.com",
+    placeholderModel: "gpt-5.4",
     Icon: FileText,
   },
 ];
@@ -79,6 +79,8 @@ const providerOptions: Array<{
   { value: "anthropic", label: "Anthropic" },
   { value: "openai", label: "OpenAI-compatible" },
 ];
+
+const LOOPBACK_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 
 type RuntimeTestResult =
   | {
@@ -140,6 +142,19 @@ export function VideoRuntimeConfigPanel({
         .length,
     [aiRuntimeSettings]
   );
+  const localhostMismatchSections = useMemo(() => {
+    if (typeof window === "undefined") {
+      return [];
+    }
+
+    if (LOOPBACK_HOSTS.has(window.location.hostname)) {
+      return [];
+    }
+
+    return runtimeSections.filter(({ key }) =>
+      isLoopbackBaseUrl(aiRuntimeSettings[key].baseUrl)
+    );
+  }, [aiRuntimeSettings]);
 
   useEffect(() => {
     onServerStatusChangeRef.current = onServerStatusChange;
@@ -486,6 +501,14 @@ export function VideoRuntimeConfigPanel({
       </CardHeader>
 
       <CardContent className="space-y-4">
+        {localhostMismatchSections.length > 0 ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+            当前页面运行在远程站点，但你把{" "}
+            {localhostMismatchSections.map((section) => section.title).join(" / ")}{" "}
+            配到了 `127.0.0.1` 或 `localhost`。这些请求会从站点服务器发起，服务器访问不到你电脑本地网关，所以会连接失败。请改成公网 HTTPS 桥接地址，或改在本地页面中测试。
+          </div>
+        ) : null}
+
         <div className="flex flex-wrap gap-2">
           {runtimeSections.map((section) => (
             <Badge key={section.key} variant="outline" className="gap-1">
@@ -824,8 +847,12 @@ export function VideoRuntimeConfigPanel({
           Runtime settings are sent in both <span className="font-mono">runtime</span>{" "}
           and <span className="font-mono">runtimeConfig</span> fields, so the
           video studio can use the same override contract as the Listing flow.
-          Audio transcription still depends on the server-side{" "}
-          <span className="font-mono">OPENAI_API_KEY</span>.
+          Audio transcription is configured separately on the server with{" "}
+          <span className="font-mono">OPENAI_TRANSCRIBE_API_KEY</span> /{" "}
+          <span className="font-mono">OPENAI_TRANSCRIBE_BASE_URL</span>. It only
+          falls back to <span className="font-mono">OPENAI_API_KEY</span> /{" "}
+          <span className="font-mono">OPENAI_BASE_URL</span> when no dedicated
+          transcription base URL is set.
         </div>
       </CardContent>
     </Card>
@@ -960,4 +987,19 @@ function formatServerStatusSummary(status: VideoServerRuntimeStatus): string {
   const provider = status.provider ? formatProviderLabel(status.provider) : "Auto";
   const model = status.model || "model not set";
   return `${provider} / ${model}`;
+}
+
+function isLoopbackBaseUrl(baseUrl: string): boolean {
+  const value = baseUrl.trim();
+
+  if (!value) {
+    return false;
+  }
+
+  try {
+    const url = new URL(value);
+    return LOOPBACK_HOSTS.has(url.hostname);
+  } catch {
+    return /^(https?:\/\/)?(127\.0\.0\.1|localhost)(:\d+)?/i.test(value);
+  }
 }

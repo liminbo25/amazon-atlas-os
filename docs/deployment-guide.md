@@ -11,6 +11,7 @@
 
 Framework Preset 保持 `Next.js`。常用环境变量：
 
+- `AI_PROVIDER`
 - `ANTHROPIC_API_KEY`
 - `ANTHROPIC_BASE_URL`
 - `ANTHROPIC_MODEL`
@@ -28,6 +29,8 @@ Framework Preset 保持 `Next.js`。常用环境变量：
 - `OPENAI_API_KEY`
 - `OPENAI_BASE_URL`
 - `OPENAI_MODEL`
+- `OPENAI_TRANSCRIBE_API_KEY`
+- `OPENAI_TRANSCRIBE_BASE_URL`
 - `OPENAI_TRANSCRIBE_MODEL`
 - `VIDEO_OUTPUT_ROOT`
 - `VIDEO_MAX_UPLOAD_MB`
@@ -38,6 +41,24 @@ If `FASHN_API_KEY` is configured, the try-on flow will switch to FASHN Try-On Ma
 
 `NEXT_PUBLIC_VIDEO_API_BASE_URL` 不再是默认必需项。只有临时切回旧 `video-backend/` FastAPI 服务时才设置它。
 
+### 使用本地 OpenAI-compatible 网关作为线上默认 LLM
+
+如果你的主 LLM 运行在本机，例如 `http://127.0.0.1:8317/v1`，Vercel 线上函数无法直接访问这个地址。可行做法是：
+
+1. 在本机启动一个公网 HTTPS 隧道，把 `127.0.0.1:8317` 暴露出去。
+2. 将 Vercel 的 `AI_PROVIDER` 设为 `openai`。
+3. 将 `OPENAI_BASE_URL` 设为隧道暴露出的公网地址。
+4. 将 `OPENAI_API_KEY` 设为该网关所需的 key。
+5. 将 `OPENAI_MODEL` 设为 `gpt-5.4`。
+
+推荐把视频音频转写保持独立：
+
+- `OPENAI_TRANSCRIBE_BASE_URL=https://api.openai.com`
+- `OPENAI_TRANSCRIBE_API_KEY=<你的转写 key>`
+- `OPENAI_TRANSCRIBE_MODEL=whisper-1`
+
+这样 Listing、多源分析、视频关键帧分析、视频脚本生成会走你的 `gpt-5.4` 网关，而图片生成、视频生成、音频转写仍可保留原有供应商。
+
 ## 视频模块部署说明
 
 视频工坊默认走项目内 Next.js API：
@@ -47,7 +68,7 @@ If `FASHN_API_KEY` is configured, the try-on flow will switch to FASHN Try-On Ma
 - `/api/video-studio/upload-video`
 - `/api/video-studio/generate-copy`
 
-抽帧依赖 npm 包 `ffmpeg-static` 和 `ffprobe-static`，不用单独启动 Python 服务。音频转写依赖 `OPENAI_API_KEY`；未配置时视频上传仍会返回关键帧和基础 manifest，脚本区可以手动补字幕后继续。
+抽帧依赖 npm 包 `ffmpeg-static` 和 `ffprobe-static`，不用单独启动 Python 服务。音频转写优先读取 `OPENAI_TRANSCRIBE_API_KEY` / `OPENAI_TRANSCRIBE_BASE_URL`；只有未单独指定 `OPENAI_TRANSCRIBE_BASE_URL` 时才会回退到 `OPENAI_API_KEY` / `OPENAI_BASE_URL`。如果转写凭证最终仍未配置，视频上传仍会返回关键帧和基础 manifest，脚本区可以手动补字幕后继续。
 
 Vercel serverless 文件系统只适合作为临时输出目录。若视频任务需要长期保存关键帧、上传素材或真实生成结果，后续应接对象存储或数据库。
 
