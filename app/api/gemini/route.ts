@@ -17,6 +17,12 @@ type GeminiRequestType =
   | "free-generation";
 type GeminiImageModel = "nano_banana_pro" | "image2";
 type GeminiFreeGenerationMode = "text-to-image" | "image-to-image";
+type GeminiRouteError = Error & {
+  code?: string;
+  status?: number;
+  retryable?: boolean;
+  model?: GeminiImageModel;
+};
 
 export interface GeminiRequest {
   image?: string;
@@ -66,6 +72,7 @@ const GEMINI_UPSTREAM_RETRYABLE_ERROR_CODES = new Set([
   "UPSTREAM_CONNECT_TIMEOUT",
   "UPSTREAM_RESPONSE_TIMEOUT",
 ]);
+const MAX_INLINE_RESULT_BYTES = 2 * 1024 * 1024;
 
 function resolveApiBaseUrl(
   rawBaseUrl: string | undefined,
@@ -88,6 +95,15 @@ function resolveApiBaseUrl(
 
 function isSupportedGeminiImageModel(value?: string): value is GeminiImageModel {
   return value === "nano_banana_pro" || value === "image2";
+}
+
+function createGeminiRouteError(
+  message: string,
+  overrides: Partial<GeminiRouteError> = {}
+) {
+  const error = new Error(message) as GeminiRouteError;
+  Object.assign(error, overrides);
+  return error;
 }
 
 function usesChatCompletionsModel(imageModel: GeminiImageModel) {
@@ -183,6 +199,23 @@ async function persistGeneratedImageResult(source: string, folder: string) {
     return uploadedResult.url;
   } catch (error) {
     console.warn("Failed to persist generated image result to Blob:", error);
+
+    if (source.startsWith("data:image/")) {
+      const base64Payload = source.split(",")[1] || "";
+      const estimatedBytes = Math.ceil((base64Payload.length * 3) / 4);
+
+      if (estimatedBytes > MAX_INLINE_RESULT_BYTES) {
+        throw createGeminiRouteError(
+          "Generated image was created, but storing the result failed before a browser-safe URL could be returned. Please retry.",
+          {
+            code: "RESULT_PERSIST_FAILED",
+            status: 502,
+            retryable: true,
+          }
+        );
+      }
+    }
+
     return source;
   }
 }
@@ -356,11 +389,12 @@ async function requestProviderJson(
   apiBaseUrl: string,
   endpointPath: string,
   geminiApiKey: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  maxAttempts = GEMINI_UPSTREAM_MAX_ATTEMPTS
 ) {
   let lastNetworkError: unknown;
 
-  for (let attempt = 1; attempt <= GEMINI_UPSTREAM_MAX_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const response = await sendProviderRequest(
         apiBaseUrl,
@@ -371,7 +405,7 @@ async function requestProviderJson(
 
       if (
         shouldRetryUpstreamStatus(response.status, response.responseText) &&
-        attempt < GEMINI_UPSTREAM_MAX_ATTEMPTS
+        attempt < maxAttempts
       ) {
         await sleep(500 * attempt);
         continue;
@@ -380,20 +414,24 @@ async function requestProviderJson(
       return response;
     } catch (error) {
       lastNetworkError = error;
+      const retryable = isRetryableNetworkError(error);
 
-      if (
-        isRetryableNetworkError(error) &&
-        attempt < GEMINI_UPSTREAM_MAX_ATTEMPTS
-      ) {
+      if (retryable && attempt < maxAttempts) {
         await sleep(500 * attempt);
         continue;
       }
 
-      throw new Error(formatNetworkError(error));
+      throw createGeminiRouteError(formatNetworkError(error), {
+        code: extractErrorCode(error),
+        retryable,
+      });
     }
   }
 
-  throw new Error(formatNetworkError(lastNetworkError));
+  throw createGeminiRouteError(formatNetworkError(lastNetworkError), {
+    code: extractErrorCode(lastNetworkError),
+    retryable: isRetryableNetworkError(lastNetworkError),
+  });
 }
 
 function parseImageGenerationResponse(responseText: string) {
@@ -716,7 +754,81 @@ function extractImageFromChatCompletion(data: {
   return extractImageFromText(text);
 }
 
-async function runImageGeneration(options: {
+function createProviderResponseError(
+  imageModel: GeminiImageModel,
+  status: number,
+  responseText: string
+) {
+  return createGeminiRouteError(`API request failed: ${status} - ${responseText}`, {
+    status,
+    retryable: shouldRetryUpstreamStatus(status, responseText),
+    model: imageModel,
+  });
+}
+
+function getAlternateGeminiImageModel(
+  imageModel: GeminiImageModel
+): GeminiImageModel | null {
+  return imageModel === "image2" ? "nano_banana_pro" : null;
+}
+
+function shouldFallbackToAlternateGeminiModel(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const normalizedMessage = error.message.toLowerCase();
+  const maybeGeminiError = error as GeminiRouteError;
+
+  if (maybeGeminiError.retryable) {
+    return true;
+  }
+
+  return (
+    normalizedMessage.includes("did not include an image url") ||
+    normalizedMessage.includes("did not include an image result") ||
+    normalizedMessage.includes("returned unreadable content") ||
+    normalizedMessage.includes("upstream took too long") ||
+    normalizedMessage.includes("upstream connection timed out") ||
+    normalizedMessage.includes("upstream request failed")
+  );
+}
+
+function getGeminiErrorStatus(error: unknown) {
+  if (
+    error &&
+    typeof error === "object" &&
+    "status" in error &&
+    typeof error.status === "number"
+  ) {
+    return error.status;
+  }
+
+  const code = extractErrorCode(error);
+
+  if (code === "UPSTREAM_RESPONSE_TIMEOUT" || code === "UND_ERR_HEADERS_TIMEOUT") {
+    return 504;
+  }
+
+  if (code === "UPSTREAM_CONNECT_TIMEOUT" || code === "UND_ERR_CONNECT_TIMEOUT") {
+    return 504;
+  }
+
+  if (error instanceof Error && error.message.toLowerCase().includes("upstream")) {
+    return 502;
+  }
+
+  if (
+    error instanceof Error &&
+    /api request failed:\s*(429|500|502|503|504)\b/i.test(error.message)
+  ) {
+    return 502;
+  }
+
+  return 500;
+}
+
+interface RunImageGenerationOptions {
   geminiApiKey: string;
   imageModel: GeminiImageModel;
   prompt: string;
@@ -724,7 +836,10 @@ async function runImageGeneration(options: {
   imageLabels?: string[];
   size: string;
   fallbackSize?: string;
-}) {
+  maxAttempts?: number;
+}
+
+async function runImageGeneration(options: RunImageGenerationOptions) {
   const {
     geminiApiKey,
     imageModel,
@@ -733,13 +848,17 @@ async function runImageGeneration(options: {
     imageLabels,
     size,
     fallbackSize,
+    maxAttempts = GEMINI_UPSTREAM_MAX_ATTEMPTS,
   } = options;
   const apiBaseUrl = resolveImageApiBaseUrl(imageModel);
   const normalizedImages = images.map((image) => normalizeImageForProvider(image));
   const normalizedSize = normalizeSizeForModel(imageModel, size, fallbackSize);
 
   if (usesChatCompletionsModel(imageModel)) {
-    const apiResult = await requestProviderJson(
+    const normalizedFallbackSize = fallbackSize
+      ? normalizeSizeForModel(imageModel, fallbackSize, fallbackSize)
+      : undefined;
+    let apiResult = await requestProviderJson(
       apiBaseUrl,
       "/chat/completions",
       geminiApiKey,
@@ -751,16 +870,58 @@ async function runImageGeneration(options: {
           imageLabels
         ),
         size: normalizedSize,
-      }
+      },
+      maxAttempts
     );
 
-    if (!apiResult.ok) {
-      throw new Error(
-        `API request failed: ${apiResult.status} - ${apiResult.responseText}`
+    if (
+      !apiResult.ok &&
+      normalizedFallbackSize &&
+      normalizedSize !== normalizedFallbackSize &&
+      shouldRetryWithFallbackSize(apiResult.responseText, apiResult.status)
+    ) {
+      apiResult = await requestProviderJson(
+        apiBaseUrl,
+        "/chat/completions",
+        geminiApiKey,
+        {
+          model: imageModel,
+          messages: buildChatCompletionMessages(
+            prompt,
+            normalizedImages,
+            imageLabels
+          ),
+          size: normalizedFallbackSize,
+        },
+        maxAttempts
       );
     }
 
-    const data = parseChatCompletionResponse(apiResult.responseText);
+    if (!apiResult.ok) {
+      throw createProviderResponseError(
+        imageModel,
+        apiResult.status,
+        apiResult.responseText
+      );
+    }
+
+    let data: ReturnType<typeof parseChatCompletionResponse>;
+
+    try {
+      data = parseChatCompletionResponse(apiResult.responseText);
+    } catch (error) {
+      throw createGeminiRouteError(
+        error instanceof Error
+          ? error.message
+          : "Chat completions returned unreadable content.",
+        {
+          code: "UPSTREAM_INVALID_RESPONSE",
+          retryable: true,
+          model: imageModel,
+        }
+      );
+    }
+
     const result = extractImageFromChatCompletion(data);
 
     if (result) {
@@ -768,10 +929,19 @@ async function runImageGeneration(options: {
     }
 
     if (data.error?.message) {
-      throw new Error(data.error.message);
+      throw createGeminiRouteError(data.error.message, {
+        model: imageModel,
+      });
     }
 
-    throw new Error("Chat completions response did not include an image URL.");
+    throw createGeminiRouteError(
+      "Chat completions response did not include an image URL.",
+      {
+        code: "UPSTREAM_MISSING_IMAGE",
+        retryable: true,
+        model: imageModel,
+      }
+    );
   }
 
   const normalizedFallbackSize = fallbackSize
@@ -794,7 +964,8 @@ async function runImageGeneration(options: {
     apiBaseUrl,
     "/images/generations",
     geminiApiKey,
-    imageGenerationPayload
+    imageGenerationPayload,
+    maxAttempts
   );
 
   if (
@@ -812,7 +983,8 @@ async function runImageGeneration(options: {
       apiBaseUrl,
       "/images/generations",
       geminiApiKey,
-      fallbackPayload
+      fallbackPayload,
+      maxAttempts
     );
   }
 
@@ -822,7 +994,23 @@ async function runImageGeneration(options: {
     );
   }
 
-  const data = parseImageGenerationResponse(apiResult.responseText);
+  let data: ReturnType<typeof parseImageGenerationResponse>;
+
+  try {
+    data = parseImageGenerationResponse(apiResult.responseText);
+  } catch (error) {
+    throw createGeminiRouteError(
+      error instanceof Error
+        ? error.message
+        : "Image generation returned unreadable content.",
+      {
+        code: "UPSTREAM_INVALID_RESPONSE",
+        retryable: true,
+        model: imageModel,
+      }
+    );
+  }
+
   const result = extractImageFromResponse(data);
 
   if (result) {
@@ -830,7 +1018,9 @@ async function runImageGeneration(options: {
   }
 
   if (data.error?.message) {
-    throw new Error(data.error.message);
+    throw createGeminiRouteError(data.error.message, {
+      model: imageModel,
+    });
   }
 
   throw new Error("接口返回中没有找到图片结果。");
@@ -895,6 +1085,44 @@ function normalizeReferenceImages(referenceImages?: string[]) {
   );
 }
 
+async function runImageGenerationWithFallback(options: RunImageGenerationOptions) {
+  try {
+    const result = await runImageGeneration(options);
+    return {
+      result,
+      modelUsed: options.imageModel,
+      fallbackModelUsed: false,
+    };
+  } catch (error) {
+    const alternateModel = getAlternateGeminiImageModel(options.imageModel);
+
+    if (!alternateModel || !shouldFallbackToAlternateGeminiModel(error)) {
+      throw error;
+    }
+
+    console.warn("Primary Gemini image model failed, falling back.", {
+      requestedModel: options.imageModel,
+      alternateModel,
+      error: error instanceof Error ? error.message : String(error),
+    });
+
+    const alternateSize = options.fallbackSize || getDefaultTryOnSize(alternateModel);
+    const result = await runImageGeneration({
+      ...options,
+      imageModel: alternateModel,
+      size: alternateSize,
+      fallbackSize: alternateSize,
+      maxAttempts: 1,
+    });
+
+    return {
+      result,
+      modelUsed: alternateModel,
+      fallbackModelUsed: true,
+    };
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as GeminiRequest;
@@ -929,7 +1157,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const result = await runImageGeneration({
+      const generation = await runImageGenerationWithFallback({
         geminiApiKey,
         imageModel,
         prompt: buildVirtualTryOnPrompt(imageModel, garmentNote),
@@ -939,13 +1167,15 @@ export async function POST(request: NextRequest) {
         fallbackSize: "1024x1024",
       });
       const persistedResult = await persistGeneratedImageResult(
-        result,
+        generation.result,
         "image-studio/generated/try-on"
       );
 
       return NextResponse.json({
         success: true,
         result: persistedResult,
+        modelUsed: generation.modelUsed,
+        fallbackModelUsed: generation.fallbackModelUsed || undefined,
       });
     }
 
@@ -957,7 +1187,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const result = await runImageGeneration({
+      const generation = await runImageGenerationWithFallback({
         geminiApiKey,
         imageModel,
         prompt: buildWhiteBackgroundPrompt(),
@@ -966,13 +1196,15 @@ export async function POST(request: NextRequest) {
         fallbackSize: "1024x1024",
       });
       const persistedResult = await persistGeneratedImageResult(
-        result,
+        generation.result,
         "image-studio/generated/white-background"
       );
 
       return NextResponse.json({
         success: true,
         result: persistedResult,
+        modelUsed: generation.modelUsed,
+        fallbackModelUsed: generation.fallbackModelUsed || undefined,
       });
     }
 
@@ -1018,7 +1250,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const result = await runImageGeneration({
+      const generation = await runImageGenerationWithFallback({
         geminiApiKey,
         imageModel,
         prompt: prompt.trim(),
@@ -1027,13 +1259,15 @@ export async function POST(request: NextRequest) {
         fallbackSize: "1024x1024",
       });
       const persistedResult = await persistGeneratedImageResult(
-        result,
+        generation.result,
         "image-studio/generated/free-generation"
       );
 
       return NextResponse.json({
         success: true,
         result: persistedResult,
+        modelUsed: generation.modelUsed,
+        fallbackModelUsed: generation.fallbackModelUsed || undefined,
       });
     }
 
@@ -1044,7 +1278,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const result = await runImageGeneration({
+    const generation = await runImageGenerationWithFallback({
       geminiApiKey,
       imageModel,
       prompt: buildModelSwapPrompt(prompt),
@@ -1053,13 +1287,15 @@ export async function POST(request: NextRequest) {
       fallbackSize: "1024x1024",
     });
     const persistedResult = await persistGeneratedImageResult(
-      result,
+      generation.result,
       "image-studio/generated/model-swap"
     );
 
     return NextResponse.json({
       success: true,
       result: persistedResult,
+      modelUsed: generation.modelUsed,
+      fallbackModelUsed: generation.fallbackModelUsed || undefined,
     });
   } catch (error) {
     console.error("Gemini route error:", error);
@@ -1069,7 +1305,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: error instanceof Error ? error.message : "服务器内部错误。",
       },
-      { status: 500 }
+      { status: getGeminiErrorStatus(error) }
     );
   }
 }

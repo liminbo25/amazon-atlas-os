@@ -55,7 +55,7 @@ export async function GET(
     }
 
     const response = await fetch(
-      `${config.baseUrl}/v1/status/${encodeURIComponent(jobId)}`,
+      `${config.baseUrl}/status/${encodeURIComponent(jobId)}`,
       {
         method: "GET",
         headers: buildFashnAuthHeaders(config.apiKey),
@@ -89,18 +89,28 @@ export async function GET(
         );
       }
 
-      const uploadedResult = await uploadImageSourceToBlob(
-        sourceUrl,
-        "image-studio/generated/try-on"
-      );
+      let result = sourceUrl;
+      let blobPersisted = false;
+
+      try {
+        const uploadedResult = await uploadImageSourceToBlob(
+          sourceUrl,
+          "image-studio/generated/try-on"
+        );
+        result = uploadedResult.url;
+        blobPersisted = true;
+      } catch (error) {
+        console.warn("Failed to persist FASHN result to Blob:", error);
+      }
 
       return NextResponse.json({
         success: true,
         provider: "fashn",
         jobId,
         status: providerStatus,
-        result: uploadedResult.url,
+        result,
         sourceUrl,
+        blobPersisted,
         outputFormat: config.outputFormat,
         creditsUsed,
       });

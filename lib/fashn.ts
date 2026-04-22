@@ -42,10 +42,16 @@ function normalizeFashnApiBaseUrl(rawValue?: string) {
   const trimmed = rawValue?.trim();
 
   if (!trimmed) {
-    return DEFAULT_FASHN_API_BASE_URL;
+    return `${DEFAULT_FASHN_API_BASE_URL}/v1`;
   }
 
-  return trimmed.replace(/\/+$/, "");
+  const normalized = trimmed.replace(/\/+$/, "");
+
+  if (/\/v\d+$/i.test(normalized)) {
+    return normalized;
+  }
+
+  return `${normalized}/v1`;
 }
 
 function normalizeFashnGenerationMode(

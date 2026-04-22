@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     }
 
     const prompt = buildStrictTryOnPrompt(body.garmentNote);
-    const response = await fetch(`${config.baseUrl}/v1/run`, {
+    const response = await fetch(`${config.baseUrl}/run`, {
       method: "POST",
       headers: buildFashnAuthHeaders(config.apiKey),
       body: JSON.stringify({
