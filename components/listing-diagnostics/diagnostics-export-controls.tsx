@@ -58,7 +58,7 @@ export function DiagnosticsExportControls({
       setExportError(
         error instanceof Error
           ? error.message
-          : "Export failed. Please try again."
+          : "导出失败，请稍后重试。"
       );
     } finally {
       setExporting(null);
@@ -71,23 +71,21 @@ export function DiagnosticsExportControls({
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">Reporting export</Badge>
+              <Badge variant="secondary">导出中心</Badge>
               <Badge variant="outline">{result.request.marketplace}</Badge>
               <Badge variant="outline">ASIN {result.request.targetAsin}</Badge>
             </div>
             <CardTitle className="text-xl text-slate-950">
-              Download the current diagnostics run
+              导出当前诊断结果
             </CardTitle>
             <CardDescription className="max-w-3xl text-sm leading-7 text-slate-600">
-              Export the current reporting layer as a Word summary, workbook, or
-              structured JSON payload without rerunning the diagnostic engine. The
-              exports preserve root-cause drilldown, verification labels, and the
-              executable action plan.
+              不需要重新跑诊断，就可以把当前结果导出为 Word 摘要、Excel 分析表或 JSON
+              结构化数据。Excel 会按中文业务模板输出，便于直接对照和继续优化。
             </CardDescription>
           </div>
 
           <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
-            <p className="font-semibold text-slate-900">Generated</p>
+            <p className="font-semibold text-slate-900">生成时间</p>
             <p className="mt-1">{formatDateTime(result.generatedAt)}</p>
           </div>
         </div>
@@ -95,8 +93,8 @@ export function DiagnosticsExportControls({
       <CardContent className="space-y-4 pt-6">
         <div className="grid gap-3 md:grid-cols-3">
           <ExportButton
-            title="Word report"
-            description="Narrative report with score breakdown, root causes, action plan, benchmark summary, and evidence appendix."
+            title="Word 报告"
+            description="导出叙述型总结，包含评分拆解、根因、行动建议、基准摘要和证据附录。"
             extension=".docx"
             icon={<FileText className="h-5 w-5 text-blue-600" />}
             iconWrapperClass="bg-blue-100"
@@ -106,8 +104,8 @@ export function DiagnosticsExportControls({
             }}
           />
           <ExportButton
-            title="Excel workbook"
-            description="Workbook tabs for summary, score breakdown, coverage, enriched findings, action plan, benchmark, and evidence."
+            title="Excel 分析表"
+            description="按中文模板导出基础对比、关键词分析、优化方案、覆盖矩阵和行动清单。"
             extension=".xlsx"
             icon={<Table2 className="h-5 w-5 text-emerald-600" />}
             iconWrapperClass="bg-emerald-100"
@@ -117,8 +115,8 @@ export function DiagnosticsExportControls({
             }}
           />
           <ExportButton
-            title="JSON payload"
-            description="Machine-readable payload with verification labels, root causes, findings, action plan, source coverage, and benchmark summary."
+            title="JSON 数据"
+            description="导出结构化诊断原始数据，适合二次处理、接口对接和问题复盘。"
             extension=".json"
             icon={<FileJson className="h-5 w-5 text-amber-600" />}
             iconWrapperClass="bg-amber-100"
@@ -137,7 +135,7 @@ export function DiagnosticsExportControls({
 
         {lastExportedFile ? (
           <div className="rounded-[1.3rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-            Download generated: {lastExportedFile}
+            已生成：{lastExportedFile}
           </div>
         ) : null}
       </CardContent>
@@ -189,7 +187,7 @@ function ExportButton({
         ) : (
           <Download className="h-4 w-4" />
         )}
-        {isLoading ? "Generating..." : `Download ${extension}`}
+        {isLoading ? "生成中..." : `导出 ${extension}`}
       </Button>
     </div>
   );
@@ -202,5 +200,5 @@ function formatDateTime(value: string) {
     return value;
   }
 
-  return date.toLocaleString("en-US");
+  return date.toLocaleString("zh-CN");
 }
