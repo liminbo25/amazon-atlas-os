@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 type GeminiRequestType = "virtual-tryon" | "white-background" | "model-swap";
+type GeminiImageModel = "nano_banana_pro" | "image2";
 
 export interface GeminiRequest {
   image?: string;
@@ -15,6 +16,7 @@ export interface GeminiRequest {
   garmentNote?: string;
   type?: GeminiRequestType;
   size?: string;
+  model?: GeminiImageModel;
 }
 
 export interface GeminiResponse {
@@ -23,13 +25,21 @@ export interface GeminiResponse {
   error?: string;
 }
 
-const DEFAULT_API_BASE_URL = "https://ai.yijiarj.cn/v1";
-const DEFAULT_MODEL = "nano_banana_pro";
+const DEFAULT_IMAGE_GENERATIONS_API_BASE_URL = "https://ai.yijiarj.cn/v1";
+const DEFAULT_CHAT_COMPLETIONS_API_BASE_URL = "https://api.yijiarj.cn/v1";
+const DEFAULT_MODEL: GeminiImageModel = "nano_banana_pro";
 const DEFAULT_GEMINI_TRYON_SIZE = "1024x1024";
 const GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS = 30_000;
 const GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS = 180_000;
 const GEMINI_UPSTREAM_MAX_ATTEMPTS = 3;
 const GEMINI_UPSTREAM_RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+const IMAGE2_SUPPORTED_SIZES = new Set([
+  "1024x1024",
+  "1024x1792",
+  "1792x1024",
+  "1920x822",
+  "822x1920",
+]);
 const GEMINI_UPSTREAM_RETRYABLE_ERROR_CODES = new Set([
   "ECONNABORTED",
   "ECONNRESET",
@@ -44,11 +54,14 @@ const GEMINI_UPSTREAM_RETRYABLE_ERROR_CODES = new Set([
   "UPSTREAM_RESPONSE_TIMEOUT",
 ]);
 
-function resolveApiBaseUrl(rawBaseUrl?: string) {
+function resolveApiBaseUrl(
+  rawBaseUrl: string | undefined,
+  defaultBaseUrl: string
+) {
   const trimmed = rawBaseUrl?.trim();
 
   if (!trimmed) {
-    return DEFAULT_API_BASE_URL;
+    return defaultBaseUrl;
   }
 
   const normalized = trimmed.replace(/\/+$/, "");
@@ -60,11 +73,42 @@ function resolveApiBaseUrl(rawBaseUrl?: string) {
   return `${normalized}/v1`;
 }
 
-function resolveImageModel() {
-  return (
-    process.env.GEMINI_IMAGE_MODEL?.trim() ||
-    process.env.GEMINI_MODEL?.trim() ||
-    DEFAULT_MODEL
+function isSupportedGeminiImageModel(value?: string): value is GeminiImageModel {
+  return value === "nano_banana_pro" || value === "image2";
+}
+
+function usesChatCompletionsModel(imageModel: GeminiImageModel) {
+  return imageModel === "image2";
+}
+
+function resolveImageModel(requestedModel?: string): GeminiImageModel {
+  const normalizedRequestedModel = requestedModel?.trim();
+
+  if (isSupportedGeminiImageModel(normalizedRequestedModel)) {
+    return normalizedRequestedModel;
+  }
+
+  const configuredModel =
+    process.env.GEMINI_IMAGE_MODEL?.trim() || process.env.GEMINI_MODEL?.trim();
+
+  if (isSupportedGeminiImageModel(configuredModel)) {
+    return configuredModel;
+  }
+
+  return DEFAULT_MODEL;
+}
+
+function resolveImageApiBaseUrl(imageModel: GeminiImageModel) {
+  const configuredBaseUrl =
+    imageModel === "image2"
+      ? process.env.GEMINI_IMAGE2_API_BASE_URL?.trim()
+      : process.env.GEMINI_API_BASE_URL?.trim();
+
+  return resolveApiBaseUrl(
+    configuredBaseUrl,
+    usesChatCompletionsModel(imageModel)
+      ? DEFAULT_CHAT_COMPLETIONS_API_BASE_URL
+      : DEFAULT_IMAGE_GENERATIONS_API_BASE_URL
   );
 }
 
@@ -81,6 +125,37 @@ function normalizeImageForProvider(image: string) {
 
   const base64Data = trimmed.includes(",") ? trimmed.split(",")[1] : trimmed;
   return `data:image/png;base64,${base64Data}`;
+}
+
+function normalizeSizeForModel(
+  imageModel: GeminiImageModel,
+  requestedSize: string | undefined,
+  fallbackSize?: string
+) {
+  const normalizedRequested = requestedSize?.trim().toLowerCase();
+  const normalizedFallback = fallbackSize?.trim().toLowerCase();
+
+  if (!usesChatCompletionsModel(imageModel)) {
+    return normalizedRequested || normalizedFallback || "1024x1024";
+  }
+
+  if (normalizedRequested && IMAGE2_SUPPORTED_SIZES.has(normalizedRequested)) {
+    return normalizedRequested;
+  }
+
+  if (normalizedRequested === "1024x1536") {
+    return "1024x1792";
+  }
+
+  if (normalizedRequested === "1536x1024") {
+    return "1792x1024";
+  }
+
+  if (normalizedFallback && IMAGE2_SUPPORTED_SIZES.has(normalizedFallback)) {
+    return normalizedFallback;
+  }
+
+  return "1024x1024";
 }
 
 function sleep(delayMs: number) {
@@ -158,12 +233,13 @@ function formatNetworkError(error: unknown) {
   return "Gemini upstream request failed before a complete response was received.";
 }
 
-async function sendImageGenerationRequest(
+async function sendProviderRequest(
   apiBaseUrl: string,
+  endpointPath: string,
   geminiApiKey: string,
   payload: Record<string, unknown>
 ) {
-  const requestUrl = new URL(`${apiBaseUrl}/images/generations`);
+  const requestUrl = new URL(`${apiBaseUrl}${endpointPath}`);
   const requestBody = JSON.stringify(payload);
   const requestImpl =
     requestUrl.protocol === "http:" ? httpRequest : httpsRequest;
@@ -247,8 +323,9 @@ async function sendImageGenerationRequest(
   });
 }
 
-async function requestImageGeneration(
+async function requestProviderJson(
   apiBaseUrl: string,
+  endpointPath: string,
   geminiApiKey: string,
   payload: Record<string, unknown>
 ) {
@@ -256,8 +333,9 @@ async function requestImageGeneration(
 
   for (let attempt = 1; attempt <= GEMINI_UPSTREAM_MAX_ATTEMPTS; attempt += 1) {
     try {
-      const response = await sendImageGenerationRequest(
+      const response = await sendProviderRequest(
         apiBaseUrl,
+        endpointPath,
         geminiApiKey,
         payload
       );
@@ -329,26 +407,175 @@ function extractImageFromResponse(data: {
   return null;
 }
 
+function buildChatCompletionMessages(prompt: string, images: string[]) {
+  return [
+    {
+      role: "user",
+      content: [
+        {
+          type: "text",
+          text: prompt,
+        },
+        ...images.map((image) => ({
+          type: "image_url",
+          image_url: {
+            url: image,
+          },
+        })),
+      ],
+    },
+  ];
+}
+
+function parseChatCompletionResponse(responseText: string) {
+  try {
+    return JSON.parse(responseText) as {
+      choices?: Array<{
+        message?: {
+          content?:
+            | string
+            | Array<{
+                type?: string;
+                text?: string;
+              }>;
+        };
+      }>;
+      error?: { message?: string };
+    };
+  } catch {
+    throw new Error(
+      `Chat completions returned unreadable content: ${responseText.slice(0, 200)}`
+    );
+  }
+}
+
+function extractImageFromChatCompletion(data: {
+  choices?: Array<{
+    message?: {
+      content?:
+        | string
+        | Array<{
+            type?: string;
+            text?: string;
+          }>;
+    };
+  }>;
+}) {
+  const content = data.choices?.[0]?.message?.content;
+
+  if (!content) {
+    return null;
+  }
+
+  const text =
+    typeof content === "string"
+      ? content
+      : content
+          .filter(
+            (item): item is { type?: string; text: string } =>
+              typeof item?.text === "string"
+          )
+          .map((item) => item.text)
+          .join("\n");
+
+  if (!text) {
+    return null;
+  }
+
+  const markdownMatch = text.match(/!\[[^\]]*]\((https?:\/\/[^)\s]+)\)/i);
+
+  if (markdownMatch?.[1]) {
+    return markdownMatch[1];
+  }
+
+  const urlMatch = text.match(/https?:\/\/[^\s)]+/i);
+  return urlMatch?.[0] || null;
+}
+
 async function runImageGeneration(options: {
-  apiBaseUrl: string;
   geminiApiKey: string;
-  payload: Record<string, unknown>;
+  imageModel: GeminiImageModel;
+  prompt: string;
+  images: string[];
+  size: string;
   fallbackSize?: string;
 }) {
-  const { apiBaseUrl, geminiApiKey, payload, fallbackSize } = options;
+  const { geminiApiKey, imageModel, prompt, images, size, fallbackSize } = options;
+  const apiBaseUrl = resolveImageApiBaseUrl(imageModel);
+  const normalizedImages = images.map((image) => normalizeImageForProvider(image));
+  const normalizedSize = normalizeSizeForModel(imageModel, size, fallbackSize);
 
-  let apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, payload);
+  if (usesChatCompletionsModel(imageModel)) {
+    const apiResult = await requestProviderJson(
+      apiBaseUrl,
+      "/chat/completions",
+      geminiApiKey,
+      {
+        model: imageModel,
+        messages: buildChatCompletionMessages(prompt, normalizedImages),
+        size: normalizedSize,
+      }
+    );
+
+    if (!apiResult.ok) {
+      throw new Error(
+        `API request failed: ${apiResult.status} - ${apiResult.responseText}`
+      );
+    }
+
+    const data = parseChatCompletionResponse(apiResult.responseText);
+    const result = extractImageFromChatCompletion(data);
+
+    if (result) {
+      return result;
+    }
+
+    if (data.error?.message) {
+      throw new Error(data.error.message);
+    }
+
+    throw new Error("Chat completions response did not include an image URL.");
+  }
+
+  const normalizedFallbackSize = fallbackSize
+    ? normalizeSizeForModel(imageModel, fallbackSize, fallbackSize)
+    : undefined;
+
+  let apiResult = await requestProviderJson(
+    apiBaseUrl,
+    "/images/generations",
+    geminiApiKey,
+    {
+      model: imageModel,
+      prompt,
+      image: normalizedImages,
+      n: 1,
+      size: normalizedSize,
+      quality: "hd",
+      style: "natural",
+    }
+  );
 
   if (
     !apiResult.ok &&
-    fallbackSize &&
-    payload.size !== fallbackSize &&
+    normalizedFallbackSize &&
+    normalizedSize !== normalizedFallbackSize &&
     shouldRetryWithFallbackSize(apiResult.responseText, apiResult.status)
   ) {
-    apiResult = await requestImageGeneration(apiBaseUrl, geminiApiKey, {
-      ...payload,
-      size: fallbackSize,
-    });
+    apiResult = await requestProviderJson(
+      apiBaseUrl,
+      "/images/generations",
+      geminiApiKey,
+      {
+        model: imageModel,
+        prompt,
+        image: normalizedImages,
+        n: 1,
+        size: normalizedFallbackSize,
+        quality: "hd",
+        style: "natural",
+      }
+    );
   }
 
   if (!apiResult.ok) {
@@ -448,11 +675,11 @@ export async function POST(request: NextRequest) {
       garmentNote,
       type = "model-swap",
       size,
+      model,
     } = body;
 
     const geminiApiKey = process.env.GEMINI_API_KEY;
-    const apiBaseUrl = resolveApiBaseUrl(process.env.GEMINI_API_BASE_URL);
-    const imageModel = resolveImageModel();
+    const imageModel = resolveImageModel(model);
 
     if (!geminiApiKey) {
       return NextResponse.json(
@@ -470,20 +697,11 @@ export async function POST(request: NextRequest) {
       }
 
       const result = await runImageGeneration({
-        apiBaseUrl,
         geminiApiKey,
-        payload: {
-          model: imageModel,
-          prompt: buildVirtualTryOnPrompt(garmentNote),
-          image: [
-            normalizeImageForProvider(clothingImage),
-            normalizeImageForProvider(modelImage),
-          ],
-          n: 1,
-          size: size || DEFAULT_GEMINI_TRYON_SIZE,
-          quality: "hd",
-          style: "natural",
-        },
+        imageModel,
+        prompt: buildVirtualTryOnPrompt(garmentNote),
+        images: [clothingImage, modelImage],
+        size: size || DEFAULT_GEMINI_TRYON_SIZE,
         fallbackSize: "1024x1024",
       });
 
@@ -502,17 +720,11 @@ export async function POST(request: NextRequest) {
       }
 
       const result = await runImageGeneration({
-        apiBaseUrl,
         geminiApiKey,
-        payload: {
-          model: imageModel,
-          prompt: buildWhiteBackgroundPrompt(),
-          image: [normalizeImageForProvider(image)],
-          n: 1,
-          size: size || "1024x1024",
-          quality: "hd",
-          style: "natural",
-        },
+        imageModel,
+        prompt: buildWhiteBackgroundPrompt(),
+        images: [image],
+        size: size || "1024x1024",
         fallbackSize: "1024x1024",
       });
 
@@ -530,17 +742,11 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await runImageGeneration({
-      apiBaseUrl,
       geminiApiKey,
-      payload: {
-        model: imageModel,
-        prompt: buildModelSwapPrompt(prompt),
-        image: [normalizeImageForProvider(image)],
-        n: 1,
-        size: size || "1024x1536",
-        quality: "hd",
-        style: "natural",
-      },
+      imageModel,
+      prompt: buildModelSwapPrompt(prompt),
+      images: [image],
+      size: size || "1024x1536",
       fallbackSize: "1024x1024",
     });
 

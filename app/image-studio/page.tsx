@@ -9,6 +9,7 @@ import { StudioHeader } from "@/components/portal/studio-header";
 
 type AsyncStatus = "idle" | "processing" | "success" | "error";
 type TryOnProvider = "gemini" | "fashn";
+type GeminiImageModel = "nano_banana_pro" | "image2";
 type TryOnProviderStatus =
   | "starting"
   | "in_queue"
@@ -33,6 +34,13 @@ interface GenerationModeOption {
   modelTitle: string;
   modelDescription: string;
   relationshipSummary: string;
+}
+
+interface GeminiImageModelOption {
+  value: GeminiImageModel;
+  label: string;
+  description: string;
+  endpoint: string;
 }
 
 interface ImageTaskState {
@@ -166,6 +174,20 @@ const quickNotes = [
 
 const formatOptions: UpscaleOutputFormat[] = ["jpg", "png", "webp"];
 const GEMINI_TRYON_SIZE = "1024x1024";
+const geminiImageModelOptions: GeminiImageModelOption[] = [
+  {
+    value: "nano_banana_pro",
+    label: "Nano Banana Pro",
+    description: "Uses /v1/images/generations. Current default Gemini image path.",
+    endpoint: "https://ai.yijiarj.cn/v1/images/generations",
+  },
+  {
+    value: "image2",
+    label: "Image2",
+    description: "Uses /v1/chat/completions and returns the image URL from chat output.",
+    endpoint: "https://api.yijiarj.cn/v1/chat/completions",
+  },
+];
 
 let taskSequence = 0;
 const FASHN_POLL_INTERVAL_MS = 2500;
@@ -625,6 +647,8 @@ export default function ImageStudioPage() {
   const [previewImage, setPreviewImage] = useState<PreviewState | null>(null);
   const [isTryOnConfigured, setIsTryOnConfigured] = useState<boolean | null>(null);
   const [tryOnProvider, setTryOnProvider] = useState<TryOnProvider>("gemini");
+  const [selectedGeminiModel, setSelectedGeminiModel] =
+    useState<GeminiImageModel>("nano_banana_pro");
   const [tryOnConfigMessage, setTryOnConfigMessage] = useState<string | null>(null);
   const [tryOnConfigSummary, setTryOnConfigSummary] = useState<string | null>(null);
   const [isUpscaleConfigured, setIsUpscaleConfigured] = useState<boolean | null>(
@@ -645,6 +669,9 @@ export default function ImageStudioPage() {
   const processedTasksRef = useRef<ImageGenerationTask[]>([]);
 
   const selectedModeOption = generationModeOptions[generationMode];
+  const selectedGeminiModelOption =
+    geminiImageModelOptions.find((option) => option.value === selectedGeminiModel) ||
+    geminiImageModelOptions[0];
   const plannedTaskCount = getPlannedTaskCount(
     generationMode,
     clothingImages.length,
@@ -1066,6 +1093,7 @@ export default function ImageStudioPage() {
         garmentNote,
         type: "virtual-tryon",
         size: GEMINI_TRYON_SIZE,
+        model: selectedGeminiModel,
       }),
     });
 
@@ -1105,6 +1133,7 @@ export default function ImageStudioPage() {
         image,
         type: "white-background",
         size: "1024x1024",
+        model: selectedGeminiModel,
       }),
     });
 
@@ -2093,6 +2122,54 @@ export default function ImageStudioPage() {
 
                   <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
                     当前配置：{tryOnBackendSummary}
+                  </div>
+
+                  <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                      Gemini Model
+                    </p>
+                    <div className="mt-3 grid gap-2">
+                      {geminiImageModelOptions.map((option) => {
+                        const isActive = option.value === selectedGeminiModel;
+
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setSelectedGeminiModel(option.value)}
+                            className={`rounded-2xl border px-4 py-3 text-left transition ${
+                              isActive
+                                ? "border-slate-950 bg-slate-950 text-white"
+                                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="text-sm font-semibold">{option.label}</span>
+                              <span
+                                className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                                  isActive ? "text-white/80" : "text-slate-400"
+                                }`}
+                              >
+                                {isActive ? "Selected" : "Available"}
+                              </span>
+                            </div>
+                            <p
+                              className={`mt-2 text-sm leading-6 ${
+                                isActive ? "text-white/80" : "text-slate-500"
+                              }`}
+                            >
+                              {option.description}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="mt-3 text-xs leading-5 text-slate-500">
+                      Active endpoint: {selectedGeminiModelOption.endpoint}
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">
+                      Applies to Gemini try-on fallback and white-background jobs.
+                    </p>
                   </div>
 
                   {!tryOnBackendReady ? (

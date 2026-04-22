@@ -28,6 +28,7 @@ npm run dev
 - `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_TRANSCRIBE_MODEL`：视频音频转写使用；未配置时仍可上传抽帧，并可手动补字幕后生成脚本。
 - `SELLERSPRITE_SECRET_KEY`：竞品/关键词分析。
 - `GEMINI_API_KEY` / `GEMINI_API_BASE_URL`：图片生成。
+- `GEMINI_IMAGE_MODEL` supports `nano_banana_pro` and `image2`; `image2` defaults to `https://api.yijiarj.cn/v1/chat/completions` and can be overridden with `GEMINI_IMAGE2_API_BASE_URL`.
 - `REPLICATE_API_TOKEN`：图片超分增强。
 - `VIDEO_OUTPUT_ROOT` / `VIDEO_MAX_UPLOAD_MB`：视频上传、关键帧和任务文件的本地输出目录与上传大小上限。
 
