@@ -21,6 +21,7 @@ type GenerationMode =
   | "multi-clothing-single-model"
   | "single-clothing-multi-model"
   | "all-combinations";
+type StudioWorkspace = "overview" | "try-on" | "free" | "post" | "results";
 type UpscaleMode = "target" | "factor";
 type UpscaleOutputFormat = "jpg" | "png" | "webp";
 
@@ -182,14 +183,13 @@ const geminiImageModelOptions: GeminiImageModelOption[] = [
   {
     value: "nano_banana_pro",
     label: "Nano Banana Pro",
-    description: "Uses /v1/images/generations. Current default Gemini image path.",
+    description: "使用 /v1/images/generations，当前默认的 Gemini 图像生成路径。",
     endpoint: "https://ai.yijiarj.cn/v1/images/generations",
   },
   {
     value: "image2",
     label: "Image2",
-    description:
-      "Uses /v1/chat/completions, defaults to 1024x1792 for try-on, and uses a higher-fidelity prompt template.",
+    description: "使用 /v1/chat/completions，默认走 1024x1792，并使用更高保真的提示模板。",
     endpoint: "https://api.yijiarj.cn/v1/chat/completions",
   },
 ];
@@ -634,6 +634,8 @@ function PreviewTile({
 }
 
 export default function ImageStudioPage() {
+  const [activeWorkspace, setActiveWorkspace] =
+    useState<StudioWorkspace>("overview");
   const [generationMode, setGenerationMode] = useState<GenerationMode>(
     "multi-clothing-single-model"
   );
@@ -864,6 +866,49 @@ export default function ImageStudioPage() {
   const tryOnBackendSummary =
     tryOnConfigSummary ||
     (tryOnBackendReady ? "tryon-max / quality / 2k / png" : "当前仍走旧换装链路");
+  const workspaceOptions = [
+    {
+      value: "overview" as const,
+      eyebrow: "总览入口",
+      label: "功能总览",
+      description: "先选入口，再进入对应工作区，减少整页滚动。",
+      metric: "4 个入口",
+    },
+    {
+      value: "try-on" as const,
+      eyebrow: "换装生成",
+      label: "换装工作区",
+      description: "模式选择、服装图、模特图和批量换装放在这里。",
+      metric: plannedTaskCount > 0 ? `预计 ${plannedTaskCount} 张` : "等待上传",
+    },
+    {
+      value: "free" as const,
+      eyebrow: "自由生图",
+      label: "文生图 / 图生图",
+      description: "自由输入提示词，切换模型，单独进入生成。",
+      metric: selectedGeminiModelOption.label,
+    },
+    {
+      value: "post" as const,
+      eyebrow: "后处理",
+      label: "白底图 / 高清增强",
+      description: "集中处理白底、增强和单图后处理，不和主流程混在一起。",
+      metric:
+        standaloneImages.length + successfulCount > 0
+          ? `${standaloneImages.length + successfulCount} 张可处理`
+          : "暂无待处理",
+    },
+    {
+      value: "results" as const,
+      eyebrow: "结果查看",
+      label: "结果总览",
+      description: "统一查看换装图、白底图和增强图，不再跟上传区连在一起。",
+      metric: hasResultCards ? `${processedTasks.length} 张结果` : "暂无结果",
+    },
+  ];
+  const activeWorkspaceOption =
+    workspaceOptions.find((option) => option.value === activeWorkspace) ||
+    workspaceOptions[0];
 
   function replaceProcessedTasks(nextTasks: ImageGenerationTask[]) {
     processedTasksRef.current = nextTasks;
@@ -1593,46 +1638,65 @@ export default function ImageStudioPage() {
     <div className="min-h-screen pb-10">
       <StudioHeader
         eyebrow="图片工坊"
-        title="三种换装模式、白底图、变清晰，一页完成"
-        description="在同一个工作区里完成模式选择、任务预估、换装生成、单张重试、整批换白底、整批变清晰和独立图片处理。"
+        title="换装、自由生图、后处理，分入口切换"
+        description="把长页面拆成几个点击进入的工作区：换装生成、自由生图、后处理和结果查看，当前只展示你正在处理的模块。"
         badge="图片处理工作台"
       />
 
-      <main className="page-shell mt-8">
+      <main className="mx-auto mt-8 w-full max-w-[1580px] px-4 sm:px-6 lg:px-8">
         <div className="flex w-full flex-col gap-6">
           <section className="overflow-hidden rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,_rgba(15,23,42,0.96),_rgba(39,39,42,0.92))] p-6 text-white shadow-[0_32px_90px_rgba(15,23,42,0.24)] sm:p-8">
             <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-3xl space-y-5">
                 <div className="inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-white/75">
                   <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                  三种换装模式 + 白底图 + 高清增强
+                  {activeWorkspaceOption.eyebrow}
                 </div>
                 <div className="space-y-4">
                   <h1 className="font-serif text-4xl tracking-[-0.04em] text-balance sm:text-5xl">
-                    先选生成模式，再批量出图，后处理继续接着做。
+                    {activeWorkspace === "overview"
+                      ? "先点入口，再进入对应工作区。"
+                      : activeWorkspace === "try-on"
+                        ? "换装生成单独处理，不再和别的模块挤在一起。"
+                        : activeWorkspace === "free"
+                          ? "自由生图独立成区，提示词和结果查看更集中。"
+                          : activeWorkspace === "post"
+                            ? "白底和增强拆出来做，后处理终于不用来回找。"
+                            : "结果集中看，不用再从上传区一路往下翻。"}
                   </h1>
                   <p className="max-w-2xl text-base leading-8 text-white/70 sm:text-lg">
-                    当前模式：
-                    <span className="font-semibold text-white">
-                      {" "}
-                      {selectedModeOption.title}
-                    </span>
-                    。{selectedModeOption.relationshipSummary}
+                    当前入口：
+                    <span className="font-semibold text-white"> {activeWorkspaceOption.label}</span>
+                    。{activeWorkspaceOption.description}
                   </p>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <button
-                    type="button"
-                    onClick={() => void handleStartProcessing()}
-                    disabled={!hasUploads || isProcessing}
-                    className={`inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition ${
-                      !hasUploads || isProcessing
-                        ? "cursor-not-allowed bg-white/10 text-white/40"
-                        : "bg-amber-300 text-slate-950 hover:bg-amber-200"
-                    }`}
-                  >
-                    {isProcessing ? "当前批次生成中..." : "开始当前模式生成"}
-                  </button>
+                  {activeWorkspace === "try-on" ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleStartProcessing()}
+                      disabled={!hasUploads || isProcessing}
+                      className={`inline-flex items-center justify-center rounded-full px-6 py-3 text-sm font-semibold transition ${
+                        !hasUploads || isProcessing
+                          ? "cursor-not-allowed bg-white/10 text-white/40"
+                          : "bg-amber-300 text-slate-950 hover:bg-amber-200"
+                      }`}
+                    >
+                      {isProcessing ? "当前批次生成中..." : "开始当前模式生成"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setActiveWorkspace(
+                          activeWorkspace === "overview" ? "try-on" : "overview"
+                        )
+                      }
+                      className="inline-flex items-center justify-center rounded-full bg-amber-300 px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-amber-200"
+                    >
+                      {activeWorkspace === "overview" ? "进入换装工作区" : "返回功能入口"}
+                    </button>
+                  )}
                   <Link
                     href="/"
                     className="inline-flex items-center justify-center rounded-full border border-white/15 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
@@ -1671,9 +1735,124 @@ export default function ImageStudioPage() {
             </div>
           </section>
 
-          <section className="grid gap-6 lg:grid-cols-[1.35fr_0.65fr]">
+          <section className="grid gap-6 xl:grid-cols-[260px_minmax(0,1fr)_320px]">
+            <aside className="xl:sticky xl:top-6 xl:self-start">
+              <article className="rounded-[2rem] border border-slate-200/80 bg-white/85 p-5 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                    功能入口
+                  </p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                    点击进入对应工作区
+                  </h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    把换装、自由生图、后处理和结果查看拆开，当前页面只展示正在处理的模块。
+                  </p>
+                </div>
+
+                <div className="mt-5 space-y-3">
+                  {workspaceOptions.map((option) => {
+                    const isActive = option.value === activeWorkspace;
+
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setActiveWorkspace(option.value)}
+                        className={`w-full rounded-[1.5rem] border px-4 py-4 text-left transition ${
+                          isActive
+                            ? "border-slate-950 bg-slate-950 text-white shadow-[0_18px_40px_rgba(15,23,42,0.16)]"
+                            : "border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-400 hover:bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div>
+                            <p
+                              className={`text-[11px] font-semibold uppercase tracking-[0.22em] ${
+                                isActive ? "text-white/60" : "text-slate-400"
+                              }`}
+                            >
+                              {option.eyebrow}
+                            </p>
+                            <p className="mt-2 text-base font-semibold">{option.label}</p>
+                          </div>
+                          <span
+                            className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                              isActive
+                                ? "bg-white/10 text-white"
+                                : "bg-white text-slate-500"
+                            }`}
+                          >
+                            {option.metric}
+                          </span>
+                        </div>
+                        <p className={`mt-3 text-sm leading-6 ${isActive ? "text-white/75" : "text-slate-500"}`}>
+                          {option.description}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </article>
+            </aside>
+
             <div className="space-y-6">
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              {activeWorkspace === "overview" ? (
+                <article className="rounded-[2rem] border border-slate-200/80 bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        工作区总览
+                      </p>
+                      <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                        现在先选入口，再进入对应模块
+                      </h2>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        原来一页里所有区域都同时展开，现在改成入口式工作台，滚动距离会短很多。
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white">
+                      当前共 4 个入口
+                    </span>
+                  </div>
+
+                  <div className="mt-6 grid gap-4 xl:grid-cols-2">
+                    {workspaceOptions
+                      .filter((option) => option.value !== "overview")
+                      .map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setActiveWorkspace(option.value)}
+                          className="rounded-[1.75rem] border border-slate-200 bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.16),_transparent_52%)] px-5 py-5 text-left transition hover:border-slate-400 hover:bg-white"
+                        >
+                          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                            {option.eyebrow}
+                          </p>
+                          <div className="mt-4 flex items-start justify-between gap-4">
+                            <div>
+                              <p className="text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                                {option.label}
+                              </p>
+                              <p className="mt-3 text-sm leading-6 text-slate-600">
+                                {option.description}
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-500">
+                              {option.metric}
+                            </span>
+                          </div>
+                          <p className="mt-5 text-sm font-semibold text-slate-950">
+                            点击进入
+                          </p>
+                        </button>
+                      ))}
+                  </div>
+                </article>
+              ) : null}
+
+              {activeWorkspace === "try-on" ? (
+                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
@@ -1732,9 +1911,11 @@ export default function ImageStudioPage() {
                     当前任务量较大，将连续生成 {plannedTaskCount} 张结果。建议先确认服装图、模特图和备注都已准备好再开始。
                   </div>
                 ) : null}
-              </article>
+                </article>
+              ) : null}
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              {activeWorkspace === "try-on" ? (
+                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <MultiImageUploader
                   images={clothingImages}
                   onImagesChange={setClothingImages}
@@ -1770,9 +1951,11 @@ export default function ImageStudioPage() {
                     </div>
                   )}
                 />
-              </article>
+                </article>
+              ) : null}
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              {activeWorkspace === "try-on" ? (
+                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <MultiImageUploader
                   images={modelImages}
                   onImagesChange={setModelImages}
@@ -1781,9 +1964,11 @@ export default function ImageStudioPage() {
                   maxImages={selectedModeOption.modelMaxImages}
                   uploadFolder="model"
                 />
-              </article>
+                </article>
+              ) : null}
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              {activeWorkspace === "post" ? (
+                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <MultiImageUploader
                   images={standaloneImages}
                   onImagesChange={setStandaloneImages}
@@ -1865,9 +2050,10 @@ export default function ImageStudioPage() {
                     独立增强图 {standaloneEnhancedCount}
                   </span>
                 </div>
-              </article>
+                </article>
+              ) : null}
 
-              {hasStandaloneOutputCards ? (
+              {activeWorkspace === "post" && hasStandaloneOutputCards ? (
                 <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                     <div>
@@ -2033,16 +2219,44 @@ export default function ImageStudioPage() {
                 </article>
               ) : null}
 
-              <FreeGenerationPanel
-                selectedModel={selectedGeminiModel}
-                onModelChange={setSelectedGeminiModel}
-                modelOptions={geminiImageModelOptions}
-                onPreview={openPreview}
-                onDownload={handleDownload}
-              />
+              {activeWorkspace === "free" ? (
+                <FreeGenerationPanel
+                  selectedModel={selectedGeminiModel}
+                  onModelChange={setSelectedGeminiModel}
+                  modelOptions={geminiImageModelOptions}
+                  onPreview={openPreview}
+                  onDownload={handleDownload}
+                />
+              ) : null}
             </div>
 
             <aside className="space-y-6">
+              <article className="rounded-[2rem] border border-slate-200/80 bg-white/85 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                  当前入口
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
+                  {activeWorkspaceOption.label}
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  {activeWorkspaceOption.description}
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold text-white">
+                    {activeWorkspaceOption.metric}
+                  </span>
+                  {activeWorkspace !== "overview" ? (
+                    <button
+                      type="button"
+                      onClick={() => setActiveWorkspace("overview")}
+                      className="inline-flex items-center justify-center rounded-full border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                    >
+                      返回入口
+                    </button>
+                  ) : null}
+                </div>
+              </article>
+
               <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <div className="flex items-center justify-between">
                   <div>
@@ -2141,7 +2355,7 @@ export default function ImageStudioPage() {
 
                   <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                      Gemini Model
+                      Gemini 图像模型
                     </p>
                     <div className="mt-3 grid gap-2">
                       {geminiImageModelOptions.map((option) => {
@@ -2165,7 +2379,7 @@ export default function ImageStudioPage() {
                                   isActive ? "text-white/80" : "text-slate-400"
                                 }`}
                               >
-                                {isActive ? "Selected" : "Available"}
+                                {isActive ? "当前使用" : "可切换"}
                               </span>
                             </div>
                             <p
@@ -2180,10 +2394,10 @@ export default function ImageStudioPage() {
                       })}
                     </div>
                     <p className="mt-3 text-xs leading-5 text-slate-500">
-                      Active endpoint: {selectedGeminiModelOption.endpoint}
+                      当前接口：{selectedGeminiModelOption.endpoint}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
-                      Applies to Gemini try-on fallback, white-background jobs, and free generation.
+                      同时作用于 Gemini 换装兜底、换白底和自由生图。
                     </p>
                   </div>
 
@@ -2195,7 +2409,8 @@ export default function ImageStudioPage() {
                 </div>
               </article>
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              {activeWorkspace === "post" ? (
+                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <div className="flex flex-col gap-4">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -2462,9 +2677,11 @@ export default function ImageStudioPage() {
                     </div>
                   </div>
                 </div>
-              </article>
+                </article>
+              ) : null}
 
-              <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+              {activeWorkspace !== "free" ? (
+                <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
                   使用提示
                 </p>
@@ -2476,9 +2693,12 @@ export default function ImageStudioPage() {
                     </li>
                   ))}
                 </ul>
-              </article>
+                </article>
+              ) : null}
 
-              {generationMode === "multi-clothing-single-model" && modelImages[0] ? (
+              {activeWorkspace === "try-on" &&
+              generationMode === "multi-clothing-single-model" &&
+              modelImages[0] ? (
                 <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                   <div className="aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-100">
                     <img
@@ -2499,7 +2719,9 @@ export default function ImageStudioPage() {
                 </article>
               ) : null}
 
-              {generationMode === "single-clothing-multi-model" && clothingImages[0] ? (
+              {activeWorkspace === "try-on" &&
+              generationMode === "single-clothing-multi-model" &&
+              clothingImages[0] ? (
                 <article className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-4 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
                   <div className="aspect-[4/5] overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-100">
                     <img
@@ -2522,7 +2744,8 @@ export default function ImageStudioPage() {
             </aside>
           </section>
 
-          <section className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+          {activeWorkspace === "results" ? (
+            <section className="rounded-[2rem] border border-slate-200/80 bg-white/80 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
@@ -2837,7 +3060,8 @@ export default function ImageStudioPage() {
                 ))}
               </div>
             )}
-          </section>
+            </section>
+          ) : null}
         </div>
 
         {previewImage ? (

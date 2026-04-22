@@ -54,22 +54,53 @@ const MODE_OPTIONS: Array<{
 }> = [
   {
     value: "text-to-image",
-    label: "Text to image",
-    eyebrow: "Prompt only",
-    description: "Generate a fresh concept from a single prompt.",
+    label: "文生图",
+    eyebrow: "仅输入提示词",
+    description: "直接生成新画面，适合概念图、商品氛围图和快速试稿。",
   },
   {
     value: "image-to-image",
-    label: "Image to image",
-    eyebrow: "Prompt + reference",
-    description: "Upload one reference image and steer the output with your prompt.",
+    label: "图生图",
+    eyebrow: "提示词 + 参考图",
+    description: "上传 1 张参考图，保留结构方向，再用提示词控制风格和细节。",
   },
 ];
+
+const MODE_LABEL: Record<FreeGenerationMode, string> = {
+  "text-to-image": "文生图",
+  "image-to-image": "图生图",
+};
+
+const STATUS_META: Record<
+  FreeGenerationStatus,
+  { label: string; className: string; emptyLabel: string; emptyDescription: string }
+> = {
+  processing: {
+    label: "生成中",
+    className: "bg-amber-100 text-amber-700",
+    emptyLabel: "正在排队生成",
+    emptyDescription: "结果返回后会自动更新到这里。",
+  },
+  success: {
+    label: "已完成",
+    className: "bg-emerald-100 text-emerald-700",
+    emptyLabel: "已完成",
+    emptyDescription: "这次任务已经生成可预览、可下载的结果。",
+  },
+  error: {
+    label: "失败",
+    className: "bg-rose-100 text-rose-700",
+    emptyLabel: "本次未返回结果",
+    emptyDescription: "可以复用参数后重新生成。",
+  },
+};
 
 const MODEL_SIZE_BY_VALUE: Record<FreeGenerationModelValue, string> = {
   nano_banana_pro: "1024x1024",
   image2: "1024x1792",
 };
+
+const PROMPT_HINTS = ["主体要清楚", "场景别太泛", "光线/镜头可写", "商品图建议写材质和角度"];
 
 const HISTORY_LIMIT = 8;
 
@@ -90,11 +121,12 @@ function getModelSize(model: FreeGenerationModelValue) {
 }
 
 function formatTimestamp(timestamp: number) {
-  return new Intl.DateTimeFormat("en", {
-    month: "short",
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "numeric",
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   }).format(timestamp);
 }
 
@@ -161,7 +193,7 @@ export default function FreeGenerationPanel({
       value: selectedModel,
       label: selectedModel,
     };
-
+  const activeModeOption = MODE_OPTIONS.find((option) => option.value === mode) || MODE_OPTIONS[0];
   const latestResult = history[0];
   const canSubmit =
     !disabled &&
@@ -173,12 +205,12 @@ export default function FreeGenerationPanel({
     const trimmedPrompt = prompt.trim();
 
     if (!trimmedPrompt) {
-      setError("Enter a prompt before generating.");
+      setError("请先输入提示词，再开始生成。");
       return;
     }
 
     if (mode === "image-to-image" && referenceImages.length === 0) {
-      setError("Upload one reference image to use image-to-image mode.");
+      setError("图生图模式需要先上传 1 张参考图。");
       return;
     }
 
@@ -217,7 +249,7 @@ export default function FreeGenerationPanel({
       const payload = (await response.json()) as GeminiResponse;
 
       if (!response.ok || payload.success !== true || !payload.result) {
-        throw new Error(payload.error || "Image generation failed.");
+        throw new Error(payload.error || "生成失败，请稍后重试。");
       }
 
       setHistory((current) =>
@@ -234,10 +266,7 @@ export default function FreeGenerationPanel({
         )
       );
     } catch (generationError) {
-      const message = normalizeClientError(
-        generationError,
-        "Image generation failed. Please retry."
-      );
+      const message = normalizeClientError(generationError, "生成失败，请稍后重试。");
 
       setError(message);
       setHistory((current) =>
@@ -266,8 +295,8 @@ export default function FreeGenerationPanel({
 
     const title =
       target === "result"
-        ? `Free generation result ${formatTimestamp(item.createdAt)}`
-        : `Free generation reference ${formatTimestamp(item.createdAt)}`;
+        ? `自由生图结果 ${formatTimestamp(item.createdAt)}`
+        : `自由生图参考图 ${formatTimestamp(item.createdAt)}`;
 
     if (onPreview) {
       onPreview(src, title);
@@ -300,256 +329,313 @@ export default function FreeGenerationPanel({
   }
 
   return (
-    <section className="space-y-6">
-      <article className="overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white/80 shadow-[0_20px_60px_rgba(15,23,42,0.08)] backdrop-blur">
-        <div className="border-b border-slate-200 bg-[radial-gradient(circle_at_top,_rgba(251,191,36,0.18),_transparent_55%)] px-6 py-6">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-2xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Free generation
+    <section className="space-y-4">
+      <article className="overflow-hidden rounded-[1.75rem] border border-slate-200/80 bg-white/90 shadow-[0_18px_48px_rgba(15,23,42,0.08)] backdrop-blur">
+        <div className="border-b border-slate-200 bg-[linear-gradient(135deg,rgba(249,115,22,0.12),rgba(15,23,42,0.02)_55%,rgba(255,255,255,0.88))] px-5 py-5 sm:px-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="max-w-3xl">
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
+                自由生图
               </p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
-                Text-driven image creation
+              <h2 className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950 sm:text-2xl">
+                更短、更快的文生图 / 图生图工作台
               </h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                Switch between prompt-only generation and prompt-guided reference generation,
-                then keep the output in a reusable gallery with preview and download actions.
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                适合嵌入式入口页使用。保留模型切换、参考图生成、结果历史、预览和下载，首屏尽量压缩到一次看完。
               </p>
             </div>
 
-            <div className="rounded-[1.5rem] border border-slate-200 bg-white/90 px-4 py-3 text-sm leading-6 text-slate-600">
-              <p className="font-semibold text-slate-950">Request contract</p>
-              <p className="mt-1">
-                Sends <code>type: &quot;free-generation&quot;</code> and
-                <code> referenceImages</code> to <code>/api/gemini</code>.
-              </p>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <div className="rounded-[1.25rem] border border-white/70 bg-white/90 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  当前模式
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-950">{activeModeOption.label}</p>
+              </div>
+              <div className="rounded-[1.25rem] border border-white/70 bg-white/90 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  输出尺寸
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-950">
+                  {getModelSize(selectedModel)}
+                </p>
+              </div>
+              <div className="rounded-[1.25rem] border border-white/70 bg-white/90 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                  历史记录
+                </p>
+                <p className="mt-2 text-sm font-semibold text-slate-950">最多 {HISTORY_LIMIT} 条</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="grid gap-6 p-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-          <div className="space-y-6">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                Generation mode
-              </p>
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                {MODE_OPTIONS.map((option) => {
-                  const isActive = option.value === mode;
+        <div className="grid gap-5 p-5 sm:p-6 xl:grid-cols-[minmax(0,1.18fr)_360px]">
+          <div className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+              <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                      提示词
+                    </p>
+                    <p className="mt-2 text-sm text-slate-600">
+                      用更直接的中文描述主体、场景、光线、构图和质感。
+                    </p>
+                  </div>
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
+                    {prompt.trim().length} 字
+                  </span>
+                </div>
 
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => {
-                        setMode(option.value);
-                        setError(null);
-                      }}
-                      className={`rounded-[1.5rem] border px-5 py-5 text-left transition ${
-                        isActive
-                          ? "border-slate-950 bg-slate-950 text-white shadow-[0_18px_40px_rgba(15,23,42,0.18)]"
-                          : "border-slate-200 bg-slate-50 text-slate-950 hover:border-slate-400 hover:bg-white"
-                      }`}
-                    >
-                      <p
-                        className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${
-                          isActive ? "text-white/65" : "text-slate-400"
-                        }`}
-                      >
-                        {option.eyebrow}
-                      </p>
-                      <p className="mt-3 text-lg font-semibold">{option.label}</p>
-                      <p className={`mt-2 text-sm leading-6 ${isActive ? "text-white/80" : "text-slate-500"}`}>
-                        {option.description}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                  Model
-                </p>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
-                  Active size {getModelSize(selectedModel)}
-                </span>
-              </div>
-
-              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                {modelOptions.map((option) => {
-                  const isActive = option.value === selectedModel;
-
-                  return (
-                    <button
-                      key={option.value}
-                      type="button"
-                      onClick={() => onModelChange(option.value)}
-                      className={`rounded-[1.5rem] border px-5 py-5 text-left transition ${
-                        isActive
-                          ? "border-amber-300 bg-amber-50 shadow-[0_14px_30px_rgba(245,158,11,0.15)]"
-                          : "border-slate-200 bg-white hover:border-slate-400 hover:bg-slate-50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-base font-semibold text-slate-950">{option.label}</p>
-                        {isActive ? (
-                          <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
-                            Active
-                          </span>
-                        ) : null}
-                      </div>
-                      {option.description ? (
-                        <p className="mt-3 text-sm leading-6 text-slate-500">{option.description}</p>
-                      ) : null}
-                      {option.endpoint ? (
-                        <p className="mt-3 text-xs leading-5 text-slate-400">{option.endpoint}</p>
-                      ) : null}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <label
-                  htmlFor="free-generation-prompt"
-                  className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400"
-                >
-                  Prompt
-                </label>
-                <span className="text-xs text-slate-400">{prompt.trim().length} chars</span>
-              </div>
-
-              <textarea
-                id="free-generation-prompt"
-                rows={7}
-                value={prompt}
-                onChange={(event) => {
-                  setPrompt(event.target.value);
-                  if (error) {
-                    setError(null);
-                  }
-                }}
-                placeholder="Describe the scene, product angle, lighting, mood, texture, framing, and any details that must remain stable."
-                className="w-full rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-4 text-sm leading-7 text-slate-700 outline-none transition focus:border-slate-950 focus:bg-white"
-              />
-
-              <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600">
-                Use direct, production-focused prompts. If the result must stay close to a source
-                image, switch to image-to-image and upload one clean reference.
-              </div>
-            </div>
-
-            {mode === "image-to-image" ? (
-              <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50/70 p-4">
-                <MultiImageUploader
-                  images={referenceImages}
-                  onImagesChange={(images) => {
-                    setReferenceImages(images.slice(0, 1));
+                <textarea
+                  id="free-generation-prompt"
+                  rows={5}
+                  value={prompt}
+                  onChange={(event) => {
+                    setPrompt(event.target.value);
                     if (error) {
                       setError(null);
                     }
                   }}
-                  maxImages={1}
-                  uploadFolder="free-generation"
-                  title="Reference image"
-                  description="Upload one source image to guide composition, structure, or styling for the generated result."
-                  renderImageFooter={() => (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-6 text-slate-500">
-                      This image is sent as the first entry in <code>referenceImages</code>.
-                    </div>
-                  )}
+                  placeholder="例：白底棚拍的保温杯主图，金属拉丝质感，45 度侧前方视角，柔和高光，杯身细节清晰，画面干净，高级电商视觉。"
+                  className="mt-4 w-full rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-7 text-slate-700 outline-none transition focus:border-slate-950 focus:bg-white"
                 />
+
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {PROMPT_HINTS.map((hint) => (
+                    <span
+                      key={hint}
+                      className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600"
+                    >
+                      {hint}
+                    </span>
+                  ))}
+                </div>
+
+                {mode === "image-to-image" ? (
+                  <div className="mt-4 rounded-[1.25rem] border border-slate-200 bg-slate-50/70 p-4">
+                    <MultiImageUploader
+                      images={referenceImages}
+                      onImagesChange={(images) => {
+                        setReferenceImages(images.slice(0, 1));
+                        if (error) {
+                          setError(null);
+                        }
+                      }}
+                      maxImages={1}
+                      uploadFolder="free-generation"
+                      title="参考图"
+                      description="仅保留 1 张参考图，用来约束结构、主体或风格方向。"
+                      renderImageFooter={() => (
+                        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-6 text-slate-500">
+                          该图片会作为 <code>referenceImages</code> 的首项发送。
+                        </div>
+                      )}
+                    />
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-600">
+                    当前是文生图模式，不需要上传参考图。
+                  </div>
+                )}
+
+                {error ? (
+                  <div className="mt-4 rounded-[1.25rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
+                    {error}
+                  </div>
+                ) : null}
+
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => void handleGenerate()}
+                    disabled={!canSubmit}
+                    className={`inline-flex min-w-36 items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition ${
+                      canSubmit
+                        ? "bg-slate-950 text-white hover:bg-slate-800"
+                        : "cursor-not-allowed bg-slate-100 text-slate-400"
+                    }`}
+                  >
+                    {isSubmitting ? "生成中..." : "开始生成"}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPrompt("");
+                      setReferenceImages([]);
+                      setError(null);
+                      setMode("text-to-image");
+                    }}
+                    disabled={isSubmitting}
+                    className={`inline-flex items-center justify-center rounded-full border px-5 py-3 text-sm font-semibold transition ${
+                      isSubmitting
+                        ? "cursor-not-allowed border-slate-200 text-slate-300"
+                        : "border-slate-200 text-slate-700 hover:border-slate-400 hover:bg-slate-50"
+                    }`}
+                  >
+                    清空重填
+                  </button>
+
+                  <p className="text-xs leading-6 text-slate-500">
+                    {mode === "image-to-image"
+                      ? "图生图会发送提示词和参考图。"
+                      : "文生图只发送提示词和模型配置。"}
+                  </p>
+                </div>
               </div>
-            ) : null}
 
-            {error ? (
-              <div className="rounded-[1.5rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
-                {error}
+              <div className="space-y-4">
+                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        生成模式
+                      </p>
+                      <p className="mt-2 text-sm text-slate-600">{activeModeOption.description}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+                    {MODE_OPTIONS.map((option) => {
+                      const isActive = option.value === mode;
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setMode(option.value);
+                            setError(null);
+                          }}
+                          className={`rounded-[1.25rem] border px-4 py-3 text-left transition ${
+                            isActive
+                              ? "border-slate-950 bg-slate-950 text-white shadow-[0_14px_30px_rgba(15,23,42,0.16)]"
+                              : "border-slate-200 bg-slate-50 text-slate-950 hover:border-slate-400 hover:bg-white"
+                          }`}
+                        >
+                          <p
+                            className={`text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                              isActive ? "text-white/65" : "text-slate-400"
+                            }`}
+                          >
+                            {option.eyebrow}
+                          </p>
+                          <p className="mt-2 text-sm font-semibold">{option.label}</p>
+                          <p
+                            className={`mt-1 text-xs leading-5 ${
+                              isActive ? "text-white/80" : "text-slate-500"
+                            }`}
+                          >
+                            {option.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                        模型切换
+                      </p>
+                      <p className="mt-2 text-sm text-slate-600">
+                        当前输出尺寸 {getModelSize(selectedModel)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 space-y-2.5">
+                    {modelOptions.map((option) => {
+                      const isActive = option.value === selectedModel;
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => onModelChange(option.value)}
+                          className={`w-full rounded-[1.25rem] border px-4 py-3 text-left transition ${
+                            isActive
+                              ? "border-amber-300 bg-amber-50 shadow-[0_12px_24px_rgba(245,158,11,0.14)]"
+                              : "border-slate-200 bg-slate-50 hover:border-slate-400 hover:bg-white"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-sm font-semibold text-slate-950">{option.label}</p>
+                              {option.description ? (
+                                <p className="mt-1 text-xs leading-5 text-slate-500">
+                                  {option.description}
+                                </p>
+                              ) : null}
+                            </div>
+                            {isActive ? (
+                              <span className="rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                                当前
+                              </span>
+                            ) : null}
+                          </div>
+
+                          {option.endpoint ? (
+                            <p className="mt-2 truncate text-[11px] leading-5 text-slate-400">
+                              {option.endpoint}
+                            </p>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
-            ) : null}
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => void handleGenerate()}
-                disabled={!canSubmit}
-                className={`inline-flex min-w-40 items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition ${
-                  canSubmit
-                    ? "bg-slate-950 text-white hover:bg-slate-800"
-                    : "cursor-not-allowed bg-slate-100 text-slate-400"
-                }`}
-              >
-                {isSubmitting ? "Generating..." : "Generate image"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setPrompt("");
-                  setReferenceImages([]);
-                  setError(null);
-                  setMode("text-to-image");
-                }}
-                disabled={isSubmitting}
-                className={`inline-flex items-center justify-center rounded-full border px-5 py-3 text-sm font-semibold transition ${
-                  isSubmitting
-                    ? "cursor-not-allowed border-slate-200 text-slate-300"
-                    : "border-slate-200 text-slate-700 hover:border-slate-400 hover:bg-slate-50"
-                }`}
-              >
-                Reset inputs
-              </button>
             </div>
           </div>
 
           <div className="space-y-4">
-            <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-4">
+            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                    Latest result
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    最新结果
                   </p>
                   <p className="mt-2 text-lg font-semibold text-slate-950">
-                    {latestResult ? latestResult.modelLabel : "No generation yet"}
+                    {latestResult ? latestResult.modelLabel : "等待第一次生成"}
                   </p>
                 </div>
                 <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500">
-                  {history.length} {history.length === 1 ? "item" : "items"}
+                  {history.length} 条
                 </span>
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white">
+              <div className="mt-4 overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white">
                 {latestResult?.result ? (
                   <button
                     type="button"
                     onClick={() => handlePreviewAction(latestResult, "result")}
                     className="block w-full text-left transition hover:bg-slate-50"
                   >
-                    <div className="aspect-[4/5] bg-slate-100">
+                    <div className="aspect-[4/3] bg-slate-100">
                       <img
                         src={latestResult.result}
-                        alt="Latest free generation result"
+                        alt="最新自由生图结果"
                         className="h-full w-full object-cover"
                       />
                     </div>
                   </button>
                 ) : (
-                  <div className="flex aspect-[4/5] items-center justify-center px-6 text-center">
+                  <div className="flex aspect-[4/3] items-center justify-center px-6 text-center">
                     <div>
                       <p className="text-base font-semibold text-slate-900">
-                        {latestResult?.status === "processing"
-                          ? "Generation in progress"
-                          : "Your next result lands here"}
+                        {latestResult
+                          ? STATUS_META[latestResult.status].emptyLabel
+                          : "你的下一张结果会显示在这里"}
                       </p>
                       <p className="mt-2 text-sm leading-6 text-slate-500">
-                        {latestResult?.status === "processing"
-                          ? "The gallery updates automatically when the request completes."
-                          : "Submit a prompt to start building a reusable result history."}
+                        {latestResult
+                          ? STATUS_META[latestResult.status].emptyDescription
+                          : "输入提示词后发起生成，右侧会自动沉淀最近结果。"}
                       </p>
                     </div>
                   </div>
@@ -557,21 +643,25 @@ export default function FreeGenerationPanel({
               </div>
 
               {latestResult ? (
-                <div className="mt-4 space-y-4">
+                <div className="mt-4 space-y-3">
                   <div className="flex flex-wrap gap-2">
-                    <span className="rounded-full bg-slate-950 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
-                      {latestResult.mode}
+                    <span className="rounded-full bg-slate-950 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-white">
+                      {MODE_LABEL[latestResult.mode]}
                     </span>
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-500">
                       {latestResult.modelLabel}
                     </span>
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                      {latestResult.status}
+                    <span
+                      className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                        STATUS_META[latestResult.status].className
+                      }`}
+                    >
+                      {STATUS_META[latestResult.status].label}
                     </span>
                   </div>
 
-                  <p className="text-sm leading-7 text-slate-600">
-                    {truncatePrompt(latestResult.prompt, 180)}
+                  <p className="text-sm leading-6 text-slate-600">
+                    {truncatePrompt(latestResult.prompt, 120)}
                   </p>
 
                   {latestResult.error ? (
@@ -580,7 +670,7 @@ export default function FreeGenerationPanel({
                     </div>
                   ) : null}
 
-                  <div className="flex flex-wrap gap-3">
+                  <div className="flex flex-wrap gap-2.5">
                     {latestResult.result ? (
                       <>
                         <button
@@ -588,14 +678,14 @@ export default function FreeGenerationPanel({
                           onClick={() => handlePreviewAction(latestResult, "result")}
                           className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
                         >
-                          Preview result
+                          预览结果
                         </button>
                         <button
                           type="button"
                           onClick={() => void handleDownloadAction(latestResult)}
                           className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white"
                         >
-                          Download result
+                          下载图片
                         </button>
                       </>
                     ) : null}
@@ -606,7 +696,7 @@ export default function FreeGenerationPanel({
                         onClick={() => handlePreviewAction(latestResult, "reference")}
                         className="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-white"
                       >
-                        Preview reference
+                        查看参考图
                       </button>
                     ) : null}
                   </div>
@@ -614,23 +704,24 @@ export default function FreeGenerationPanel({
               ) : null}
             </div>
 
-            <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4">
+            <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                    Result history
+                  <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    结果历史
                   </p>
-                  <p className="mt-2 text-lg font-semibold text-slate-950">
-                    Reuse prompts and compare outputs
-                  </p>
+                  <p className="mt-2 text-sm text-slate-600">复用提示词、参数和参考图，快速回放。</p>
                 </div>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-500">
+                  最近 {history.length}/{HISTORY_LIMIT}
+                </span>
               </div>
 
               {history.length === 0 ? (
-                <div className="mt-4 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center">
-                  <p className="text-base font-semibold text-slate-900">No history yet</p>
+                <div className="mt-4 rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center">
+                  <p className="text-base font-semibold text-slate-900">还没有历史记录</p>
                   <p className="mt-2 text-sm leading-6 text-slate-500">
-                    Each generation is saved here with its prompt, model, and actions.
+                    每次生成都会保留模式、模型、参考图和结果操作。
                   </p>
                 </div>
               ) : (
@@ -638,152 +729,121 @@ export default function FreeGenerationPanel({
                   {history.map((item) => (
                     <article
                       key={item.id}
-                      className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4"
+                      className="rounded-[1.25rem] border border-slate-200 bg-slate-50/80 p-3"
                     >
-                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        <div className="min-w-0 flex-1">
+                      <div className="grid gap-3 sm:grid-cols-[96px_minmax(0,1fr)]">
+                        <div className="grid grid-cols-2 gap-2 sm:grid-cols-1">
+                          {item.referenceImages[0] ? (
+                            <button
+                              type="button"
+                              onClick={() => handlePreviewAction(item, "reference")}
+                              className="overflow-hidden rounded-[1rem] border border-slate-200 bg-white transition hover:border-slate-400"
+                            >
+                              <div className="aspect-square bg-slate-100">
+                                <img
+                                  src={item.referenceImages[0]}
+                                  alt="历史参考图"
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="flex aspect-square items-center justify-center rounded-[1rem] border border-dashed border-slate-200 bg-white px-2 text-center text-[11px] font-medium text-slate-400">
+                              无参考图
+                            </div>
+                          )}
+
+                          {item.result ? (
+                            <button
+                              type="button"
+                              onClick={() => handlePreviewAction(item, "result")}
+                              className="overflow-hidden rounded-[1rem] border border-slate-200 bg-white transition hover:border-slate-400"
+                            >
+                              <div className="aspect-square bg-slate-100">
+                                <img
+                                  src={item.result}
+                                  alt="历史生成结果"
+                                  className="h-full w-full object-cover"
+                                />
+                              </div>
+                            </button>
+                          ) : (
+                            <div className="flex aspect-square items-center justify-center rounded-[1rem] border border-dashed border-slate-200 bg-white px-2 text-center text-[11px] font-medium text-slate-400">
+                              {STATUS_META[item.status].label}
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                              {item.mode}
+                            <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-500">
+                              {MODE_LABEL[item.mode]}
                             </span>
-                            <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                            <span className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-500">
                               {item.modelLabel}
                             </span>
                             <span
-                              className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${
-                                item.status === "success"
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : item.status === "error"
-                                    ? "bg-rose-100 text-rose-700"
-                                    : "bg-amber-100 text-amber-700"
+                              className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                                STATUS_META[item.status].className
                               }`}
                             >
-                              {item.status}
+                              {STATUS_META[item.status].label}
                             </span>
                             <span className="text-xs text-slate-400">
                               {formatTimestamp(item.createdAt)}
                             </span>
                           </div>
 
-                          <p className="mt-3 text-sm leading-7 text-slate-600">
-                            {truncatePrompt(item.prompt)}
+                          <p className="mt-3 text-sm leading-6 text-slate-600">
+                            {truncatePrompt(item.prompt, 88)}
                           </p>
 
                           {item.error ? (
-                            <p className="mt-3 rounded-[1.25rem] border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-700">
+                            <p className="mt-3 rounded-[1rem] border border-rose-200 bg-rose-50 px-3 py-2 text-sm leading-6 text-rose-700">
                               {item.error}
                             </p>
                           ) : null}
-                        </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => restoreHistoryItem(item)}
-                            className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-                          >
-                            Reuse settings
-                          </button>
-
-                          {item.result ? (
-                            <>
-                              <button
-                                type="button"
-                                onClick={() => handlePreviewAction(item, "result")}
-                                className="inline-flex items-center justify-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                              >
-                                Preview
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => void handleDownloadAction(item)}
-                                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
-                              >
-                                Download
-                              </button>
-                            </>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      {(item.referenceImages[0] || item.result) ? (
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                          {item.referenceImages[0] ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
                             <button
                               type="button"
-                              onClick={() => handlePreviewAction(item, "reference")}
-                              className="overflow-hidden rounded-[1.25rem] border border-slate-200 bg-white text-left transition hover:border-slate-400"
+                              onClick={() => restoreHistoryItem(item)}
+                              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
                             >
-                              <div className="aspect-[4/5] bg-slate-100">
-                                <img
-                                  src={item.referenceImages[0]}
-                                  alt="Free generation reference"
-                                  className="h-full w-full object-cover"
-                                />
-                              </div>
-                              <div className="px-4 py-3">
-                                <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                  Reference
-                                </p>
-                              </div>
+                              复用参数
                             </button>
-                          ) : (
-                            <div className="flex aspect-[4/5] items-center justify-center rounded-[1.25rem] border border-dashed border-slate-200 bg-white px-4 text-center">
-                              <div>
-                                <p className="text-sm font-semibold text-slate-900">
-                                  Prompt-only request
-                                </p>
-                                <p className="mt-2 text-sm leading-6 text-slate-500">
-                                  This history item did not use a reference image.
-                                </p>
-                              </div>
-                            </div>
-                          )}
 
-                          <button
-                            type="button"
-                            onClick={() => item.result && handlePreviewAction(item, "result")}
-                            disabled={!item.result}
-                            className={`overflow-hidden rounded-[1.25rem] border text-left transition ${
-                              item.result
-                                ? "border-slate-200 bg-white hover:border-slate-400"
-                                : "cursor-not-allowed border-dashed border-slate-200 bg-white"
-                            }`}
-                          >
+                            {item.referenceImages[0] ? (
+                              <button
+                                type="button"
+                                onClick={() => handlePreviewAction(item, "reference")}
+                                className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                              >
+                                看参考图
+                              </button>
+                            ) : null}
+
                             {item.result ? (
                               <>
-                                <div className="aspect-[4/5] bg-slate-100">
-                                  <img
-                                    src={item.result}
-                                    alt="Free generation result"
-                                    className="h-full w-full object-cover"
-                                  />
-                                </div>
-                                <div className="px-4 py-3">
-                                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">
-                                    Result
-                                  </p>
-                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handlePreviewAction(item, "result")}
+                                  className="inline-flex items-center justify-center rounded-full bg-slate-950 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                                >
+                                  预览
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => void handleDownloadAction(item)}
+                                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+                                >
+                                  下载
+                                </button>
                               </>
-                            ) : (
-                              <div className="flex aspect-[4/5] items-center justify-center px-4 text-center">
-                                <div>
-                                  <p className="text-sm font-semibold text-slate-900">
-                                    {item.status === "processing"
-                                      ? "Waiting for output"
-                                      : "No output saved"}
-                                  </p>
-                                  <p className="mt-2 text-sm leading-6 text-slate-500">
-                                    {item.status === "processing"
-                                      ? "The result tile fills in after the request returns."
-                                      : "This run did not return a downloadable image."}
-                                  </p>
-                                </div>
-                              </div>
-                            )}
-                          </button>
+                            ) : null}
+                          </div>
                         </div>
-                      ) : null}
+                      </div>
                     </article>
                   ))}
                 </div>
