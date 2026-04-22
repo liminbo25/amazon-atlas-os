@@ -56,9 +56,7 @@ export function DiagnosticsExportControls({
       setLastExportedFile(fileName);
     } catch (error) {
       setExportError(
-        error instanceof Error
-          ? error.message
-          : "导出失败，请稍后重试。"
+        error instanceof Error ? error.message : "导出失败，请稍后重试。"
       );
     } finally {
       setExporting(null);
@@ -79,8 +77,8 @@ export function DiagnosticsExportControls({
               导出当前诊断结果
             </CardTitle>
             <CardDescription className="max-w-3xl text-sm leading-7 text-slate-600">
-              不需要重新跑诊断，就可以把当前结果导出为 Word 摘要、Excel 分析表或 JSON
-              结构化数据。Excel 会按中文业务模板输出，便于直接对照和继续优化。
+              无需重新跑诊断，就可以把当前结果导出为 Word 摘要、Excel 分析表或
+              JSON 结构化数据。Excel 会按中文业务模板输出，便于直接对照和继续优化。
             </CardDescription>
           </div>
 

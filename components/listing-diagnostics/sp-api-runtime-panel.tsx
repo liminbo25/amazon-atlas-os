@@ -90,21 +90,21 @@ const MODE_OPTIONS: Array<{
 }> = [
   {
     value: "off",
-    label: "Off",
+    label: "关闭",
     description:
-      "Skip Amazon SP-API verification and keep the current SellerSprite-only path.",
+      "跳过 Amazon SP-API 校验，保持当前仅 SellerSprite 的路径。",
   },
   {
     value: "server-default",
-    label: "Server default",
+    label: "服务器默认",
     description:
-      "Use the server's shared SP-API credentials when they are configured.",
+      "如果服务器已配置共享的 SP-API 凭证，就使用它们。",
   },
   {
     value: "runtime",
-    label: "Runtime",
+    label: "运行时",
     description:
-      "Send credentials with this request only and keep them in browser local storage.",
+      "仅随本次请求发送凭证，并保存在浏览器本地存储中。",
   },
 ];
 
@@ -135,7 +135,7 @@ export function SpApiRuntimePanel({
         });
 
         if (!response.ok) {
-          throw new Error("Failed to load listing diagnostics capabilities.");
+          throw new Error("加载 Listing 诊断能力信息失败。");
         }
 
         const payload =
@@ -161,7 +161,7 @@ export function SpApiRuntimePanel({
           error:
             error instanceof Error && error.message.trim()
               ? error.message.trim()
-              : "Failed to load listing diagnostics capabilities.",
+              : "加载 Listing 诊断能力信息失败。",
         });
       }
     }
@@ -199,14 +199,14 @@ export function SpApiRuntimePanel({
     if (config.mode === "off") {
       setTestResult({
         status: "error",
-        message: "Enable server-default or runtime mode before testing SP-API connectivity.",
+        message: "请先启用服务器默认模式或运行时模式，再测试 SP-API 连通性。",
       });
       return;
     }
 
     setTestResult({
       status: "testing",
-      message: "Validating SP-API credentials...",
+      message: "正在校验 SP-API 凭证...",
     });
 
     try {
@@ -226,14 +226,14 @@ export function SpApiRuntimePanel({
       });
 
       if (!response.ok) {
-        throw await parseApiRequestError(response, "SP-API connectivity test failed.");
+        throw await parseApiRequestError(response, "SP-API 连通性测试失败。");
       }
 
       const payload = (await response.json()) as ListingDiagnosticsSpApiTestResponse;
       const detail =
         payload.targetAsin && payload.checks.catalog === "verified"
-          ? `Verified catalog and account access for ASIN ${payload.targetAsin}.`
-          : "Token exchange succeeded. Add a valid target ASIN to also verify catalog and account access.";
+          ? `已验证 ASIN ${payload.targetAsin} 的目录与账户访问权限。`
+          : "令牌交换成功。填写有效的目标 ASIN 后，还会校验目录和账户访问权限。";
 
       setTestResult({
         status: "success",
@@ -241,10 +241,7 @@ export function SpApiRuntimePanel({
         detail,
       });
     } catch (error) {
-      const normalizedError = normalizeApiRequestError(
-        error,
-        "SP-API connectivity test failed."
-      );
+      const normalizedError = normalizeApiRequestError(error, "SP-API 连通性测试失败。");
 
       setTestResult({
         status: "error",
@@ -257,23 +254,22 @@ export function SpApiRuntimePanel({
   return (
     <Card className="border-dashed border-slate-300 bg-slate-50/75">
       <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="rounded-full bg-white p-2 text-slate-700 shadow-sm">
-              <ShieldCheck className="h-4 w-4" />
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="rounded-full bg-white p-2 text-slate-700 shadow-sm">
+                <ShieldCheck className="h-4 w-4" />
+              </div>
+              <CardTitle>Amazon SP-API 校验</CardTitle>
+              <Badge variant={config.mode === "off" ? "outline" : "secondary"}>
+                {formatModeLabel(config.mode)}
+              </Badge>
+              <Badge variant="outline">存储于当前浏览器</Badge>
             </div>
-            <CardTitle>Amazon SP-API Verification</CardTitle>
-            <Badge variant={config.mode === "off" ? "outline" : "secondary"}>
-              {formatModeLabel(config.mode)}
-            </Badge>
-            <Badge variant="outline">Stored in this browser</Badge>
+            <CardDescription>
+              针对目标 ASIN 的可选目录与账户校验。SellerSprite 仍是 MVP 主数据路径；
+              启用后，SP-API 会补充 Amazon 侧的已验证状态。
+            </CardDescription>
           </div>
-          <CardDescription>
-            Optional catalog and account verification for the target ASIN.
-            SellerSprite remains the primary MVP data path, while SP-API adds
-            verified Amazon-side status when you enable it.
-          </CardDescription>
-        </div>
 
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -284,12 +280,12 @@ export function SpApiRuntimePanel({
           >
             {isOpen ? (
               <>
-                Collapse
+                收起
                 <ChevronUp className="ml-1 h-4 w-4" />
               </>
             ) : (
               <>
-                Expand
+                展开
                 <ChevronDown className="ml-1 h-4 w-4" />
               </>
             )}
@@ -302,7 +298,7 @@ export function SpApiRuntimePanel({
             disabled={disabled}
           >
             <RotateCcw className="mr-1 h-4 w-4" />
-            Clear runtime secrets
+            清除运行时密钥
           </Button>
         </div>
       </CardHeader>
@@ -312,29 +308,27 @@ export function SpApiRuntimePanel({
           <div className="space-y-2">
             <div className="flex items-center gap-2 font-medium text-slate-900">
               <Server className="h-4 w-4 text-[#FF9900]" />
-              Capability status
+              能力状态
             </div>
             <p>
               {capabilities.status === "loading"
-                ? "Checking whether the server exposes a shared SP-API default..."
+                ? "正在检查服务器是否暴露共享 SP-API 默认配置..."
                 : capabilities.status === "error"
                   ? capabilities.error
                   : serverDefaultConfigured
-                    ? "Server-default SP-API credentials are available for this route."
-                    : "No shared server-default SP-API credentials are configured right now."}
+                    ? "当前路由可使用服务器默认 SP-API 凭证。"
+                    : "当前未配置共享的服务器默认 SP-API 凭证。"}
             </p>
           </div>
 
           <div className="space-y-2">
-            <p className="font-medium text-slate-900">Runtime behavior</p>
+            <p className="font-medium text-slate-900">运行时行为</p>
             <p>
-              Runtime mode keeps credentials in local storage only. They are sent
-              with the analyze request and are never persisted by this app.
+              运行时模式只会把凭证保存在本地存储中。它们会随分析请求发送，本应用不会持久化保存。
             </p>
             {marketplaceCount > 0 ? (
               <p className="text-xs text-slate-500">
-                Marketplace mapping is ready for {marketplaceCount} listing-diagnostics
-                markets.
+                已为 {marketplaceCount} 个 Listing 诊断站点准备好站点映射。
               </p>
             ) : null}
           </div>
@@ -344,7 +338,7 @@ export function SpApiRuntimePanel({
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="listing-diagnostics-sp-api-mode">
-                Verification mode
+                校验模式
               </Label>
               <Select
                 value={config.mode}
@@ -353,7 +347,7 @@ export function SpApiRuntimePanel({
                 }
               >
                 <SelectTrigger id="listing-diagnostics-sp-api-mode">
-                  <SelectValue placeholder="Select verification mode" />
+                  <SelectValue placeholder="选择校验模式" />
                 </SelectTrigger>
                 <SelectContent>
                   {MODE_OPTIONS.map((option) => (
@@ -410,26 +404,23 @@ export function SpApiRuntimePanel({
             {config.mode === "server-default" ? (
               <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 text-sm leading-6 text-slate-600">
                 {serverDefaultConfigured
-                  ? "The server default is ready. Analyze requests will try to verify Amazon catalog and seller-account status with the shared credentials."
-                  : "The server default is not configured yet. The request will stay on the SellerSprite MVP path unless runtime credentials are supplied instead."}
+                  ? "服务器默认配置已就绪。分析请求会尝试使用共享凭证校验 Amazon 目录与卖家账户状态。"
+                  : "服务器默认配置尚未完成。在你提供运行时凭证前，请求会继续走 SellerSprite MVP 路径。"}
               </div>
             ) : null}
 
             {config.mode === "off" ? (
               <div className="rounded-2xl border border-slate-200 bg-white/85 p-4 text-sm leading-6 text-slate-600">
-                SP-API verification is disabled. This keeps the current deterministic
-                SellerSprite flow unchanged.
+                SP-API 校验已关闭。这样会保持当前确定性的 SellerSprite 流程不变。
               </div>
             ) : null}
 
             <div className="rounded-lg border border-slate-200 bg-slate-50/80 p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <p className="text-sm font-medium text-slate-800">Connection test</p>
+                  <p className="text-sm font-medium text-slate-800">连接测试</p>
                   <p className="text-xs text-slate-500">
-                    Validate the credentials before starting a full diagnosis.
-                    When the current target ASIN is valid, the test also checks
-                    catalog and account access.
+                    在启动完整诊断前先校验凭证。当前目标 ASIN 有效时，测试也会校验目录与账户访问权限。
                   </p>
                 </div>
                 <Button
@@ -442,10 +433,10 @@ export function SpApiRuntimePanel({
                   {testResult.status === "testing" ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Testing
+                      测试中
                     </>
                   ) : (
-                    "Test"
+                    "测试"
                   )}
                 </Button>
               </div>
@@ -487,10 +478,9 @@ export function SpApiRuntimePanel({
         ) : null}
 
         <div className="rounded-lg border border-slate-200 bg-white/85 p-3 text-xs leading-5 text-slate-500">
-          Sensitive fields are masked in UI responses and excluded from server
-          logs. The only time runtime credentials leave the browser is when you
-          deliberately submit an analyze request in{" "}
+          敏感字段会在界面响应里被遮罩，且不会写入服务器日志。运行时凭证只有在你主动以{" "}
           <span className="font-mono">runtime</span> mode.
+          {" "}模式提交分析请求时才会离开浏览器。
         </div>
       </CardContent>
     </Card>
@@ -536,23 +526,23 @@ function CredentialInput({
 function formatModeLabel(mode: ListingDiagnosticsSpApiMode): string {
   switch (mode) {
     case "server-default":
-      return "Server default";
+      return "服务器默认";
     case "runtime":
-      return "Runtime";
+      return "运行时";
     default:
-      return "Off";
+      return "关闭";
   }
 }
 
 function formatTestHeading(result: SpApiTestResult): string {
   switch (result.status) {
     case "testing":
-      return "Testing connection...";
+      return "正在测试连接...";
     case "success":
-      return "Test passed";
+      return "测试通过";
     case "error":
-      return "Test failed";
+      return "测试失败";
     default:
-      return "Not tested";
+      return "未测试";
   }
 }

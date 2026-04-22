@@ -5,14 +5,14 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", label: "Overview" },
-  { href: "/image-studio", label: "Image Studio" },
-  { href: "/listing-studio", label: "Listing Studio" },
-  { href: "/legacy-copy-diagnosis", label: "Legacy Copy" },
-  { href: "/listing-diagnostics", label: "Listing Diagnostics" },
-  { href: "/ad-optimizer", label: "Ad Optimizer" },
-  { href: "/competitor-monitor", label: "Competitor Monitor" },
-  { href: "/video-studio", label: "Video Studio" },
+  { href: "/", label: "总览" },
+  { href: "/image-studio", label: "图片工作台" },
+  { href: "/listing-studio", label: "Listing 工作台" },
+  { href: "/legacy-copy-diagnosis", label: "旧版文案" },
+  { href: "/listing-diagnostics", label: "Listing 诊断" },
+  { href: "/ad-optimizer", label: "广告优化" },
+  { href: "/competitor-monitor", label: "竞品监控" },
+  { href: "/video-studio", label: "视频工作台" },
 ];
 
 type StudioHeaderProps = {
@@ -26,7 +26,7 @@ export function StudioHeader({
   eyebrow,
   title,
   description,
-  badge = "GitHub + Vercel Ready",
+  badge = "GitHub + Vercel 就绪",
 }: StudioHeaderProps) {
   const pathname = usePathname();
 
@@ -47,8 +47,7 @@ export function StudioHeader({
                   Amazon Atlas OS
                 </p>
                 <p className="mt-1 text-sm text-slate-500">
-                  One entry point for image, listing, diagnostics, ad optimization,
-                  repository-backed competitor monitoring, and video workflows.
+                  图片、Listing、诊断、广告优化、基于仓库的竞品监控与视频工作流统一从一个入口进入。
                 </p>
               </div>
             </div>
@@ -92,13 +91,12 @@ export function StudioHeader({
 
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             <div className="rounded-[1.6rem] border border-slate-200/80 bg-white/90 p-5 shadow-[0_16px_40px_rgba(16,32,51,0.05)]">
-              <p className="section-kicker">Release path</p>
+              <p className="section-kicker">发布路径</p>
               <p className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
                 {badge}
               </p>
               <p className="mt-2 text-sm leading-7 text-slate-500">
-                Keep the portal deployable from a single repository while each module
-                stays isolated enough for later backend swaps.
+                保持整个门户可从单一仓库部署，同时让每个模块保持足够清晰的边界，便于后续替换后端。
               </p>
             </div>
           </div>
