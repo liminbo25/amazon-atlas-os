@@ -175,7 +175,7 @@ const quickNotes = [
 const formatOptions: UpscaleOutputFormat[] = ["jpg", "png", "webp"];
 const GEMINI_TRYON_SIZE_BY_MODEL: Record<GeminiImageModel, string> = {
   nano_banana_pro: "1024x1024",
-  image2: "1024x1792",
+  image2: "1024x1024",
 };
 const geminiImageModelOptions: GeminiImageModelOption[] = [
   {
@@ -188,7 +188,7 @@ const geminiImageModelOptions: GeminiImageModelOption[] = [
     value: "image2",
     label: "Image2",
     description:
-      "Uses /v1/chat/completions, defaults to 1024x1792 for try-on, and uses a higher-fidelity prompt template.",
+      "Uses /v1/chat/completions and keeps the higher-fidelity prompt template on the default try-on size.",
     endpoint: "https://api.yijiarj.cn/v1/chat/completions",
   },
 ];
