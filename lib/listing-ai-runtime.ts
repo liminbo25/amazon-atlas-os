@@ -2,9 +2,8 @@ import type { AiRuntimeServiceKey } from "@/lib/types";
 
 type ListingRuntimeTask = AiRuntimeServiceKey | "legacyCopyDiagnosis";
 
-const FALLBACK_LOCAL_OPENAI_MODEL = "gpt-5.4-mini";
-const FALLBACK_REMOTE_OPENAI_MODEL =
-  "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B";
+const FALLBACK_LOCAL_OPENAI_MODEL = "gpt-5.4";
+const FALLBACK_REMOTE_OPENAI_MODEL = "gpt-5.4";
 const FALLBACK_ANTHROPIC_MODEL = "claude-sonnet-4-20250514";
 const FALLBACK_IMAGE_MODEL = "claude-sonnet-4-20250514";
 

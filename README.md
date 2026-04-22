@@ -24,14 +24,18 @@ npm run dev
 
 复制 `.env.example` 为 `.env.local`，按需填写：
 
-- `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL`：图片分析、Listing 生成、视频关键帧分析和脚本生成可使用。
-- `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_TRANSCRIBE_MODEL`：视频音频转写使用；未配置时仍可上传抽帧，并可手动补字幕后生成脚本。
+- `AI_PROVIDER`：推荐设为 `openai`，让 Listing 与视频分析/脚本默认走 OpenAI-compatible 网关。
+- `ANTHROPIC_API_KEY` / `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL`：如需保留 Anthropic 作为视觉分析或回退链路时使用。
+- `OPENAI_API_KEY` / `OPENAI_BASE_URL` / `OPENAI_MODEL`：推荐用于 Listing、多源分析、视频关键帧分析和脚本生成；默认模型建议 `gpt-5.4`。
+- `OPENAI_TRANSCRIBE_API_KEY` / `OPENAI_TRANSCRIBE_BASE_URL` / `OPENAI_TRANSCRIBE_MODEL`：仅用于视频音频转写；可继续指向官方 OpenAI，不会跟主 LLM 网关绑死。若单独设置了 `OPENAI_TRANSCRIBE_BASE_URL`，请同时设置 `OPENAI_TRANSCRIBE_API_KEY`。
 - `SELLERSPRITE_SECRET_KEY`：竞品/关键词分析。
 - `GEMINI_API_KEY` / `GEMINI_API_BASE_URL`：图片生成。
 - `REPLICATE_API_TOKEN`：图片超分增强。
 - `VIDEO_OUTPUT_ROOT` / `VIDEO_MAX_UPLOAD_MB`：视频上传、关键帧和任务文件的本地输出目录与上传大小上限。
 
 `NEXT_PUBLIC_VIDEO_API_BASE_URL` 现在只是可选 legacy fallback。默认留空即可使用项目内 `/api/video-studio/...` 路由；只有想临时切回旧 FastAPI 服务时才需要设置。
+
+如果线上站点也要调用你本机的 OpenAI-compatible 接口，不要把 `OPENAI_BASE_URL` 直接写成 `http://127.0.0.1:8317/v1`。线上环境访问不到本机回环地址，必须先把本地接口暴露成一个公网 HTTPS 地址，再把 `OPENAI_BASE_URL` 指向那个桥接地址。
 
 ## 视频模块
 

@@ -58,7 +58,7 @@ const runtimeSections: Array<{
     description: "Step 1 image understanding request",
     step: "Step 1 /api/analyze-images",
     placeholderBaseUrl: "http://127.0.0.1:8317/v1",
-    placeholderModel: "vision-model",
+    placeholderModel: "gpt-5.4",
     Icon: Image,
   },
   {
@@ -67,7 +67,7 @@ const runtimeSections: Array<{
     description: "Step 3 review and copy insight request",
     step: "Step 3 /api/keywords",
     placeholderBaseUrl: "https://api.openai.com",
-    placeholderModel: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+    placeholderModel: "gpt-5.4",
     Icon: MessagesSquare,
   },
   {
@@ -76,7 +76,7 @@ const runtimeSections: Array<{
     description: "Step 4 copy generation request",
     step: "Step 4 /api/generate-copy",
     placeholderBaseUrl: "https://api.openai.com",
-    placeholderModel: "deepseek-ai/DeepSeek-R1-Distill-Qwen-7B",
+    placeholderModel: "gpt-5.4",
     Icon: FileText,
   },
 ];
