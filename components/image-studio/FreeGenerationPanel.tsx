@@ -370,17 +370,15 @@ export default function FreeGenerationPanel({
           </div>
         </div>
 
-        <div className="grid gap-5 p-5 sm:p-6 xl:grid-cols-[minmax(0,1.18fr)_360px]">
-          <div className="space-y-4">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-              <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
+        <div className="space-y-4 p-5 sm:p-6">
+          <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)] sm:p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
-                      提示词
+                      提示词与参考图
                     </p>
                     <p className="mt-2 text-sm text-slate-600">
-                      用更直接的中文描述主体、场景、光线、构图和质感。
+                      先把主体、场景、光线、构图和质感写清楚。图生图时，参考图也放在这里一起处理。
                     </p>
                   </div>
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-500">
@@ -484,9 +482,10 @@ export default function FreeGenerationPanel({
                       : "文生图只发送提示词和模型配置。"}
                   </p>
                 </div>
-              </div>
+          </div>
 
-              <div className="space-y-4">
+          <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)]">
+            <div className="space-y-4">
                 <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4 shadow-[0_10px_30px_rgba(15,23,42,0.04)]">
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -591,7 +590,6 @@ export default function FreeGenerationPanel({
                 </div>
               </div>
             </div>
-          </div>
 
           <div className="space-y-4">
             <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50/80 p-4">
@@ -635,7 +633,7 @@ export default function FreeGenerationPanel({
                       <p className="mt-2 text-sm leading-6 text-slate-500">
                         {latestResult
                           ? STATUS_META[latestResult.status].emptyDescription
-                          : "输入提示词后发起生成，右侧会自动沉淀最近结果。"}
+                          : "输入提示词后发起生成，这里会自动沉淀最近结果。"}
                       </p>
                     </div>
                   </div>
