@@ -24,11 +24,7 @@ export interface ListingDiagnosticsEvidenceRow {
   category: "finding" | "coverage";
 }
 
-const ACTION_PRIORITY_ORDER: ListingDiagnosticsActionPriority[] = [
-  "P0",
-  "P1",
-  "P2",
-];
+const ACTION_PRIORITY_ORDER: ListingDiagnosticsActionPriority[] = ["P0", "P1", "P2"];
 
 const ACTION_PRIORITY_META: Record<
   ListingDiagnosticsActionPriority,
@@ -37,20 +33,17 @@ const ACTION_PRIORITY_META: Record<
   P0: {
     id: "P0",
     label: "P0",
-    description:
-      "Fix now. These items are blocking buyability, compliance, or other critical outcomes.",
+    description: "立即处理。优先解决可售性、合规或其他强阻塞问题。",
   },
   P1: {
     id: "P1",
     label: "P1",
-    description:
-      "Queue next. These items should move as soon as the P0 blockers are under control.",
+    description: "本周推进。在 P0 受控后尽快执行的高影响动作。",
   },
   P2: {
     id: "P2",
     label: "P2",
-    description:
-      "Monitor or batch later. These items matter, but they should not displace higher-impact fixes.",
+    description: "两周内优化。重要但不应挤占更高优先级动作。",
   },
 };
 
@@ -121,7 +114,11 @@ export function buildListingDiagnosticsEvidenceRows(
     return evidenceItems.map((evidence, index) => ({
       id: `finding-${finding.id}-${index}`,
       signal: finding.title,
-      source: resolveEvidenceSourceLabel(relatedCoverageItems, finding, verifiedFindingIds),
+      source: resolveEvidenceSourceLabel(
+        relatedCoverageItems,
+        finding,
+        verifiedFindingIds
+      ),
       confidence: finding.confidence,
       verification: finding.verification,
       evidence,
@@ -149,17 +146,16 @@ export function buildListingDiagnosticsEvidenceRows(
   });
 
   return [...findingRows, ...coverageRows].sort((left, right) => {
-    const categoryRank = left.category === right.category
-      ? 0
-      : left.category === "finding"
-        ? -1
-        : 1;
+    const categoryRank =
+      left.category === right.category ? 0 : left.category === "finding" ? -1 : 1;
 
     if (categoryRank !== 0) {
       return categoryRank;
     }
 
-    const verificationRank = getVerificationRank(left.verification) - getVerificationRank(right.verification);
+    const verificationRank =
+      getVerificationRank(left.verification) -
+      getVerificationRank(right.verification);
     if (verificationRank !== 0) {
       return verificationRank;
     }
@@ -173,11 +169,11 @@ export function formatEvidenceVerificationLabel(
 ): string {
   switch (verification) {
     case "verified":
-      return "Verified";
+      return "Amazon 已验证";
     case "inferred":
-      return "Inferred";
+      return "待验证假设";
     case "direct":
-      return "Direct";
+      return "直接证据";
   }
 }
 

@@ -221,6 +221,116 @@ export interface ListingDiagnosticsImpactSummaryItem {
   topFindingIds: string[];
 }
 
+export interface ListingDiagnosticsOperatorComparisonRow {
+  metric: string;
+  targetValue: string;
+  competitorValue: string;
+  analysis: string;
+}
+
+export interface ListingDiagnosticsOperatorKeywordRow {
+  keyword: string;
+  monthlySearchVolume: number;
+  targetOrganicRank: string;
+  targetSponsoredRank: string;
+  competitorAsin: string;
+  competitorOrganicRank: string;
+  competitorSponsoredRank: string;
+  purchaseShare: string;
+  diagnosis: string;
+}
+
+export interface ListingDiagnosticsOperatorGapRow {
+  dimension: string;
+  targetStrengths: string[];
+  targetWeaknesses: string[];
+  competitorStrengths: string[];
+  competitorWeaknesses: string[];
+}
+
+export interface ListingDiagnosticsOperatorIssueRow {
+  id: string;
+  title: string;
+  dimension: string;
+  priority: string;
+  evidenceLevel: string;
+  issueStatus: string;
+  impact: string;
+  symptom: string;
+  rootCause: string;
+  recommendation: string;
+  whereToChange: string;
+  expectedImpact: string;
+  evidenceSummary: string;
+  verificationAction: string;
+}
+
+export interface ListingDiagnosticsOperatorOptimizationBullet {
+  label: string;
+  focus: string;
+  text: string;
+}
+
+export interface ListingDiagnosticsOperatorOptimizationTextRow {
+  label: string;
+  text: string;
+}
+
+export interface ListingDiagnosticsOperatorOptimizationPlan {
+  recommendedTitle: string;
+  titleLogic: string;
+  coreKeywords: string[];
+  bullets: ListingDiagnosticsOperatorOptimizationBullet[];
+  searchTerms: ListingDiagnosticsOperatorOptimizationTextRow[];
+  searchTermStrategy: string;
+  aPlusAltText: ListingDiagnosticsOperatorOptimizationTextRow[];
+  altTextStrategy: string;
+  occasionType: string;
+  attributeRecommendations: string[];
+  executionNotes: string[];
+}
+
+export interface ListingDiagnosticsOperatorCoverageRow {
+  keyword: string;
+  monthlySearchVolume: number;
+  targetTitle: string;
+  targetBullets: string;
+  targetSearchTerms: string;
+  competitorTitle: string;
+  competitorBullets: string;
+  optimizedTitle: string;
+  optimizedBullets: string;
+  optimizedSearchTerms: string;
+  optimizedAltText: string;
+  insight: string;
+}
+
+export interface ListingDiagnosticsOperatorRoadmapRow {
+  priority: string;
+  action: string;
+  expectedEffect: string;
+  timeline: string;
+  verification: string;
+  owner: string;
+}
+
+export interface ListingDiagnosticsOperatorReport {
+  primaryCompetitorAsin: string | null;
+  primaryCompetitorLabel: string;
+  headline: string;
+  summary: string;
+  leadingDiagnosis: string;
+  dataQuality: string;
+  keyTakeaways: string[];
+  comparisonRows: ListingDiagnosticsOperatorComparisonRow[];
+  keywordRows: ListingDiagnosticsOperatorKeywordRow[];
+  gapRows: ListingDiagnosticsOperatorGapRow[];
+  issues: ListingDiagnosticsOperatorIssueRow[];
+  optimizationPlan: ListingDiagnosticsOperatorOptimizationPlan;
+  coverageRows: ListingDiagnosticsOperatorCoverageRow[];
+  roadmap: ListingDiagnosticsOperatorRoadmapRow[];
+}
+
 export interface ListingDiagnosticsResult {
   generatedAt: string;
   request: ListingDiagnosticsRequest;
@@ -241,6 +351,7 @@ export interface ListingDiagnosticsResult {
   benchmark: ListingDiagnosticsBenchmark;
   spApiVerification: ListingDiagnosticsSpApiVerificationSummary | null;
   inferredCount: number;
+  operatorReport: ListingDiagnosticsOperatorReport;
 }
 
 export interface ListingDiagnosticsApiResponse {

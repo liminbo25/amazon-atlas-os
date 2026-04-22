@@ -66,20 +66,19 @@ export function DiagnosticsForm({
             <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-white">
               <Search className="h-4 w-4" />
             </span>
-            Listing Diagnostics Workbench
+            Listing 诊断工作台
           </CardTitle>
           <p className="text-sm leading-7 text-slate-600">
-            SellerSprite stays on the deterministic primary path. Optional SP-API
-            verification upgrades BUYABLE and DISCOVERABLE blockers into
-            verified operator-grade root causes without breaking the fallback
-            scoring flow.
+            SellerSprite 负责基础 Listing、评论和关键词信号，Amazon SP-API
+            负责把可售性与目录阻塞项升级成已验证问题。最终输出不是一串英文 findings，
+            而是一份能直接执行的中文运营诊断。
           </p>
         </CardHeader>
 
         <CardContent className="space-y-6 pt-6">
           <div className="grid gap-4 lg:grid-cols-[1fr_180px]">
             <div className="space-y-2">
-              <Label htmlFor="target-asin">Target ASIN</Label>
+              <Label htmlFor="target-asin">目标 ASIN</Label>
               <Input
                 id="target-asin"
                 placeholder="B0XXXXXXXX"
@@ -92,7 +91,7 @@ export function DiagnosticsForm({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="marketplace">Marketplace</Label>
+              <Label htmlFor="marketplace">站点</Label>
               <Select
                 value={marketplace}
                 onValueChange={(value) => {
@@ -102,7 +101,7 @@ export function DiagnosticsForm({
                 }}
               >
                 <SelectTrigger id="marketplace" className="h-10 w-full">
-                  <SelectValue placeholder="Select marketplace" />
+                  <SelectValue placeholder="选择站点" />
                 </SelectTrigger>
                 <SelectContent>
                   {MARKETPLACE_OPTIONS.map((option) => (
@@ -118,10 +117,9 @@ export function DiagnosticsForm({
           <div className="space-y-3">
             <div className="flex items-center justify-between gap-4">
               <div>
-                <Label>Competitor ASINs</Label>
+                <Label>竞品 ASIN</Label>
                 <p className="mt-1 text-sm text-slate-500">
-                  Optional, but 2-3 ASINs give the benchmark and keyword proxy layers more
-                  confidence.
+                  建议至少提供 2-3 个竞品 ASIN，这样关键词竞争、优缺点对比和优化方案会更稳。
                 </p>
               </div>
 
@@ -132,7 +130,7 @@ export function DiagnosticsForm({
                 disabled={isSubmitting || competitorAsins.length >= 5}
               >
                 <Plus />
-                Add ASIN
+                添加 ASIN
               </Button>
             </div>
 
@@ -144,7 +142,7 @@ export function DiagnosticsForm({
                 >
                   <div className="flex items-center justify-between gap-3">
                     <Label htmlFor={`competitor-asin-${index}`}>
-                      Competitor {index + 1}
+                      竞品 {index + 1}
                     </Label>
                     {competitorAsins.length > 1 ? (
                       <Button
@@ -185,12 +183,10 @@ export function DiagnosticsForm({
           />
 
           <div className="rounded-[1.6rem] border border-slate-200 bg-[linear-gradient(135deg,rgba(246,182,63,0.12),rgba(229,237,246,0.5))] p-4">
-            <p className="text-sm font-semibold text-slate-900">Phase 1 scope</p>
+            <p className="text-sm font-semibold text-slate-900">当前交付范围</p>
             <p className="mt-2 text-sm leading-7 text-slate-600">
-              SellerSprite remains the primary analysis path. When SP-API verification is
-              enabled, the result can verify catalog and seller-account blockers,
-              classify likely root causes, and rank the next operator actions
-              without changing the fallback behavior.
+              本模块会把 SellerSprite 的 Listing、评论、关键词信号重组为中文运营报告；
+              如果启用 SP-API，还会把目录和可售性阻塞项单独升级成 Amazon 已验证问题。
             </p>
           </div>
         </CardContent>
@@ -202,10 +198,10 @@ export function DiagnosticsForm({
             onClick={onReset}
             disabled={isSubmitting}
           >
-            Reset
+            重置
           </Button>
           <Button type="submit" size="lg" disabled={isSubmitting}>
-            {isSubmitting ? "Running diagnosis..." : "Analyze listing"}
+            {isSubmitting ? "正在生成诊断..." : "开始分析"}
           </Button>
         </CardFooter>
       </form>

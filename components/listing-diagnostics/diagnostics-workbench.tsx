@@ -45,7 +45,7 @@ export function DiagnosticsWorkbench() {
     const normalizedTargetAsin = targetAsin.trim().toUpperCase();
 
     if (!ASIN_PATTERN.test(normalizedTargetAsin)) {
-      failAnalysis("Target ASIN must be a valid 10-character ASIN.", "targetAsin_invalid");
+      failAnalysis("目标 ASIN 必须是合法的 10 位 ASIN。", "target_asin_invalid");
       return;
     }
 
@@ -58,7 +58,7 @@ export function DiagnosticsWorkbench() {
 
     if (invalidCompetitorAsins.length > 0) {
       failAnalysis(
-        `Competitor ASINs must be valid 10-character ASINs. Invalid values: ${invalidCompetitorAsins.join(", ")}.`,
+        `竞品 ASIN 必须是合法的 10 位 ASIN。无效值：${invalidCompetitorAsins.join(", ")}。`,
         "competitor_asins_invalid"
       );
       return;
@@ -66,7 +66,7 @@ export function DiagnosticsWorkbench() {
 
     if (normalizedCompetitorAsins.some((asin) => asin === normalizedTargetAsin)) {
       failAnalysis(
-        "Competitor ASINs cannot include the target ASIN.",
+        "竞品 ASIN 里不能包含目标 ASIN。",
         "competitor_asins_duplicate_target"
       );
       return;
@@ -78,7 +78,9 @@ export function DiagnosticsWorkbench() {
 
     if (duplicateCompetitorAsins.length > 0) {
       failAnalysis(
-        `Competitor ASINs must be unique. Duplicate values: ${Array.from(new Set(duplicateCompetitorAsins)).join(", ")}.`,
+        `竞品 ASIN 不能重复。重复值：${Array.from(
+          new Set(duplicateCompetitorAsins)
+        ).join(", ")}。`,
         "competitor_asins_duplicate"
       );
       return;
@@ -94,7 +96,9 @@ export function DiagnosticsWorkbench() {
 
       if (missingFields.length > 0) {
         failAnalysis(
-          `SP-API runtime mode requires ${missingFields.map(formatSpApiFieldLabel).join(", ")}.`,
+          `SP-API 运行时模式缺少：${missingFields
+            .map(formatSpApiFieldLabel)
+            .join(", ")}。`,
           "sp_api_runtime_incomplete"
         );
         return;
@@ -120,7 +124,7 @@ export function DiagnosticsWorkbench() {
       });
 
       if (!response.ok) {
-        throw await parseApiRequestError(response, "Listing diagnosis failed.");
+        throw await parseApiRequestError(response, "Listing 诊断失败。");
       }
 
       const parsed = (await response.json()) as ListingDiagnosticsApiResponse;
@@ -131,7 +135,7 @@ export function DiagnosticsWorkbench() {
     } catch (error) {
       const normalizedError = normalizeApiRequestError(
         error,
-        "Listing diagnosis failed."
+        "Listing 诊断失败。"
       );
 
       startTransition(() => {

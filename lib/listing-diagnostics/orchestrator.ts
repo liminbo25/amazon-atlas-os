@@ -1,4 +1,5 @@
 import { fetchCompetitorData } from "@/lib/seller-sprite-client";
+import { buildListingDiagnosticsOperatorReport } from "@/lib/listing-diagnostics/operator-report";
 import { listingDiagnosticsRules } from "@/lib/listing-diagnostics/rules";
 import { buildListingDiagnosticsSpApiEnhancement } from "@/lib/listing-diagnostics/sp-api";
 import {
@@ -186,7 +187,7 @@ export async function runListingDiagnostics(
   const rootCauseSummary = buildRootCauseSummary(findings, summaryActions);
   const impactSummary = buildImpactSummary(findings, summaryActions);
 
-  const result: ListingDiagnosticsResult = {
+  const draftResult: ListingDiagnosticsResult = {
     generatedAt: new Date().toISOString(),
     request: normalizedRequest,
     status,
@@ -221,6 +222,43 @@ export async function runListingDiagnostics(
       findings.filter((item) => item.inferred).length +
       actionPlan.filter((item) => item.inferred).length +
       combinedSourceCoverage.filter((item) => item.inferred).length,
+    operatorReport: {
+      primaryCompetitorAsin: null,
+      primaryCompetitorLabel: "",
+      headline: "",
+      summary: "",
+      leadingDiagnosis: "",
+      dataQuality: "",
+      keyTakeaways: [],
+      comparisonRows: [],
+      keywordRows: [],
+      gapRows: [],
+      issues: [],
+      optimizationPlan: {
+        recommendedTitle: "",
+        titleLogic: "",
+        coreKeywords: [],
+        bullets: [],
+        searchTerms: [],
+        searchTermStrategy: "",
+        aPlusAltText: [],
+        altTextStrategy: "",
+        occasionType: "",
+        attributeRecommendations: [],
+        executionNotes: [],
+      },
+      coverageRows: [],
+      roadmap: [],
+    },
+  };
+
+  const operatorReport = await buildListingDiagnosticsOperatorReport(draftResult);
+
+  const result: ListingDiagnosticsResult = {
+    ...draftResult,
+    headline: operatorReport.headline,
+    summary: operatorReport.summary,
+    operatorReport,
   };
 
   return {
@@ -288,8 +326,8 @@ function buildSourceCoverage(
       expected: 1,
       detail:
         targetListingAvailable > 0
-          ? "Direct title, bullet, price, and rating fields are available."
-          : "SellerSprite did not return a usable listing snapshot for the target ASIN.",
+          ? "已拿到目标 ASIN 的标题、Bullet、价格和评分等前台字段。"
+          : "SellerSprite 没有返回可用的目标 ASIN Listing 快照。",
       confidence: targetListingAvailable > 0 ? 0.98 : 0,
       inferred: false,
     },
@@ -301,7 +339,7 @@ function buildSourceCoverage(
       status: getCountCoverageStatus(target.negativeReviews.length, 8, 1),
       available: target.negativeReviews.length,
       expected: 8,
-      detail: `${target.negativeReviews.length} negative reviews collected for the target ASIN.`,
+      detail: `目标 ASIN 已抓取 ${target.negativeReviews.length} 条差评样本。`,
       confidence: getCountConfidence(target.negativeReviews.length, 8, 1),
       inferred: false,
     },
@@ -313,7 +351,7 @@ function buildSourceCoverage(
       status: getCountCoverageStatus(target.positiveReviews.length, 8, 1),
       available: target.positiveReviews.length,
       expected: 8,
-      detail: `${target.positiveReviews.length} positive reviews collected for the target ASIN.`,
+      detail: `目标 ASIN 已抓取 ${target.positiveReviews.length} 条好评样本。`,
       confidence: getCountConfidence(target.positiveReviews.length, 8, 1),
       inferred: false,
     },
@@ -325,7 +363,7 @@ function buildSourceCoverage(
       status: getCountCoverageStatus(target.keywords.length, 8, 1),
       available: target.keywords.length,
       expected: 8,
-      detail: `${target.keywords.length} traffic keywords collected for the target ASIN.`,
+      detail: `目标 ASIN 已抓取 ${target.keywords.length} 个流量关键词样本。`,
       confidence: getCountConfidence(target.keywords.length, 8, 1),
       inferred: false,
     },
@@ -343,8 +381,8 @@ function buildSourceCoverage(
       expected: competitors.length,
       detail:
         competitors.length > 0
-          ? `${competitorListingCount} of ${competitors.length} competitor ASINs returned listing snapshots.`
-          : "No competitor ASINs were provided for the benchmark set.",
+          ? `${competitorListingCount}/${competitors.length} 个竞品 ASIN 返回了 Listing 快照。`
+          : "当前没有提供竞品 ASIN，无法形成竞品基准集。",
       confidence:
         competitors.length > 0 ? safeDivide(competitorListingCount, competitors.length) : 0,
       inferred: false,
@@ -363,8 +401,8 @@ function buildSourceCoverage(
       expected: competitors.length,
       detail:
         competitors.length > 0
-          ? `${competitorReviewCount} of ${competitors.length} competitor ASINs returned reviews.`
-          : "No competitor ASINs were provided for review benchmarking.",
+          ? `${competitorReviewCount}/${competitors.length} 个竞品 ASIN 返回了评论样本。`
+          : "当前没有提供竞品 ASIN，无法形成评论基准样本。",
       confidence:
         competitors.length > 0 ? safeDivide(competitorReviewCount, competitors.length) : 0,
       inferred: false,
@@ -383,8 +421,8 @@ function buildSourceCoverage(
       expected: competitors.length,
       detail:
         competitors.length > 0
-          ? `${competitorKeywordCount} of ${competitors.length} competitor ASINs returned traffic keywords.`
-          : "No competitor ASINs were provided for keyword benchmarking.",
+          ? `${competitorKeywordCount}/${competitors.length} 个竞品 ASIN 返回了流量关键词样本。`
+          : "当前没有提供竞品 ASIN，无法形成关键词基准样本。",
       confidence:
         competitors.length > 0 ? safeDivide(competitorKeywordCount, competitors.length) : 0,
       inferred: false,
@@ -399,8 +437,8 @@ function buildSourceCoverage(
       expected: 1,
       detail:
         competitorListingCount > 0
-          ? "Benchmark averages and pack-level comparisons are derived from the available competitor snapshots."
-          : "Benchmark averages cannot be derived until competitor listing snapshots are available.",
+          ? "当前竞品均值和对标比较由已获取到的竞品快照推导得出。"
+          : "缺少竞品 Listing 快照，暂时无法推导竞品均值基准。",
       confidence:
         competitors.length > 0 ? safeDivide(competitorListingCount, competitors.length) : 0,
       inferred: true,
@@ -491,7 +529,7 @@ function buildWarnings(
 
   if (findings.some((finding) => finding.inferred)) {
     warnings.push(
-      "Some findings are marked as inferred because they rely on competitor proxy data or a derived benchmark."
+      "当前有部分结论被标记为“待验证假设”，因为它们依赖竞品代理信号或推导基准。"
     );
   }
 
