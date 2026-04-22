@@ -13,20 +13,16 @@ import {
   type ListingDiagnosticsActionPlanSection,
   type ListingDiagnosticsEvidenceRow,
 } from "@/lib/listing-diagnostics/reporting";
-import {
-  formatDimensionLabel,
-  formatImpactType,
-  formatRootCauseCategory,
-} from "@/lib/listing-diagnostics/rules/shared";
 
 const DOCX_MIME =
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 const XLSX_MIME =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 const JSON_MIME = "application/json;charset=utf-8";
-const EXPORT_SCHEMA_VERSION = "listing-diagnostics.report.v3";
+const EXPORT_SCHEMA_VERSION = "listing-diagnostics.report.v4";
 
 type DocxModule = typeof import("docx");
+type XlsxModule = typeof import("xlsx");
 type SheetRow = Record<string, string | number>;
 
 export interface ListingDiagnosticsExportPayload {
@@ -52,6 +48,7 @@ export interface ListingDiagnosticsExportPayload {
   evidenceTable: ListingDiagnosticsEvidenceRow[];
   warnings: string[];
   spApiVerification: ListingDiagnosticsResult["spApiVerification"];
+  operatorReport: ListingDiagnosticsResult["operatorReport"];
 }
 
 export function buildListingDiagnosticsExportPayload(
@@ -63,9 +60,9 @@ export function buildListingDiagnosticsExportPayload(
   return {
     schemaVersion: EXPORT_SCHEMA_VERSION,
     exportedAt: exportedAt.toISOString(),
-    exportedAtLocal: exportedAt.toLocaleString("en-US"),
+    exportedAtLocal: exportedAt.toLocaleString("zh-CN"),
     generatedAt: result.generatedAt,
-    generatedAtLocal: new Date(result.generatedAt).toLocaleString("en-US"),
+    generatedAtLocal: new Date(result.generatedAt).toLocaleString("zh-CN"),
     request: result.request,
     status: result.status,
     headline: result.headline,
@@ -83,6 +80,7 @@ export function buildListingDiagnosticsExportPayload(
     evidenceTable: buildListingDiagnosticsEvidenceRows(result),
     warnings: result.warnings,
     spApiVerification: result.spApiVerification,
+    operatorReport: result.operatorReport,
   };
 }
 
@@ -97,100 +95,92 @@ export async function exportListingDiagnosticsReportDocx(
     "docx"
   );
   const docx = await import("docx");
-  const { Document, HeadingLevel, Packer, Paragraph, TextRun } = docx;
+  const { Document, HeadingLevel, Packer, Paragraph } = docx;
+
+  const issues = payload.operatorReport.issues.slice(0, 6);
+  const roadmap = payload.operatorReport.roadmap.slice(0, 6);
+  const bullets = payload.operatorReport.optimizationPlan.bullets;
 
   const children = [
     new Paragraph({
-      text: "Listing Diagnostics Report",
+      text: "Listing 运营诊断报告",
       heading: HeadingLevel.TITLE,
     }),
+    new Paragraph(`目标 ASIN：${payload.request.targetAsin}`),
+    new Paragraph(`站点：${payload.request.marketplace}`),
+    new Paragraph(`生成时间：${payload.generatedAtLocal}`),
+    new Paragraph(`导出时间：${payload.exportedAtLocal}`),
+    new Paragraph(""),
     new Paragraph({
-      children: [
-        new TextRun({ text: "Target ASIN: ", bold: true }),
-        new TextRun(payload.request.targetAsin),
-      ],
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: "Marketplace: ", bold: true }),
-        new TextRun(payload.request.marketplace),
-      ],
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: "Generated At: ", bold: true }),
-        new TextRun(payload.generatedAtLocal),
-      ],
-    }),
-    new Paragraph({
-      children: [
-        new TextRun({ text: "Exported At: ", bold: true }),
-        new TextRun(payload.exportedAtLocal),
-      ],
-    }),
-    new Paragraph({ text: "" }),
-    new Paragraph({
-      text: "Executive Summary",
+      text: "诊断摘要",
       heading: HeadingLevel.HEADING_1,
     }),
-    createLabelParagraph(docx, "Status", payload.status),
-    createLabelParagraph(docx, "Overall score", `${payload.overallScore}/100`),
-    createLabelParagraph(docx, "Confidence", `${payload.confidence}%`),
-    createLabelParagraph(docx, "Headline", payload.headline),
-    createLabelParagraph(docx, "Summary", payload.summary),
-    ...(payload.spApiVerification
-      ? [
-          createLabelParagraph(
-            docx,
-            "SP-API verification",
-            `${payload.spApiVerification.mode}; catalog ${payload.spApiVerification.catalogStatus}; account ${payload.spApiVerification.accountStatus}`
-          ),
-        ]
-      : []),
-    ...(payload.warnings.length > 0
-      ? [
-          new Paragraph({
-            text: "Warnings",
-            heading: HeadingLevel.HEADING_2,
-          }),
-          ...createBulletParagraphs(docx, payload.warnings),
-        ]
-      : []),
+    new Paragraph(payload.operatorReport.headline),
+    new Paragraph(payload.operatorReport.summary),
+    new Paragraph(`主诊断：${payload.operatorReport.leadingDiagnosis}`),
+    new Paragraph(`数据质量：${payload.operatorReport.dataQuality}`),
+    new Paragraph(""),
     new Paragraph({
-      text: "Operator Queue",
+      text: "关键结论",
       heading: HeadingLevel.HEADING_1,
     }),
-    ...buildOperatorQueueParagraphs(docx, payload),
+    ...payload.operatorReport.keyTakeaways.map(
+      (item) =>
+        new Paragraph({
+          text: item,
+          bullet: { level: 0 },
+        })
+    ),
+    new Paragraph(""),
     new Paragraph({
-      text: "Score Breakdown",
+      text: "问题清单",
       heading: HeadingLevel.HEADING_1,
     }),
-    ...buildScoreBreakdownParagraphs(docx, payload),
+    ...issues.flatMap((issue) => [
+      new Paragraph({
+        text: `${issue.priority}｜${issue.title}`,
+        heading: HeadingLevel.HEADING_2,
+      }),
+      new Paragraph(`维度：${issue.dimension}`),
+      new Paragraph(`状态：${issue.issueStatus} / ${issue.evidenceLevel}`),
+      new Paragraph(`当前表现：${issue.symptom}`),
+      new Paragraph(`根因诊断：${issue.rootCause}`),
+      new Paragraph(`建议动作：${issue.recommendation}`),
+      new Paragraph(`修改位置：${issue.whereToChange}`),
+      new Paragraph(`验收动作：${issue.verificationAction}`),
+    ]),
+    new Paragraph(""),
     new Paragraph({
-      text: "Source Coverage",
+      text: "行动清单",
       heading: HeadingLevel.HEADING_1,
     }),
-    ...buildSourceCoverageParagraphs(docx, payload),
+    ...roadmap.flatMap((row) => [
+      new Paragraph({
+        text: `${row.priority}｜${row.action}`,
+        heading: HeadingLevel.HEADING_2,
+      }),
+      new Paragraph(`预期效果：${row.expectedEffect}`),
+      new Paragraph(`时间节点：${row.timeline}`),
+      new Paragraph(`责任角色：${row.owner}`),
+      new Paragraph(`验收方式：${row.verification}`),
+    ]),
+    new Paragraph(""),
     new Paragraph({
-      text: "Findings",
+      text: "优化方向",
       heading: HeadingLevel.HEADING_1,
     }),
-    ...buildFindingParagraphs(docx, payload),
-    new Paragraph({
-      text: "Action Plan",
-      heading: HeadingLevel.HEADING_1,
-    }),
-    ...buildActionPlanParagraphs(docx, payload),
-    new Paragraph({
-      text: "Benchmark Summary",
-      heading: HeadingLevel.HEADING_1,
-    }),
-    ...buildBenchmarkParagraphs(docx, payload),
-    new Paragraph({
-      text: "Evidence Appendix",
-      heading: HeadingLevel.HEADING_1,
-    }),
-    ...buildEvidenceParagraphs(docx, payload),
+    new Paragraph(`推荐标题：${payload.operatorReport.optimizationPlan.recommendedTitle}`),
+    new Paragraph(`标题逻辑：${payload.operatorReport.optimizationPlan.titleLogic}`),
+    new Paragraph(
+      `核心关键词：${payload.operatorReport.optimizationPlan.coreKeywords.join(", ")}`
+    ),
+    ...bullets.flatMap((bullet) => [
+      new Paragraph({
+        text: `${bullet.label}｜${bullet.focus}`,
+        heading: HeadingLevel.HEADING_2,
+      }),
+      new Paragraph(bullet.text),
+    ]),
   ];
 
   const document = new Document({
@@ -211,85 +201,116 @@ export async function exportListingDiagnosticsReportDocx(
 export async function exportListingDiagnosticsWorkbookXlsx(
   result: ListingDiagnosticsResult
 ): Promise<string> {
-  const payload = buildListingDiagnosticsExportPayload(result);
   const fileName = buildFileName(
-    "listing-diagnostics-data",
+    "listing-diagnostics-report",
     result.request.marketplace,
     result.request.targetAsin,
     "xlsx"
   );
+  const buffer = await buildListingDiagnosticsWorkbookBuffer(result);
+  const blobBuffer = buffer.buffer.slice(
+    buffer.byteOffset,
+    buffer.byteOffset + buffer.byteLength
+  ) as ArrayBuffer;
+
+  triggerDownload(fileName, new Blob([blobBuffer], { type: XLSX_MIME }));
+
+  return fileName;
+}
+
+export async function buildListingDiagnosticsWorkbookBuffer(
+  result: ListingDiagnosticsResult
+): Promise<Uint8Array> {
   const XLSX = await import("xlsx");
-  const workbook = XLSX.utils.book_new();
-
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildSummaryRows(payload)),
-    "Summary"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildScoreBreakdownRows(payload)),
-    "ScoreBreakdown"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildRootCauseSummaryRows(payload)),
-    "RootCauseQueue"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildImpactSummaryRows(payload)),
-    "ImpactQueue"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildSourceCoverageRows(payload)),
-    "SourceCoverage"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildFindingsRows(payload)),
-    "Findings"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildActionPlanRows(payload)),
-    "ActionPlan"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildBenchmarkSummaryRows(payload)),
-    "Benchmark"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildBenchmarkKeywordRows(payload)),
-    "BenchmarkKeywords"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildBenchmarkThemeRows(payload)),
-    "BenchmarkThemes"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildEvidenceRows(payload)),
-    "Evidence"
-  );
-  XLSX.utils.book_append_sheet(
-    workbook,
-    XLSX.utils.json_to_sheet(buildWarningRows(payload)),
-    "Warnings"
-  );
-
+  const workbook = await buildListingDiagnosticsWorkbook(result);
   const buffer = XLSX.write(workbook, {
     bookType: "xlsx",
     type: "array",
   });
 
-  triggerDownload(fileName, new Blob([buffer], { type: XLSX_MIME }));
+  return applyWorkbookStyleTemplate(new Uint8Array(buffer));
+}
 
-  return fileName;
+export async function buildListingDiagnosticsWorkbook(
+  result: ListingDiagnosticsResult
+) {
+  const payload = buildListingDiagnosticsExportPayload(result);
+  const XLSX = await import("xlsx");
+  const workbook = XLSX.utils.book_new();
+
+  appendJsonSheet(
+    XLSX,
+    workbook,
+    "诊断总览",
+    buildOverviewRows(payload),
+    [18, 20, 24, 72]
+  );
+  appendJsonSheet(
+    XLSX,
+    workbook,
+    "基础对比",
+    buildComparisonRows(payload),
+    [18, 40, 40, 60]
+  );
+  appendJsonSheet(
+    XLSX,
+    workbook,
+    "流量关键词TOP30",
+    buildKeywordRows(payload),
+    [24, 14, 14, 14, 16, 16, 18, 12, 10, 12, 52]
+  );
+  appendJsonSheet(
+    XLSX,
+    workbook,
+    "Listing优缺点",
+    buildGapRows(payload),
+    [18, 42, 42, 42, 42]
+  );
+  appendAoaSheet(
+    XLSX,
+    workbook,
+    "新Listing优化方案",
+    buildOptimizationRows(payload),
+    [{ wch: 28 }, { wch: 132 }],
+    [{ s: { r: 0, c: 0 }, e: { r: 0, c: 1 } }]
+  );
+  appendJsonSheet(
+    XLSX,
+    workbook,
+    "关键词覆盖矩阵",
+    buildCoverageRows(payload),
+    [28, 14, 12, 12, 12, 12, 12, 12, 12, 12, 12, 48]
+  );
+  appendJsonSheet(
+    XLSX,
+    workbook,
+    "行动清单",
+    buildRoadmapRows(payload),
+    [16, 64, 44, 18, 34, 20]
+  );
+  appendJsonSheet(
+    XLSX,
+    workbook,
+    "问题清单",
+    buildIssueRows(payload),
+    [16, 16, 16, 16, 14, 14, 28, 28, 28, 28, 28, 32, 32, 28]
+  );
+  appendJsonSheet(
+    XLSX,
+    workbook,
+    "证据明细",
+    buildEvidenceRows(payload),
+    [28, 20, 14, 14, 64]
+  );
+  appendJsonSheet(
+    XLSX,
+    workbook,
+    "原始诊断数据",
+    buildRawSummaryRows(payload),
+    [24, 120]
+  );
+
+  return workbook;
 }
 
 export async function exportListingDiagnosticsPayloadJson(
@@ -309,648 +330,692 @@ export async function exportListingDiagnosticsPayloadJson(
   return fileName;
 }
 
-function buildScoreBreakdownParagraphs(
-  docx: DocxModule,
-  payload: ListingDiagnosticsExportPayload
-) {
-  const { HeadingLevel, Paragraph } = docx;
-
-  if (payload.scoreBreakdown.length === 0) {
-    return [new Paragraph("No score breakdown is available.")];
-  }
-
-  return payload.scoreBreakdown.flatMap((dimension) => [
-    new Paragraph({
-      text: `${dimension.label} (${dimension.score}/100)`,
-      heading: HeadingLevel.HEADING_2,
-    }),
-    createLabelParagraph(docx, "Summary", dimension.summary),
-    createLabelParagraph(
-      docx,
-      "Weight / Confidence",
-      `${Math.round(dimension.weight * 100)}% / ${Math.round(dimension.confidence * 100)}%`
-    ),
-    createLabelParagraph(
-      docx,
-      "Coverage / Inferred",
-      `${dimension.coverage} / ${dimension.inferred ? "yes" : "no"}`
-    ),
-  ]);
-}
-
-function buildOperatorQueueParagraphs(
-  docx: DocxModule,
-  payload: ListingDiagnosticsExportPayload
-) {
-  const { HeadingLevel, Paragraph } = docx;
-  const rootCauseParagraphs =
-    payload.rootCauseSummary.length > 0
-      ? payload.rootCauseSummary.flatMap((item) => [
-          new Paragraph({
-            text: `${item.label} (${item.findingCount})`,
-            heading: HeadingLevel.HEADING_2,
-          }),
-          createLabelParagraph(
-            docx,
-            "Priority / Impact",
-            `${item.topPriority} / ${formatImpactType(item.primaryImpactType)}`
-          ),
-          createLabelParagraph(
-            docx,
-            "Verified / Inferred",
-            `${item.verifiedCount} / ${item.inferredCount}`
-          ),
-          createLabelParagraph(docx, "Lead issue", item.leadFindingTitle),
-          createLabelParagraph(docx, "Lead verification", item.leadVerification),
-          createLabelParagraph(docx, "Symptom", item.symptom),
-          createLabelParagraph(docx, "Root cause", item.rootCause),
-          createLabelParagraph(docx, "Next move", item.nextMove),
-          createLabelParagraph(
-            docx,
-            "Recommended surface",
-            item.recommendedSurface
-          ),
-          createLabelParagraph(docx, "Expected impact", item.expectedImpact),
-        ])
-      : [new Paragraph("No root-cause queue is available.")];
-  const impactParagraphs =
-    payload.impactSummary.length > 0
-      ? payload.impactSummary.flatMap((item) => [
-          new Paragraph({
-            text: item.label,
-            heading: HeadingLevel.HEADING_2,
-          }),
-          createLabelParagraph(
-            docx,
-            "Priority / Findings",
-            `${item.topPriority} / ${item.findingCount}`
-          ),
-          createLabelParagraph(
-            docx,
-            "Verified / Inferred",
-            `${item.verifiedCount} / ${item.inferredCount}`
-          ),
-          createLabelParagraph(docx, "Lead issue", item.leadFindingTitle),
-          createLabelParagraph(docx, "Lead verification", item.leadVerification),
-          createLabelParagraph(docx, "Headline", item.headline),
-          createLabelParagraph(docx, "Next move", item.nextMove),
-          createLabelParagraph(
-            docx,
-            "Recommended surface",
-            item.recommendedSurface
-          ),
-          createLabelParagraph(docx, "Expected impact", item.expectedImpact),
-        ])
-      : [new Paragraph("No impact queue is available.")];
+function buildOverviewRows(payload: ListingDiagnosticsExportPayload): SheetRow[] {
+  const report = payload.operatorReport;
+  const confirmedIssueCount = report.issues.filter(
+    (item) => isConfirmedIssue(item)
+  ).length;
+  const hypothesisCount = report.issues.length - confirmedIssueCount;
 
   return [
-    new Paragraph({
-      text: "Root-cause queue",
-      heading: HeadingLevel.HEADING_2,
-    }),
-    ...rootCauseParagraphs,
-    new Paragraph({
-      text: "Business impact queue",
-      heading: HeadingLevel.HEADING_2,
-    }),
-    ...impactParagraphs,
+    {
+      模块: "报告标题",
+      当前值: report.headline,
+      对标值: report.primaryCompetitorLabel,
+      结论: report.summary,
+    },
+    {
+      模块: "目标 ASIN",
+      当前值: payload.request.targetAsin,
+      对标值: payload.request.marketplace,
+      结论: report.leadingDiagnosis,
+    },
+    {
+      模块: "综合评分",
+      当前值: `${payload.overallScore}/100`,
+      对标值: `证据可信度 ${payload.confidence}%`,
+      结论: report.dataQuality,
+    },
+    {
+      模块: "问题分层",
+      当前值: `已确认问题 ${confirmedIssueCount} 个`,
+      对标值: `待验证假设 ${hypothesisCount} 个`,
+      结论: report.keyTakeaways.join("；"),
+    },
   ];
 }
 
-function buildSourceCoverageParagraphs(
-  docx: DocxModule,
-  payload: ListingDiagnosticsExportPayload
-) {
-  const { HeadingLevel, Paragraph } = docx;
-
-  if (payload.sourceCoverage.length === 0) {
-    return [new Paragraph("No source coverage rows are available.")];
-  }
-
-  return payload.sourceCoverage.flatMap((item) => [
-    new Paragraph({
-      text: item.label,
-      heading: HeadingLevel.HEADING_2,
-    }),
-    createLabelParagraph(docx, "Source", item.source),
-    createLabelParagraph(
-      docx,
-      "Status / Available",
-      `${item.status} | ${item.available} of ${item.expected}`
-    ),
-    createLabelParagraph(
-      docx,
-      "Confidence / Inferred",
-      `${Math.round(item.confidence * 100)}% / ${item.inferred ? "yes" : "no"}`
-    ),
-    createLabelParagraph(docx, "Evidence", item.detail),
-  ]);
+function buildComparisonRows(payload: ListingDiagnosticsExportPayload): SheetRow[] {
+  return payload.operatorReport.comparisonRows.map((row) => ({
+    指标: row.metric,
+    [`目标 ASIN ${payload.request.targetAsin}`]: row.targetValue,
+    [`对标 ${payload.operatorReport.primaryCompetitorLabel}`]: row.competitorValue,
+    对比分析: row.analysis,
+  }));
 }
 
-function buildFindingParagraphs(
-  docx: DocxModule,
-  payload: ListingDiagnosticsExportPayload
-) {
-  const { HeadingLevel, Paragraph } = docx;
-  const verifiedFindingIds = new Set(
-    payload.spApiVerification?.verifiedFindingIds ?? []
-  );
-
-  if (payload.findings.length === 0) {
-    return [new Paragraph("No findings were generated.")];
-  }
-
-  return payload.findings.flatMap((finding) => [
-    new Paragraph({
-      text: finding.title,
-      heading: HeadingLevel.HEADING_2,
-    }),
-    createLabelParagraph(
-      docx,
-      "Priority / Impact",
-      `${finding.priority} / ${formatImpactType(finding.impactType)}`
-    ),
-    createLabelParagraph(
-      docx,
-      "Severity / Dimension / Verification",
-      `${finding.severity} / ${formatDimensionLabel(finding.dimensionId)} / ${finding.verification}`
-    ),
-    createLabelParagraph(
-      docx,
-      "Confidence / Verified / Inferred",
-      `${Math.round(finding.confidence * 100)}% / ${verifiedFindingIds.has(finding.id) ? "yes" : "no"} / ${finding.inferred ? "yes" : "no"}`
-    ),
-    createLabelParagraph(docx, "Symptom", finding.symptom),
-    createLabelParagraph(
-      docx,
-      "Root cause",
-      `${formatRootCauseCategory(finding.rootCauseCategory)} - ${finding.rootCause}`
-    ),
-    createLabelParagraph(docx, "What to change", finding.whatToChange),
-    createLabelParagraph(docx, "Where to change", finding.whereToChange),
-    createLabelParagraph(docx, "Expected impact", finding.expectedImpact),
-    createLabelParagraph(docx, "Description", finding.description),
-    ...(finding.evidence.length > 0
-      ? [new Paragraph("Evidence:"), ...createBulletParagraphs(docx, finding.evidence)]
-      : []),
-  ]);
+function buildKeywordRows(payload: ListingDiagnosticsExportPayload): SheetRow[] {
+  return payload.operatorReport.keywordRows.map((row) => ({
+    keyword: row.keyword,
+    月搜索量: row.monthlySearchVolume,
+    目标自然排名: row.targetOrganicRank,
+    目标广告排名: row.targetSponsoredRank,
+    竞品池最佳自然位: row.competitorOrganicRank,
+    竞品池最佳广告位: row.competitorSponsoredRank,
+    抢位竞品ASIN: row.competitorAsin,
+    建议竞价$: estimateSuggestedBid(row),
+    SPR代理: estimateSprProxy(row),
+    "购买率%": row.purchaseShare,
+    竞争度分析: row.diagnosis,
+  }));
 }
 
-function buildActionPlanParagraphs(
-  docx: DocxModule,
-  payload: ListingDiagnosticsExportPayload
-) {
-  const { HeadingLevel, Paragraph } = docx;
-
-  if (payload.actionPlanByPriority.length === 0) {
-    return [new Paragraph("No action plan items were generated.")];
-  }
-
-  return payload.actionPlanByPriority.flatMap((section) => [
-    new Paragraph({
-      text: section.label,
-      heading: HeadingLevel.HEADING_2,
-    }),
-    new Paragraph(section.description),
-    ...section.items.flatMap((item) => [
-      new Paragraph({
-        text: item.title,
-        heading: HeadingLevel.HEADING_3,
-      }),
-      createLabelParagraph(
-        docx,
-        "Priority / Confidence / Verification",
-        `${item.priority} / ${Math.round(item.confidence * 100)}% / ${item.verification}`
-      ),
-      createLabelParagraph(docx, "Symptom", item.symptom),
-      createLabelParagraph(docx, "Root cause", item.rootCause),
-      createLabelParagraph(docx, "Action", item.action),
-      createLabelParagraph(docx, "Where to change", item.whereToChange),
-      createLabelParagraph(docx, "Expected impact", item.expectedImpact),
-      createLabelParagraph(docx, "Description", item.description),
-      ...(item.linkedFindingIds.length > 0
-        ? [
-            createLabelParagraph(
-              docx,
-              "Linked findings",
-              item.linkedFindingIds.join(", ")
-            ),
-          ]
-        : []),
+function buildGapRows(payload: ListingDiagnosticsExportPayload): SheetRow[] {
+  return payload.operatorReport.gapRows.map((row) => ({
+    分析维度: row.dimension,
+    [`目标 ASIN ${payload.request.targetAsin}`]: joinRowItems([
+      "优势：",
+      ...row.targetStrengths,
+      "不足：",
+      ...row.targetWeaknesses,
     ]),
-  ]);
+    [`对标 ${payload.operatorReport.primaryCompetitorLabel}`]: joinRowItems([
+      "优势：",
+      ...row.competitorStrengths,
+      "不足：",
+      ...row.competitorWeaknesses,
+    ]),
+    目标优势: joinRowItems(row.targetStrengths),
+    目标不足: joinRowItems(row.targetWeaknesses),
+  }));
 }
 
-function buildBenchmarkParagraphs(
-  docx: DocxModule,
+function buildOptimizationRows(
   payload: ListingDiagnosticsExportPayload
-) {
-  const { HeadingLevel, Paragraph } = docx;
-  const benchmark = payload.benchmarkSummary;
-
-  return [
-    createLabelParagraph(
-      docx,
-      "Competitor count",
-      String(benchmark.competitorCount)
-    ),
-    createLabelParagraph(
-      docx,
-      "Average price",
-      formatNullableNumber(benchmark.averagePrice, 2, "$")
-    ),
-    createLabelParagraph(
-      docx,
-      "Average rating",
-      formatNullableNumber(benchmark.averageRating, 2)
-    ),
-    createLabelParagraph(
-      docx,
-      "Average reviews",
-      formatNullableWhole(benchmark.averageReviews)
-    ),
-    createLabelParagraph(
-      docx,
-      "Average keyword count",
-      formatNullableWhole(benchmark.averageKeywordCount)
-    ),
-    new Paragraph({
-      text: "Top benchmark keywords",
-      heading: HeadingLevel.HEADING_2,
-    }),
-    ...(benchmark.topKeywords.length > 0
-      ? createBulletParagraphs(docx, benchmark.topKeywords)
-      : [new Paragraph("No benchmark keywords were available.")]),
-    new Paragraph({
-      text: "Top benchmark themes",
-      heading: HeadingLevel.HEADING_2,
-    }),
-    ...(benchmark.topThemes.length > 0
-      ? benchmark.topThemes.flatMap((theme) => [
-          new Paragraph({
-            text: theme.label,
-            heading: HeadingLevel.HEADING_3,
-          }),
-          createLabelParagraph(
-            docx,
-            "Mentions / Share / Inferred",
-            `${theme.mentions} / ${(theme.share * 100).toFixed(0)}% / ${theme.inferred ? "yes" : "no"}`
-          ),
-          ...(theme.keywords.length > 0
-            ? [createLabelParagraph(docx, "Keywords", theme.keywords.join(", "))]
-            : []),
-        ])
-      : [new Paragraph("No benchmark themes were available.")]),
+): Array<Array<string>> {
+  const plan = payload.operatorReport.optimizationPlan;
+  const keywordRows = payload.operatorReport.keywordRows;
+  const titleKeywords = keywordRows.slice(0, 6).map((row) => row.keyword);
+  const styleKeywords = keywordRows
+    .slice(3, 9)
+    .map((row) => row.keyword)
+    .filter(Boolean);
+  const subjectKeywords = keywordRows
+    .slice(0, 12)
+    .map((row) => row.keyword)
+    .filter(Boolean);
+  const rows: Array<Array<string>> = [
+    [
+      `新 Listing 优化方案 - ${payload.request.targetAsin} vs ${payload.operatorReport.primaryCompetitorLabel}`,
+      "",
+    ],
+    ["报告结论", payload.operatorReport.summary],
+    ["一、标题方案", ""],
+    ["推荐标题 (Title)", plan.recommendedTitle],
+    ["标题逻辑", plan.titleLogic],
+    ["嵌入核心词", plan.coreKeywords.join(", ")],
+    ["COSMO算法适配", buildCosmoAlignmentNote(payload)],
+    ["标题取舍说明", `优先保留 ${titleKeywords.slice(0, 3).join(", ") || "核心词"} 的高权重入口，再让卖点、场景词和规格词按转化顺序展开。`],
+    ["二、五点描述", ""],
   ];
-}
 
-function buildEvidenceParagraphs(
-  docx: DocxModule,
-  payload: ListingDiagnosticsExportPayload
-) {
-  const { HeadingLevel, Paragraph } = docx;
-
-  if (payload.evidenceTable.length === 0) {
-    return [new Paragraph("No evidence rows are available.")];
+  for (const bullet of plan.bullets) {
+    rows.push([`${bullet.label} - ${bullet.focus}`, bullet.text]);
   }
 
-  return payload.evidenceTable.flatMap((row) => [
-    new Paragraph({
-      text: row.signal,
-      heading: HeadingLevel.HEADING_2,
-    }),
-    createLabelParagraph(docx, "Source", row.source),
-    createLabelParagraph(
-      docx,
-      "Confidence / Verification",
-      `${Math.round(row.confidence * 100)}% / ${formatEvidenceVerificationLabel(row.verification)}`
-    ),
-    createLabelParagraph(docx, "Evidence", row.evidence),
+  rows.push([
+    "五点重排原则",
+    "先讲主卖点，再讲使用场景和材质/规格，最后处理顾虑化解与信任证明，避免五条 Bullet 平均用力。",
   ]);
+  rows.push(["三、Search Terms", ""]);
+  rows.push(["Search Terms 策略", plan.searchTermStrategy]);
+  for (const row of plan.searchTerms) {
+    rows.push([row.label, row.text]);
+  }
+
+  rows.push(["Search Terms 补词原则", "只补标题和 Bullet 没有放进去的长尾词、场景词和同义词，不重复堆已有前台词。"]);
+  rows.push(["四、A+ Alt Text", ""]);
+  rows.push(["A+ Alt Text 策略", plan.altTextStrategy]);
+  for (const row of plan.aPlusAltText) {
+    rows.push([row.label, row.text]);
+  }
+
+  rows.push(["Alt Text 协同原则", "让图片语义和前台卖点保持同方向，优先承接高价值场景词、差异化卖点和评价证据。"]);
+  rows.push(["五、后台属性与类目", ""]);
+  rows.push(["occasion_type", plan.occasionType]);
+  rows.push(["style_keywords", styleKeywords.join(", ")]);
+  rows.push(["subject_keywords", subjectKeywords.join(", ")]);
+  rows.push(["属性策略", "先补类目/材质/尺寸/适配类字段，再检查是否有影响搜索过滤与归档的缺失属性。"]);
+
+  for (const item of plan.attributeRecommendations) {
+    rows.push(["属性与后台建议", item]);
+  }
+
+  rows.push(["六、广告结构 (Ad Structure)", ""]);
+  for (const row of buildAdStructureRows(payload)) {
+    rows.push([row.label, row.text]);
+  }
+
+  rows.push(["七、执行备注", ""]);
+  for (const item of plan.executionNotes) {
+    rows.push(["执行备注", item]);
+  }
+
+  return rows;
 }
 
-function buildSummaryRows(payload: ListingDiagnosticsExportPayload) {
-  const p0Count = payload.findings.filter((finding) => finding.priority === "P0").length;
-  const p1Count = payload.findings.filter((finding) => finding.priority === "P1").length;
-  const topRootCause = payload.rootCauseSummary[0];
-  const topImpact = payload.impactSummary[0];
+function buildCoverageRows(payload: ListingDiagnosticsExportPayload): SheetRow[] {
+  return payload.operatorReport.coverageRows.map((row) => ({
+    keyword: row.keyword,
+    月搜索量: row.monthlySearchVolume,
+    目标标题: row.targetTitle,
+    目标Bullet: row.targetBullets,
+    目标ST: row.targetSearchTerms,
+    竞品标题: row.competitorTitle,
+    竞品Bullet: row.competitorBullets,
+    新标题: row.optimizedTitle,
+    新Bullet: row.optimizedBullets,
+    新ST: row.optimizedSearchTerms,
+    新AltText: row.optimizedAltText,
+    覆盖结论: row.insight,
+  }));
+}
+
+function buildRoadmapRows(payload: ListingDiagnosticsExportPayload): SheetRow[] {
+  return payload.operatorReport.roadmap.map((row) => ({
+    优先级: row.priority,
+    行动项: row.action,
+    预期效果: row.expectedEffect,
+    时间节点: row.timeline,
+    验收方式: row.verification,
+    责任角色: row.owner,
+  }));
+}
+
+function isConfirmedIssue(
+  issue: ListingDiagnosticsExportPayload["operatorReport"]["issues"][number]
+): boolean {
+  return (
+    issue.issueStatus === "已确认问题" ||
+    (issue.evidenceLevel !== "待验证假设" && issue.evidenceLevel.trim() !== "")
+  );
+}
+
+function estimateSuggestedBid(
+  row: ListingDiagnosticsExportPayload["operatorReport"]["keywordRows"][number]
+): string {
+  const targetRank = parseRankNumber(row.targetOrganicRank);
+  const competitorRank = parseRankNumber(row.competitorOrganicRank);
+  const purchaseShare = parsePercentValue(row.purchaseShare);
+  let bid = 0.45;
+
+  if (row.monthlySearchVolume >= 20000) {
+    bid += 0.95;
+  } else if (row.monthlySearchVolume >= 10000) {
+    bid += 0.7;
+  } else if (row.monthlySearchVolume >= 5000) {
+    bid += 0.45;
+  } else {
+    bid += 0.2;
+  }
+
+  if (!targetRank) {
+    bid += 0.25;
+  } else if (targetRank > 30) {
+    bid += 0.18;
+  }
+
+  if (competitorRank && competitorRank <= 10) {
+    bid += 0.22;
+  } else if (competitorRank && competitorRank <= 20) {
+    bid += 0.12;
+  }
+
+  if (purchaseShare >= 8) {
+    bid += 0.18;
+  } else if (purchaseShare >= 4) {
+    bid += 0.08;
+  }
+
+  return `$${bid.toFixed(2)}`;
+}
+
+function estimateSprProxy(
+  row: ListingDiagnosticsExportPayload["operatorReport"]["keywordRows"][number]
+): string {
+  const targetRank = parseRankNumber(row.targetOrganicRank);
+  const competitorRank = parseRankNumber(row.competitorOrganicRank);
+
+  if (!targetRank && competitorRank && competitorRank <= 10) {
+    return "12-18";
+  }
+
+  if (!targetRank && competitorRank && competitorRank <= 20) {
+    return "8-12";
+  }
+
+  if (targetRank && competitorRank && targetRank - competitorRank >= 20) {
+    return "6-10";
+  }
+
+  if (targetRank && targetRank <= 20) {
+    return "3-6";
+  }
+
+  return "4-8";
+}
+
+function parseRankNumber(value: string): number | null {
+  const match = value.match(/\d+/);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number.parseInt(match[0], 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parsePercentValue(value: string): number {
+  const match = value.match(/[\d.]+/);
+  if (!match) {
+    return 0;
+  }
+
+  const parsed = Number.parseFloat(match[0]);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function buildCosmoAlignmentNote(payload: ListingDiagnosticsExportPayload): string {
+  const topKeywords = payload.operatorReport.keywordRows
+    .slice(0, 5)
+    .map((row) => row.keyword)
+    .join(", ");
+  const confirmedIssueCount = payload.operatorReport.issues.filter((issue) =>
+    isConfirmedIssue(issue)
+  ).length;
+
+  return `把 ${topKeywords || "核心关键词"} 放进同一套“标题入口-五点承接-A+ 佐证-广告验证”链路里，先解决 ${confirmedIssueCount} 个已确认问题，再放大高价值词。`;
+}
+
+function buildAdStructureRows(
+  payload: ListingDiagnosticsExportPayload
+): Array<{ label: string; text: string }> {
+  const rows = payload.operatorReport.keywordRows;
+  const precisionKeywords = rows
+    .filter((row) => row.competitorOrganicRank !== "-" && row.targetOrganicRank === "-")
+    .slice(0, 4)
+    .map((row) => row.keyword);
+  const expansionKeywords = rows
+    .filter((row) => row.targetOrganicRank !== "-")
+    .slice(0, 4)
+    .map((row) => row.keyword);
+  const sceneKeywords = rows
+    .slice(4, 10)
+    .map((row) => row.keyword)
+    .filter(Boolean);
 
   return [
-    { item: "schemaVersion", value: payload.schemaVersion },
-    { item: "exportedAt", value: payload.exportedAt },
-    { item: "exportedAtLocal", value: payload.exportedAtLocal },
-    { item: "generatedAt", value: payload.generatedAt },
-    { item: "generatedAtLocal", value: payload.generatedAtLocal },
-    { item: "marketplace", value: payload.request.marketplace },
-    { item: "targetAsin", value: payload.request.targetAsin },
-    { item: "status", value: payload.status },
-    { item: "overallScore", value: payload.overallScore },
-    { item: "confidence", value: payload.confidence },
-    { item: "headline", value: payload.headline },
-    { item: "summary", value: payload.summary },
     {
-      item: "competitorCount",
-      value: payload.benchmarkSummary.competitorCount,
+      label: "Phase 1 - SP精准",
+      text: `围绕 ${precisionKeywords.join(", ") || "高价值缺口词"} 建精准词计划，优先验证高意图词能否抢到前排点击。`,
     },
-    { item: "warningCount", value: payload.warnings.length },
-    { item: "findingCount", value: payload.findings.length },
-    { item: "actionPlanCount", value: payload.actionPlan.length },
-    { item: "p0FindingCount", value: p0Count },
-    { item: "p1FindingCount", value: p1Count },
-    { item: "topRootCause", value: topRootCause?.label ?? "" },
-    { item: "topImpact", value: topImpact?.label ?? "" },
-  ];
-}
-
-function buildScoreBreakdownRows(payload: ListingDiagnosticsExportPayload) {
-  return payload.scoreBreakdown.map((dimension) => ({
-    id: dimension.id,
-    label: dimension.label,
-    score: dimension.score,
-    weight: dimension.weight,
-    confidence: dimension.confidence,
-    coverage: dimension.coverage,
-    inferred: dimension.inferred ? "Yes" : "No",
-    summary: dimension.summary,
-  }));
-}
-
-function buildRootCauseSummaryRows(payload: ListingDiagnosticsExportPayload) {
-  return ensureRows(
-    payload.rootCauseSummary.map((item) => ({
-      category: item.label,
-      findingCount: item.findingCount,
-      topPriority: item.topPriority,
-      primaryImpactType: formatImpactType(item.primaryImpactType),
-      verifiedCount: item.verifiedCount,
-      inferredCount: item.inferredCount,
-      leadFindingTitle: item.leadFindingTitle,
-      leadVerification: item.leadVerification,
-      symptom: item.symptom,
-      rootCause: item.rootCause,
-      nextMove: item.nextMove,
-      recommendedSurface: item.recommendedSurface,
-      expectedImpact: item.expectedImpact,
-      topFindingIds: item.topFindingIds.join(", "),
-    })),
     {
-      category: "No root-cause queue",
-      findingCount: "",
-      topPriority: "",
-      primaryImpactType: "",
-      verifiedCount: "",
-      inferredCount: "",
-      leadFindingTitle: "",
-      leadVerification: "",
-      symptom: "",
-      rootCause: "",
-      nextMove: "",
-      recommendedSurface: "",
-      expectedImpact: "",
-      topFindingIds: "",
-    }
-  );
-}
-
-function buildImpactSummaryRows(payload: ListingDiagnosticsExportPayload) {
-  return ensureRows(
-    payload.impactSummary.map((item) => ({
-      impactType: item.label,
-      findingCount: item.findingCount,
-      topPriority: item.topPriority,
-      verifiedCount: item.verifiedCount,
-      inferredCount: item.inferredCount,
-      leadFindingTitle: item.leadFindingTitle,
-      leadVerification: item.leadVerification,
-      topRootCauseCategory: formatRootCauseCategory(item.topRootCauseCategory),
-      headline: item.headline,
-      nextMove: item.nextMove,
-      recommendedSurface: item.recommendedSurface,
-      expectedImpact: item.expectedImpact,
-      topFindingIds: item.topFindingIds.join(", "),
-    })),
+      label: "Phase 1 - SP广泛",
+      text: `围绕 ${sceneKeywords.slice(0, 4).join(", ") || "场景词"} 建广泛词采词计划，为下一轮 Search Terms 和否词沉淀素材。`,
+    },
     {
-      impactType: "No impact queue",
-      findingCount: "",
-      topPriority: "",
-      verifiedCount: "",
-      inferredCount: "",
-      leadFindingTitle: "",
-      leadVerification: "",
-      topRootCauseCategory: "",
-      headline: "",
-      nextMove: "",
-      recommendedSurface: "",
-      expectedImpact: "",
-      topFindingIds: "",
-    }
-  );
-}
-
-function buildSourceCoverageRows(payload: ListingDiagnosticsExportPayload) {
-  return payload.sourceCoverage.map((item) => ({
-    id: item.id,
-    label: item.label,
-    source: item.source,
-    entity: item.entity,
-    status: item.status,
-    available: item.available,
-    expected: item.expected,
-    confidence: item.confidence,
-    inferred: item.inferred ? "Yes" : "No",
-    evidence: item.detail,
-  }));
-}
-
-function buildFindingsRows(payload: ListingDiagnosticsExportPayload) {
-  const verifiedFindingIds = new Set(
-    payload.spApiVerification?.verifiedFindingIds ?? []
-  );
-
-  return ensureRows(
-    payload.findings.map((finding) => ({
-      id: finding.id,
-      title: finding.title,
-      priority: finding.priority,
-      impactType: formatImpactType(finding.impactType),
-      severity: finding.severity,
-      tone: finding.tone,
-      dimensionId: finding.dimensionId,
-      confidence: finding.confidence,
-      verification: finding.verification,
-      verified: verifiedFindingIds.has(finding.id) ? "Yes" : "No",
-      inferred: finding.inferred ? "Yes" : "No",
-      symptom: finding.symptom,
-      rootCauseCategory: formatRootCauseCategory(finding.rootCauseCategory),
-      rootCause: finding.rootCause,
-      whatToChange: finding.whatToChange,
-      whereToChange: finding.whereToChange,
-      expectedImpact: finding.expectedImpact,
-      evidence: finding.evidence.join("\n"),
-      description: finding.description,
-    })),
+      label: "Phase 1 - SB品牌",
+      text: "品牌广告重点讲品牌主张、主卖点和类目核心用途，别只复制 SP 关键词。",
+    },
     {
-      id: "",
-      title: "No findings",
-      priority: "",
-      impactType: "",
-      severity: "",
-      tone: "",
-      dimensionId: "",
-      confidence: "",
-      verification: "",
-      verified: "",
-      inferred: "",
-      symptom: "",
-      rootCauseCategory: "",
-      rootCause: "",
-      whatToChange: "",
-      whereToChange: "",
-      expectedImpact: "",
-      evidence: "",
-      description: "",
-    }
-  );
-}
-
-function buildActionPlanRows(payload: ListingDiagnosticsExportPayload) {
-  return ensureRows(
-    payload.actionPlanByPriority.flatMap((section) =>
-      section.items.map((item) => ({
-        priorityRegion: section.label,
-        priority: item.priority,
-        verification: item.verification,
-        title: item.title,
-        confidence: item.confidence,
-        inferred: item.inferred ? "Yes" : "No",
-        symptom: item.symptom,
-        rootCause: item.rootCause,
-        action: item.action,
-        whereToChange: item.whereToChange,
-        expectedImpact: item.expectedImpact,
-        linkedFindings: item.linkedFindingIds.join(", "),
-        description: item.description,
-      }))
-    ),
+      label: "Phase 2 - 精准扩词",
+      text: `从表现好的精准词和广泛词里扩展到 ${expansionKeywords.join(", ") || "中高价值词"}，按 CTR/CVR 分层提价。`,
+    },
     {
-      priorityRegion: "",
-      priority: "",
-      verification: "",
-      title: "No action plan items",
-      confidence: "",
-      inferred: "",
-      symptom: "",
-      rootCause: "",
-      action: "",
-      whereToChange: "",
-      expectedImpact: "",
-      linkedFindings: "",
-      description: "",
-    }
-  );
-}
-
-function buildBenchmarkSummaryRows(payload: ListingDiagnosticsExportPayload) {
-  return [
+      label: "Phase 2 - SBV视频",
+      text: "视频脚本优先解释主卖点、使用场景和顾虑化解，让广告内容和详情页承接逻辑一致。",
+    },
     {
-      competitorCount: payload.benchmarkSummary.competitorCount,
-      averagePrice: payload.benchmarkSummary.averagePrice ?? "",
-      averageRating: payload.benchmarkSummary.averageRating ?? "",
-      averageReviews: payload.benchmarkSummary.averageReviews ?? "",
-      averageKeywordCount: payload.benchmarkSummary.averageKeywordCount ?? "",
+      label: "Phase 3 - 长尾精准",
+      text: "把已验证转化的长尾词拆成独立小预算计划，降低泛流量浪费。",
+    },
+    {
+      label: "ASIN 定向广告",
+      text: "优先定向评价弱、卖点弱或价格带接近的竞品详情页，用差异化卖点抢回流量。",
+    },
+    {
+      label: "广告预算建议",
+      text: "前 7 天预算集中给精准词和采词计划，预算占比建议 50% 精准 / 25% 广泛 / 15% 品牌 / 10% ASIN 定向。",
+    },
+    {
+      label: "否词策略",
+      text: "每天清理低点击高花费词和低转化词，把无关词、低意图词、误触发词及时加入否词列表。",
+    },
+    {
+      label: "复盘指标",
+      text: "按 3 天、7 天、14 天三个节奏复盘 CTR、CVR、TACoS、自然位回升和高价值词覆盖，不只看单日花费。",
     },
   ];
 }
 
-function buildBenchmarkKeywordRows(payload: ListingDiagnosticsExportPayload) {
-  return ensureRows(
-    payload.benchmarkSummary.topKeywords.map((keyword, index) => ({
-      rank: index + 1,
-      keyword,
-    })),
-    {
-      rank: "",
-      keyword: "No benchmark keywords",
-    }
-  );
+function buildIssueRows(payload: ListingDiagnosticsExportPayload): SheetRow[] {
+  return payload.operatorReport.issues.map((row) => ({
+    问题ID: row.id,
+    诊断维度: row.dimension,
+    优先级: row.priority,
+    证据等级: row.evidenceLevel,
+    问题状态: row.issueStatus,
+    影响面: row.impact,
+    问题标题: row.title,
+    当前表现: row.symptom,
+    根因诊断: row.rootCause,
+    建议动作: row.recommendation,
+    修改位置: row.whereToChange,
+    预期影响: row.expectedImpact,
+    证据摘要: row.evidenceSummary,
+    验收动作: row.verificationAction,
+  }));
 }
 
-function buildBenchmarkThemeRows(payload: ListingDiagnosticsExportPayload) {
-  return ensureRows(
-    payload.benchmarkSummary.topThemes.map((theme) => ({
-      id: theme.id,
-      label: theme.label,
-      mentions: theme.mentions,
-      share: theme.share,
-      inferred: theme.inferred ? "Yes" : "No",
-      keywords: theme.keywords.join(", "),
-    })),
-    {
-      id: "",
-      label: "No benchmark themes",
-      mentions: "",
-      share: "",
-      inferred: "",
-      keywords: "",
-    }
-  );
+function buildEvidenceRows(payload: ListingDiagnosticsExportPayload): SheetRow[] {
+  return payload.evidenceTable.map((row) => ({
+    信号: row.signal,
+    来源: localizeEvidenceSource(row.source),
+    可信度: `${Math.round(row.confidence * 100)}%`,
+    证据等级: formatEvidenceVerificationLabel(row.verification),
+    证据内容: row.evidence,
+  }));
 }
 
-function buildEvidenceRows(payload: ListingDiagnosticsExportPayload) {
-  return ensureRows(
-    payload.evidenceTable.map((row) => ({
-      signal: row.signal,
-      category: row.category,
-      source: row.source,
-      confidence: row.confidence,
-      verification: formatEvidenceVerificationLabel(row.verification),
-      evidence: row.evidence,
-    })),
+function buildRawSummaryRows(payload: ListingDiagnosticsExportPayload): SheetRow[] {
+  return [
+    { 字段: "schemaVersion", 值: payload.schemaVersion },
+    { 字段: "generatedAt", 值: payload.generatedAt },
+    { 字段: "exportedAt", 值: payload.exportedAt },
+    { 字段: "marketplace", 值: payload.request.marketplace },
+    { 字段: "targetAsin", 值: payload.request.targetAsin },
+    { 字段: "status", 值: payload.status },
+    { 字段: "overallScore", 值: payload.overallScore },
+    { 字段: "confidence", 值: payload.confidence },
+    { 字段: "headline", 值: payload.headline },
+    { 字段: "summary", 值: payload.summary },
     {
-      signal: "No evidence rows",
-      category: "",
-      source: "",
-      confidence: "",
-      verification: "",
-      evidence: "",
-    }
-  );
+      字段: "warningCount",
+      值: payload.warnings.length,
+    },
+    {
+      字段: "findingCount",
+      值: payload.findings.length,
+    },
+    {
+      字段: "actionPlanCount",
+      值: payload.actionPlan.length,
+    },
+  ];
 }
 
-function buildWarningRows(payload: ListingDiagnosticsExportPayload) {
-  return ensureRows(
-    payload.warnings.map((warning) => ({ warning })),
-    {
-      warning: "No warnings",
-    }
-  );
-}
-
-function createLabelParagraph(
-  docx: DocxModule,
-  label: string,
-  value: string
+function appendJsonSheet(
+  XLSX: XlsxModule,
+  workbook: import("xlsx").WorkBook,
+  sheetName: string,
+  rows: SheetRow[],
+  widths?: number[]
 ) {
-  const { Paragraph, TextRun } = docx;
-  const normalizedValue = value.trim() || "None";
-
-  return new Paragraph({
-    children: [
-      new TextRun({ text: `${label}: `, bold: true }),
-      new TextRun(normalizedValue),
-    ],
-  });
+  const sheet = XLSX.utils.json_to_sheet(rows);
+  if (widths) {
+    sheet["!cols"] = widths.map((wch) => ({ wch }));
+  }
+  decorateSheet(sheet, { headerRows: [0], freezeRowCount: 1, applyAutoFilter: true });
+  XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
 }
 
-function createBulletParagraphs(docx: DocxModule, items: string[]) {
-  const { Paragraph } = docx;
+function appendAoaSheet(
+  XLSX: XlsxModule,
+  workbook: import("xlsx").WorkBook,
+  sheetName: string,
+  rows: Array<Array<string>>,
+  columns?: Array<{ wch: number }>,
+  merges?: Array<{ s: { r: number; c: number }; e: { r: number; c: number } }>
+) {
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  if (columns) {
+    sheet["!cols"] = columns;
+  }
+  if (merges) {
+    sheet["!merges"] = merges;
+  }
+  decorateSheet(sheet, {
+    headerRows: [0],
+    sectionRows: rows
+      .map((row, index) => ({ row, index }))
+      .filter(({ row, index }) => index > 0 && row[1] === "" && Boolean(row[0]))
+      .map(({ index }) => index),
+    freezeRowCount: 1,
+  });
+  XLSX.utils.book_append_sheet(workbook, sheet, sheetName);
+}
 
-  return items.map((item) =>
-    new Paragraph({
-      text: item,
-      bullet: { level: 0 },
-    })
+function joinRowItems(items: string[]) {
+  return items.filter(Boolean).join("\n");
+}
+
+function decorateSheet(
+  sheet: import("xlsx").WorkSheet,
+  options: {
+    headerRows?: number[];
+    sectionRows?: number[];
+    freezeRowCount?: number;
+    applyAutoFilter?: boolean;
+  } = {}
+) {
+  const ref = sheet["!ref"];
+  if (!ref) {
+    return;
+  }
+
+  const range = decodeSheetRange(ref);
+  const headerRows = new Set(options.headerRows ?? []);
+  const sectionRows = new Set(options.sectionRows ?? []);
+
+  for (let row = range.startRow; row <= range.endRow; row += 1) {
+    for (let col = range.startCol; col <= range.endCol; col += 1) {
+      const cellRef = encodeCellRef(row, col);
+      const cell = sheet[cellRef];
+      if (!cell) {
+        continue;
+      }
+
+      const isHeader = headerRows.has(row);
+      const isSection = sectionRows.has(row);
+      cell.s = {
+        font: {
+          bold: isHeader || isSection,
+          sz: isHeader ? 12 : isSection ? 11 : 10,
+          color: { rgb: isHeader ? "0F172A" : "334155" },
+        },
+        alignment: {
+          vertical: "top",
+          wrapText: true,
+        },
+        fill: isHeader
+          ? { fgColor: { rgb: "E2E8F0" } }
+          : isSection
+            ? { fgColor: { rgb: "F8FAFC" } }
+            : undefined,
+      };
+    }
+  }
+
+  if (options.applyAutoFilter) {
+    sheet["!autofilter"] = { ref };
+  }
+
+  if (options.freezeRowCount) {
+    sheet["!freeze"] = { xSplit: 0, ySplit: options.freezeRowCount };
+  }
+}
+
+function decodeSheetRange(ref: string) {
+  const match = ref.match(/^([A-Z]+)(\d+):([A-Z]+)(\d+)$/i);
+  if (!match) {
+    return { startRow: 0, endRow: 0, startCol: 0, endCol: 0 };
+  }
+
+  return {
+    startCol: decodeColumnIndex(match[1]),
+    startRow: Number.parseInt(match[2], 10) - 1,
+    endCol: decodeColumnIndex(match[3]),
+    endRow: Number.parseInt(match[4], 10) - 1,
+  };
+}
+
+function decodeColumnIndex(value: string): number {
+  let total = 0;
+
+  for (const char of value.toUpperCase()) {
+    total = total * 26 + (char.charCodeAt(0) - 64);
+  }
+
+  return total - 1;
+}
+
+function encodeCellRef(row: number, col: number): string {
+  return `${encodeColumnName(col)}${row + 1}`;
+}
+
+function encodeColumnName(col: number): string {
+  let current = col + 1;
+  let output = "";
+
+  while (current > 0) {
+    const remainder = (current - 1) % 26;
+    output = String.fromCharCode(65 + remainder) + output;
+    current = Math.floor((current - 1) / 26);
+  }
+
+  return output;
+}
+
+const WORKBOOK_STYLE_TEMPLATE = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="6">
+    <font><sz val="11"/><color rgb="FF334155"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><color rgb="FFFFFFFF"/><name val="Calibri"/></font>
+    <font><b/><sz val="11"/><color rgb="FF0F172A"/><name val="Calibri"/></font>
+    <font><b/><sz val="16"/><color rgb="FF1E293B"/><name val="Calibri"/></font>
+    <font><b/><sz val="12"/><color rgb="FF1E3A8A"/><name val="Calibri"/></font>
+    <font><i/><sz val="11"/><color rgb="FF475569"/><name val="Calibri"/></font>
+  </fonts>
+  <fills count="8">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF1E293B"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFE2E8F0"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFF8FAFC"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFFEF3C7"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFDCFCE7"/><bgColor indexed="64"/></patternFill></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FFFEE2E2"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="2">
+    <border><left/><right/><top/><bottom/><diagonal/></border>
+    <border>
+      <left style="thin"><color rgb="FFE2E8F0"/></left>
+      <right style="thin"><color rgb="FFE2E8F0"/></right>
+      <top style="thin"><color rgb="FFE2E8F0"/></top>
+      <bottom style="thin"><color rgb="FFE2E8F0"/></bottom>
+      <diagonal/>
+    </border>
+  </borders>
+  <cellStyleXfs count="1">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
+  </cellStyleXfs>
+  <cellXfs count="13">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="center" vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="4" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="5" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="6" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="7" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="5" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="3" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="4" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="5" fillId="4" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="2" fillId="4" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+  </cellXfs>
+  <cellStyles count="1">
+    <cellStyle name="Normal" xfId="0" builtinId="0"/>
+  </cellStyles>
+  <dxfs count="0"/>
+  <tableStyles count="0" defaultTableStyle="TableStyleMedium2" defaultPivotStyle="PivotStyleMedium4"/>
+</styleSheet>`;
+
+async function applyWorkbookStyleTemplate(buffer: Uint8Array): Promise<Uint8Array> {
+  const JSZipModule = await import("jszip");
+  const JSZip = JSZipModule.default;
+  const zip = await JSZip.loadAsync(buffer);
+  zip.file("xl/styles.xml", WORKBOOK_STYLE_TEMPLATE);
+
+  const generalSheetStyles: Array<{ path: string; accentStyle: number }> = [
+    { path: "xl/worksheets/sheet1.xml", accentStyle: 2 },
+    { path: "xl/worksheets/sheet2.xml", accentStyle: 4 },
+    { path: "xl/worksheets/sheet3.xml", accentStyle: 5 },
+    { path: "xl/worksheets/sheet4.xml", accentStyle: 4 },
+    { path: "xl/worksheets/sheet6.xml", accentStyle: 2 },
+    { path: "xl/worksheets/sheet7.xml", accentStyle: 5 },
+    { path: "xl/worksheets/sheet8.xml", accentStyle: 6 },
+    { path: "xl/worksheets/sheet9.xml", accentStyle: 2 },
+    { path: "xl/worksheets/sheet10.xml", accentStyle: 4 },
+  ];
+
+  for (const sheetStyle of generalSheetStyles) {
+    const file = zip.file(sheetStyle.path);
+    if (!file) {
+      continue;
+    }
+
+    const xml = await file.async("string");
+    zip.file(sheetStyle.path, styleGeneralSheetXml(xml, sheetStyle.accentStyle));
+  }
+
+  const optimizationSheet = zip.file("xl/worksheets/sheet5.xml");
+  if (optimizationSheet) {
+    const xml = await optimizationSheet.async("string");
+    zip.file("xl/worksheets/sheet5.xml", styleOptimizationSheetXml(xml));
+  }
+
+  return zip.generateAsync({ type: "uint8array", compression: "DEFLATE" });
+}
+
+function styleGeneralSheetXml(xml: string, accentStyle: number): string {
+  return xml.replace(
+    /<c r="([A-Z]+)(\d+)"([^>]*)>/g,
+    (_match: string, col: string, row: string, attrs: string) => {
+      const styleId = row === "1" ? 1 : col === "A" ? accentStyle : 3;
+      return `<c r="${col}${row}"${withStyleAttribute(attrs, styleId)}>`;
+    }
   );
+}
+
+function styleOptimizationSheetXml(xml: string): string {
+  return xml.replace(
+    /<row r="(\d+)"([^>]*)>([\s\S]*?)<\/row>/g,
+    (_match: string, row: string, rowAttrs: string, cells: string) => {
+      const columns = Array.from(
+        cells.matchAll(/<c r="([A-Z]+)\d+"/g) as IterableIterator<RegExpMatchArray>
+      ).map((match) => match[1]);
+      const isTitleRow = row === "1";
+      const isSectionRow = row !== "1" && columns.length === 1 && columns[0] === "A";
+      const styledCells = cells.replace(
+        /<c r="([A-Z]+)(\d+)"([^>]*)>/g,
+        (_cellMatch: string, col: string, rowNum: string, attrs: string) => {
+          let styleId = 3;
+
+          if (isTitleRow) {
+            styleId = 9;
+          } else if (isSectionRow) {
+            styleId = 10;
+          } else if (col === "A") {
+            styleId = 12;
+          } else if (col === "B" && rowNum === "2") {
+            styleId = 7;
+          } else {
+            styleId = 3;
+          }
+
+          return `<c r="${col}${rowNum}"${withStyleAttribute(attrs, styleId)}>`;
+        }
+      );
+
+      return `<row r="${row}"${rowAttrs}>${styledCells}</row>`;
+    }
+  );
+}
+
+function withStyleAttribute(attrs: string, styleId: number): string {
+  const cleaned = attrs.replace(/\s+s="\d+"/, "");
+  return ` s="${styleId}"${cleaned}`;
 }
 
 function buildFileName(
@@ -997,29 +1062,18 @@ function formatFileDate(date = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-function formatNullableNumber(
-  value: number | null,
-  decimals = 2,
-  prefix = ""
-) {
-  if (value === null) {
-    return "n/a";
+function localizeEvidenceSource(source: string): string {
+  if (source === "SellerSprite MCP") {
+    return "SellerSprite";
   }
 
-  return `${prefix}${value.toFixed(decimals)}`;
-}
-
-function formatNullableWhole(value: number | null) {
-  if (value === null) {
-    return "n/a";
+  if (source === "Amazon SP-API") {
+    return "Amazon SP-API";
   }
 
-  return Math.round(value).toLocaleString("en-US");
-}
+  if (source === "Derived benchmark") {
+    return "竞品基准推断";
+  }
 
-function ensureRows<T extends SheetRow>(
-  rows: T[],
-  fallbackRow: SheetRow
-): SheetRow[] {
-  return rows.length > 0 ? rows : [fallbackRow];
+  return source;
 }

@@ -26,7 +26,7 @@ type ListingDiagnosticsPriorityInput =
 const REVIEW_THEME_DICTIONARY = [
   {
     id: "quality",
-    label: "Quality consistency",
+    label: "质量稳定性",
     keywords: [
       "broken",
       "defect",
@@ -48,7 +48,7 @@ const REVIEW_THEME_DICTIONARY = [
   },
   {
     id: "fit",
-    label: "Sizing and fit",
+    label: "尺码与版型",
     keywords: [
       "small",
       "large",
@@ -65,7 +65,7 @@ const REVIEW_THEME_DICTIONARY = [
   },
   {
     id: "usability",
-    label: "Ease of use",
+    label: "使用体验",
     keywords: [
       "hard",
       "difficult",
@@ -81,7 +81,7 @@ const REVIEW_THEME_DICTIONARY = [
   },
   {
     id: "packaging",
-    label: "Packaging and shipping",
+    label: "包装与物流",
     keywords: [
       "package",
       "packaging",
@@ -98,7 +98,7 @@ const REVIEW_THEME_DICTIONARY = [
   },
   {
     id: "value",
-    label: "Price and value",
+    label: "价格与价值感",
     keywords: [
       "price",
       "expensive",
@@ -134,7 +134,7 @@ export function safeDivide(numerator: number, denominator: number): number {
 }
 
 export function normalizeText(value: string): string {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+  return value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
 }
 
 export function buildListingText(listing: CompetitorListing | null): string {
@@ -319,6 +319,7 @@ export function getCountConfidence(
 
   return clamp(0.2 + count / (partialAt * 5), 0.2, 0.44);
 }
+
 export function normalizePriority(
   priority: ListingDiagnosticsPriorityInput
 ): ListingDiagnosticsPriority {
@@ -378,30 +379,30 @@ export function formatImpactType(
 ): string {
   switch (impactType) {
     case "visibility":
-      return "Visibility";
+      return "流量";
     case "click":
-      return "Click";
+      return "点击";
     case "conversion":
-      return "Conversion";
+      return "转化";
     case "buyability":
-      return "Buyability";
+      return "可售性";
     case "compliance":
-      return "Compliance";
+      return "合规";
   }
 }
 
 export function formatDimensionLabel(dimensionId: string): string {
   switch (dimensionId) {
     case "content-coverage":
-      return "Content coverage";
+      return "内容结构";
     case "keyword-opportunity":
-      return "Keyword opportunity";
+      return "关键词入口";
     case "review-signal":
-      return "Review signal";
+      return "评论与转化";
     case "listing-health":
-      return "Buyability & discoverability";
+      return "可售性与流量基础";
     case "market-position":
-      return "Market position";
+      return "价格与竞争位";
     default:
       return dimensionId.replace(/-/g, " ");
   }
@@ -411,26 +412,26 @@ export function formatRootCauseCategory(
   category: ListingDiagnosticsRootCauseCategory | null
 ): string {
   if (!category) {
-    return "General";
+    return "通用问题";
   }
 
   switch (category) {
     case "inventory":
-      return "Inventory";
+      return "库存";
     case "offer":
-      return "Offer";
+      return "报价与商品提供";
     case "pricing":
-      return "Pricing";
+      return "价格";
     case "buy-box":
       return "Buy Box";
     case "restrictions":
-      return "Restrictions";
+      return "限制与阻塞";
     case "missing-attributes":
-      return "Missing Attributes";
+      return "属性缺失";
     case "variation-issues":
-      return "Variation Issues";
+      return "变体问题";
     case "listing-status":
-      return "Listing Status";
+      return "Listing 状态";
   }
 }
 
@@ -459,36 +460,36 @@ function getDefaultWhereToChange(
   if (category) {
     switch (category) {
       case "inventory":
-        return "Seller Central > Manage All Inventory / FBA replenishment";
+        return "Seller Central > 库存 / FBA 补货";
       case "offer":
-        return "Seller Central > Offer / fulfillment settings / SKU setup";
+        return "Seller Central > Offer / SKU 配置";
       case "pricing":
-        return "Seller Central > Pricing / offer settings";
+        return "Seller Central > Pricing / 优惠设置";
       case "buy-box":
-        return "Seller Central > Pricing / shipping / fulfillment";
+        return "Seller Central > Pricing / 配送 / Buy Box";
       case "restrictions":
-        return "Seller Central > Listing limitations / compliance workflows";
+        return "Seller Central > Listing 限制 / 合规流程";
       case "missing-attributes":
-        return "Seller Central > Edit listing > title / bullets / attributes / images";
+        return "Seller Central > 编辑 Listing > 标题 / Bullet / 属性 / 图片";
       case "variation-issues":
-        return "Seller Central > Edit listing > Variations";
+        return "Seller Central > 编辑 Listing > 变体";
       case "listing-status":
-        return "Seller Central > Listing quality dashboard / Search Suppressed / Manage All Inventory";
+        return "Seller Central > Listing Health / Search Suppressed / 库存";
     }
   }
 
   switch (dimensionId) {
     case "content-coverage":
-      return "Seller Central > title / bullets / gallery content";
+      return "Seller Central > 标题 / Bullet / 图片内容";
     case "keyword-opportunity":
-      return "Title, bullets, backend keywords, and keyword indexing inputs";
+      return "标题、Bullet、后台关键词与索引输入";
     case "review-signal":
-      return "Copy, gallery proof points, FAQs, and expectation-setting content";
+      return "文案、图片证明、FAQ 与预期管理";
     case "listing-health":
-      return "Seller Central listing health and offer status";
+      return "Seller Central > Listing 健康度与 Offer 状态";
     case "market-position":
     default:
-      return "Pricing, merchandising, and offer positioning";
+      return "价格、促销与竞争位策略";
   }
 }
 
@@ -497,15 +498,15 @@ function getDefaultExpectedImpact(
 ): string {
   switch (impactType) {
     case "visibility":
-      return "Should recover indexed query coverage and improve retail-surface visibility.";
+      return "有助于恢复核心词覆盖并提升搜索流量入口。";
     case "click":
-      return "Should improve SERP-to-PDP click-through once the listing looks more relevant.";
+      return "有助于提升搜索结果页到详情页的点击效率。";
     case "conversion":
-      return "Should reduce purchase friction and improve PDP conversion quality.";
+      return "有助于降低详情页流失并提升转化质量。";
     case "buyability":
-      return "Should restore or stabilize the customer's ability to purchase the ASIN.";
+      return "有助于恢复或稳定 ASIN 的可售性。";
     case "compliance":
-      return "Should remove compliance blockers that are suppressing the listing.";
+      return "有助于降低 Listing 被抑制或受限的风险。";
   }
 }
 
@@ -619,9 +620,9 @@ export function createAction(params: {
     rootCause: params.rootCause ?? params.description,
     action: params.action ?? params.title,
     whereToChange:
-      params.whereToChange ?? "Seller Central or the listing content surface tied to the finding",
+      params.whereToChange ?? "Seller Central 或对应的前台内容位",
     expectedImpact:
       params.expectedImpact ??
-      "Should turn the diagnosis into a concrete operator next step with measurable impact.",
+      "把诊断结论转成具体可执行动作，并能在后续指标上看到影响。",
   };
 }
