@@ -29,6 +29,7 @@ const DEFAULT_IMAGE_GENERATIONS_API_BASE_URL = "https://ai.yijiarj.cn/v1";
 const DEFAULT_CHAT_COMPLETIONS_API_BASE_URL = "https://api.yijiarj.cn/v1";
 const DEFAULT_MODEL: GeminiImageModel = "nano_banana_pro";
 const DEFAULT_GEMINI_TRYON_SIZE = "1024x1024";
+const IMAGE2_GEMINI_TRYON_SIZE = "1024x1792";
 const GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS = 30_000;
 const GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS = 180_000;
 const GEMINI_UPSTREAM_MAX_ATTEMPTS = 3;
@@ -79,6 +80,12 @@ function isSupportedGeminiImageModel(value?: string): value is GeminiImageModel 
 
 function usesChatCompletionsModel(imageModel: GeminiImageModel) {
   return imageModel === "image2";
+}
+
+function getDefaultTryOnSize(imageModel: GeminiImageModel) {
+  return usesChatCompletionsModel(imageModel)
+    ? IMAGE2_GEMINI_TRYON_SIZE
+    : DEFAULT_GEMINI_TRYON_SIZE;
 }
 
 function resolveImageModel(requestedModel?: string): GeminiImageModel {
@@ -625,7 +632,7 @@ function shouldRetryWithFallbackSize(
   return sizeSignals.some((signal) => normalized.includes(signal));
 }
 
-function buildVirtualTryOnPrompt(garmentNote?: string) {
+function buildDefaultVirtualTryOnPrompt(garmentNote?: string) {
   const noteText = garmentNote?.trim()
     ? `8. ADDITIONAL GARMENT NOTE: ${garmentNote.trim()}`
     : "";
@@ -643,6 +650,39 @@ CRITICAL REQUIREMENTS:
 ${noteText}
 
 OUTPUT: one high-quality realistic image.`;
+}
+
+function buildImage2HighFidelityTryOnPrompt(garmentNote?: string) {
+  const noteText = garmentNote?.trim()
+    ? `10. ADDITIONAL GARMENT NOTE: ${garmentNote.trim()}`
+    : "";
+
+  return `Premium virtual try-on task: transfer the exact clothing from image 1 onto the person in image 2 and render it as a polished, luxury-grade fashion image.
+
+CRITICAL REQUIREMENTS:
+1. Preserve the exact garment from image 1 without redesigning it: pattern, color, texture, logo, trim, stitching, seams, lace motifs, mesh density, embroidery, beading, edges, and fabric appearance must remain unchanged.
+2. If the garment contains mesh, lace, tulle, sheer panels, translucent fabric, crochet, openwork, cutwork, burnout texture, or layered transparency, keep those structures exactly. Do not simplify, fill in, or smooth them into plain opaque fabric.
+3. Preserve garment geometry exactly: neckline, straps, sleeve shape, hemline, length, fit silhouette, cut lines, panel placement, and openings must stay faithful to image 1.
+4. Only replace the clothing area. Keep the person's face, body, pose, hands, legs, hair, skin tone, and scene from image 2 natural and coherent.
+5. Render premium fashion-photo quality: clean studio-grade clarity, realistic depth, crisp micro-contrast, refined skin texture, accurate textile texture, and believable material separation.
+6. Preserve realistic fabric drape, wrinkles, tension, thickness, translucency, and specular highlights so the garment feels dimensional rather than flat or painted.
+7. Keep the image sharp and high-fidelity, but do not oversoften skin, over-beautify the model, blur edges, or erase fine textile detail.
+8. Favor natural premium lighting, balanced contrast, and accurate color reproduction so the final result feels closer to a high-end campaign or polished luxury e-commerce image.
+9. Avoid a low-detail, washed-out, muddy, plastic, or overprocessed look.
+${noteText}
+
+OUTPUT: one high-quality realistic image with premium texture rendering and strong perceived sharpness.`;
+}
+
+function buildVirtualTryOnPrompt(
+  imageModel: GeminiImageModel,
+  garmentNote?: string
+) {
+  if (usesChatCompletionsModel(imageModel)) {
+    return buildImage2HighFidelityTryOnPrompt(garmentNote);
+  }
+
+  return buildDefaultVirtualTryOnPrompt(garmentNote);
 }
 
 function buildWhiteBackgroundPrompt() {
@@ -699,9 +739,9 @@ export async function POST(request: NextRequest) {
       const result = await runImageGeneration({
         geminiApiKey,
         imageModel,
-        prompt: buildVirtualTryOnPrompt(garmentNote),
+        prompt: buildVirtualTryOnPrompt(imageModel, garmentNote),
         images: [clothingImage, modelImage],
-        size: size || DEFAULT_GEMINI_TRYON_SIZE,
+        size: size || getDefaultTryOnSize(imageModel),
         fallbackSize: "1024x1024",
       });
 

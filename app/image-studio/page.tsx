@@ -173,7 +173,10 @@ const quickNotes = [
 ];
 
 const formatOptions: UpscaleOutputFormat[] = ["jpg", "png", "webp"];
-const GEMINI_TRYON_SIZE = "1024x1024";
+const GEMINI_TRYON_SIZE_BY_MODEL: Record<GeminiImageModel, string> = {
+  nano_banana_pro: "1024x1024",
+  image2: "1024x1792",
+};
 const geminiImageModelOptions: GeminiImageModelOption[] = [
   {
     value: "nano_banana_pro",
@@ -184,7 +187,8 @@ const geminiImageModelOptions: GeminiImageModelOption[] = [
   {
     value: "image2",
     label: "Image2",
-    description: "Uses /v1/chat/completions and returns the image URL from chat output.",
+    description:
+      "Uses /v1/chat/completions, defaults to 1024x1792 for try-on, and uses a higher-fidelity prompt template.",
     endpoint: "https://api.yijiarj.cn/v1/chat/completions",
   },
 ];
@@ -1070,6 +1074,8 @@ export default function ImageStudioPage() {
     garmentNote: string,
     onProgress?: (detail: string) => void
   ) {
+    const geminiTryOnSize = GEMINI_TRYON_SIZE_BY_MODEL[selectedGeminiModel];
+
     if (isTryOnConfigured === true) {
       onProgress?.("正在提交 FASHN Try-On Max 任务...");
       const job = await createFashnTryOnJob(clothingImage, modelImage, garmentNote);
@@ -1092,7 +1098,7 @@ export default function ImageStudioPage() {
         modelImage,
         garmentNote,
         type: "virtual-tryon",
-        size: GEMINI_TRYON_SIZE,
+        size: geminiTryOnSize,
         model: selectedGeminiModel,
       }),
     });
