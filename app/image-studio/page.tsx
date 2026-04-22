@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import FreeGenerationPanel from "@/components/image-studio/FreeGenerationPanel";
 import MultiImageUploader from "@/components/image-studio/MultiImageUploader";
 import { StudioHeader } from "@/components/portal/studio-header";
 
@@ -2031,6 +2032,14 @@ export default function ImageStudioPage() {
                   </div>
                 </article>
               ) : null}
+
+              <FreeGenerationPanel
+                selectedModel={selectedGeminiModel}
+                onModelChange={setSelectedGeminiModel}
+                modelOptions={geminiImageModelOptions}
+                onPreview={openPreview}
+                onDownload={handleDownload}
+              />
             </div>
 
             <aside className="space-y-6">
@@ -2174,7 +2183,7 @@ export default function ImageStudioPage() {
                       Active endpoint: {selectedGeminiModelOption.endpoint}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
-                      Applies to Gemini try-on fallback and white-background jobs.
+                      Applies to Gemini try-on fallback, white-background jobs, and free generation.
                     </p>
                   </div>
 

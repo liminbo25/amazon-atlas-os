@@ -5,16 +5,23 @@ import { NextRequest, NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-type GeminiRequestType = "virtual-tryon" | "white-background" | "model-swap";
+type GeminiRequestType =
+  | "virtual-tryon"
+  | "white-background"
+  | "model-swap"
+  | "free-generation";
 type GeminiImageModel = "nano_banana_pro" | "image2";
+type GeminiFreeGenerationMode = "text-to-image" | "image-to-image";
 
 export interface GeminiRequest {
   image?: string;
   clothingImage?: string;
   modelImage?: string;
+  referenceImages?: string[];
   prompt?: string;
   garmentNote?: string;
   type?: GeminiRequestType;
+  freeGenerationMode?: GeminiFreeGenerationMode;
   size?: string;
   model?: GeminiImageModel;
 }
@@ -547,20 +554,24 @@ async function runImageGeneration(options: {
   const normalizedFallbackSize = fallbackSize
     ? normalizeSizeForModel(imageModel, fallbackSize, fallbackSize)
     : undefined;
+  const imageGenerationPayload: Record<string, unknown> = {
+    model: imageModel,
+    prompt,
+    n: 1,
+    size: normalizedSize,
+    quality: "hd",
+    style: "natural",
+  };
+
+  if (normalizedImages.length > 0) {
+    imageGenerationPayload.image = normalizedImages;
+  }
 
   let apiResult = await requestProviderJson(
     apiBaseUrl,
     "/images/generations",
     geminiApiKey,
-    {
-      model: imageModel,
-      prompt,
-      image: normalizedImages,
-      n: 1,
-      size: normalizedSize,
-      quality: "hd",
-      style: "natural",
-    }
+    imageGenerationPayload
   );
 
   if (
@@ -569,19 +580,16 @@ async function runImageGeneration(options: {
     normalizedSize !== normalizedFallbackSize &&
     shouldRetryWithFallbackSize(apiResult.responseText, apiResult.status)
   ) {
+    const fallbackPayload = {
+      ...imageGenerationPayload,
+      size: normalizedFallbackSize,
+    };
+
     apiResult = await requestProviderJson(
       apiBaseUrl,
       "/images/generations",
       geminiApiKey,
-      {
-        model: imageModel,
-        prompt,
-        image: normalizedImages,
-        n: 1,
-        size: normalizedFallbackSize,
-        quality: "hd",
-        style: "natural",
-      }
+      fallbackPayload
     );
   }
 
@@ -704,6 +712,12 @@ function buildModelSwapPrompt(prompt: string) {
 3. 生成自然、清晰、适合展示的成图。`;
 }
 
+function normalizeReferenceImages(referenceImages?: string[]) {
+  return (referenceImages || []).filter(
+    (image): image is string => typeof image === "string" && image.trim().length > 0
+  );
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as GeminiRequest;
@@ -712,8 +726,10 @@ export async function POST(request: NextRequest) {
       prompt,
       clothingImage,
       modelImage,
+      referenceImages,
       garmentNote,
       type = "model-swap",
+      freeGenerationMode,
       size,
       model,
     } = body;
@@ -764,6 +780,63 @@ export async function POST(request: NextRequest) {
         imageModel,
         prompt: buildWhiteBackgroundPrompt(),
         images: [image],
+        size: size || "1024x1024",
+        fallbackSize: "1024x1024",
+      });
+
+      return NextResponse.json({
+        success: true,
+        result,
+      });
+    }
+
+    if (type === "free-generation") {
+      if (!prompt?.trim()) {
+        return NextResponse.json(
+          { success: false, error: "Free generation requires a prompt." },
+          { status: 400 }
+        );
+      }
+
+      if (
+        freeGenerationMode !== "text-to-image" &&
+        freeGenerationMode !== "image-to-image"
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Free generation requires freeGenerationMode to be text-to-image or image-to-image.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const normalizedReferenceImages = normalizeReferenceImages(
+        referenceImages?.length ? referenceImages : image ? [image] : []
+      );
+      const generationImages =
+        freeGenerationMode === "image-to-image" ? normalizedReferenceImages : [];
+
+      if (
+        freeGenerationMode === "image-to-image" &&
+        generationImages.length === 0
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error:
+              "Image-to-image free generation requires at least one reference image.",
+          },
+          { status: 400 }
+        );
+      }
+
+      const result = await runImageGeneration({
+        geminiApiKey,
+        imageModel,
+        prompt: prompt.trim(),
+        images: generationImages,
         size: size || "1024x1024",
         fallbackSize: "1024x1024",
       });

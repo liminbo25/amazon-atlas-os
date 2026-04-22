@@ -16,9 +16,9 @@ const modules = [
   {
     href: "/image-studio",
     title: "Image Studio",
-    subtitle: "Try-on generation and upscale workflows",
+    subtitle: "Try-on, free generation, and upscale workflows",
     description:
-      "Upload garments and model references, run the try-on batch, then keep the best outputs for quality enhancement and export.",
+      "Upload garments and model references for try-on, generate images from prompts or reference images, then keep the best outputs for white-background cleanup, quality enhancement, and export.",
     status: "Live",
     icon: ImagePlus,
     accent: "from-amber-200 via-orange-100 to-white",
