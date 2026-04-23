@@ -9,8 +9,8 @@ import MultiImageUploader from "@/components/image-studio/MultiImageUploader";
 import { StudioHeader } from "@/components/portal/studio-header";
 
 type AsyncStatus = "idle" | "processing" | "success" | "error";
-type TryOnProvider = "gemini" | "fashn";
 type GeminiImageModel = "nano_banana_pro" | "image2";
+type TryOnEngine = "fashn" | GeminiImageModel;
 type TryOnProviderStatus =
   | "starting"
   | "in_queue"
@@ -43,6 +43,15 @@ interface GeminiImageModelOption {
   label: string;
   description: string;
   endpoint: string;
+}
+
+interface TryOnEngineOption {
+  value: TryOnEngine;
+  label: string;
+  description: string;
+  endpoint: string;
+  summary?: string;
+  requiresFashn?: boolean;
 }
 
 interface ImageTaskState {
@@ -194,6 +203,18 @@ const geminiImageModelOptions: GeminiImageModelOption[] = [
       "使用 /v1/chat/completions，细节潜力更高，但回包格式和稳定性波动也更大。",
     endpoint: "https://api.yijiarj.cn/v1/chat/completions",
   },
+];
+const tryOnEngineOptions: TryOnEngineOption[] = [
+  {
+    value: "fashn",
+    label: "FASHN Try-On Max",
+    description:
+      "使用专用换装后端，人物一致性更稳，适合把换装当主链路时直接使用。",
+    endpoint: "https://api.fashn.ai/v1/run",
+    summary: "tryon-max / quality / 2k / png",
+    requiresFashn: true,
+  },
+  ...geminiImageModelOptions,
 ];
 
 let taskSequence = 0;
@@ -696,7 +717,8 @@ export default function ImageStudioPage() {
   const [error, setError] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<PreviewState | null>(null);
   const [isTryOnConfigured, setIsTryOnConfigured] = useState<boolean | null>(null);
-  const [tryOnProvider, setTryOnProvider] = useState<TryOnProvider>("gemini");
+  const [selectedTryOnEngine, setSelectedTryOnEngine] =
+    useState<TryOnEngine>("fashn");
   const [selectedGeminiModel, setSelectedGeminiModel] =
     useState<GeminiImageModel>("nano_banana_pro");
   const [tryOnConfigMessage, setTryOnConfigMessage] = useState<string | null>(null);
@@ -719,6 +741,9 @@ export default function ImageStudioPage() {
   const processedTasksRef = useRef<ImageGenerationTask[]>([]);
 
   const selectedModeOption = generationModeOptions[generationMode];
+  const selectedTryOnEngineOption =
+    tryOnEngineOptions.find((option) => option.value === selectedTryOnEngine) ||
+    tryOnEngineOptions[0];
   const selectedGeminiModelOption =
     geminiImageModelOptions.find((option) => option.value === selectedGeminiModel) ||
     geminiImageModelOptions[0];
@@ -784,7 +809,9 @@ export default function ImageStudioPage() {
 
         const configured = Boolean(data.configured);
         setIsTryOnConfigured(configured);
-        setTryOnProvider(configured ? "fashn" : "gemini");
+        setSelectedTryOnEngine((current) =>
+          current === "fashn" && !configured ? "nano_banana_pro" : current
+        );
         setTryOnConfigSummary(
           data.model && data.generationMode && data.resolution && data.outputFormat
             ? `${data.model} / ${data.generationMode} / ${data.resolution} / ${data.outputFormat}`
@@ -801,7 +828,9 @@ export default function ImageStudioPage() {
         }
 
         setIsTryOnConfigured(false);
-        setTryOnProvider("gemini");
+        setSelectedTryOnEngine((current) =>
+          current === "fashn" ? "nano_banana_pro" : current
+        );
         setTryOnConfigSummary(null);
         setTryOnConfigMessage(
           normalizeClientError(
@@ -855,6 +884,18 @@ export default function ImageStudioPage() {
     return () => controller.abort();
   }, []);
 
+  function handleTryOnEngineChange(engine: TryOnEngine) {
+    if (engine === "fashn" && isTryOnConfigured !== true) {
+      return;
+    }
+
+    setSelectedTryOnEngine(engine);
+
+    if (engine !== "fashn") {
+      setSelectedGeminiModel(engine);
+    }
+  }
+
   const hasUploads = plannedTaskCount > 0;
   const hasResultCards = processedTasks.length > 0;
   const canEnhance = isUpscaleConfigured === true;
@@ -903,12 +944,36 @@ export default function ImageStudioPage() {
   const enhancementSummary = describeUpscaleSettings(upscaleSettings);
   const resultMode = processedTasks[0]?.mode;
   const resultModeLabel = resultMode ? getGenerationModeLabel(resultMode) : null;
-  const tryOnBackendReady = isTryOnConfigured === true;
-  const tryOnBackendLabel =
-    tryOnProvider === "fashn" ? "FASHN Try-On Max" : "Gemini";
-  const tryOnBackendSummary =
+  const isFashnSelected = selectedTryOnEngine === "fashn";
+  const tryOnBackendReady = isFashnSelected ? isTryOnConfigured === true : true;
+  const tryOnBackendLabel = selectedTryOnEngineOption.label;
+  const legacyTryOnBackendSummary =
     tryOnConfigSummary ||
     (tryOnBackendReady ? "tryon-max / quality / 2k / png" : "当前仍走旧换装链路");
+  const tryOnBackendSummary = isFashnSelected
+    ? tryOnConfigSummary ||
+      (isTryOnConfigured === true
+        ? selectedTryOnEngineOption.summary || legacyTryOnBackendSummary
+        : legacyTryOnBackendSummary)
+    : `${selectedTryOnEngineOption.label} / Gemini`;
+  const tryOnBackendEndpoint = selectedTryOnEngineOption.endpoint;
+  const tryOnBackendStatusLabel = isFashnSelected
+    ? isTryOnConfigured === null
+      ? "Checking"
+      : tryOnBackendReady
+        ? "FASHN Ready"
+        : "FASHN Unavailable"
+    : "Gemini Selected";
+  const tryOnBackendStatusClass = isFashnSelected
+    ? isTryOnConfigured === null
+      ? "bg-slate-100 text-slate-500"
+      : tryOnBackendReady
+        ? "bg-emerald-100 text-emerald-700"
+        : "bg-amber-100 text-amber-700"
+    : "bg-slate-100 text-slate-700";
+  const tryOnEngineMessage = isFashnSelected
+    ? tryOnConfigMessage || "Checking FASHN try-on availability."
+    : `Current try-on engine is ${selectedTryOnEngineOption.label}. Free generation keeps its own Gemini model setting.`;
   const workspaceOptions = [
     {
       value: "overview" as const,
@@ -1170,10 +1235,13 @@ export default function ImageStudioPage() {
     garmentNote: string,
     onProgress?: (detail: string) => void
   ) {
-    const geminiTryOnSize = GEMINI_TRYON_SIZE_BY_MODEL[selectedGeminiModel];
-
-    if (isTryOnConfigured === true) {
+    if (selectedTryOnEngine === "fashn") {
       onProgress?.("正在提交 FASHN Try-On Max 任务...");
+      if (isTryOnConfigured !== true) {
+        throw new Error(
+          tryOnConfigMessage || "FASHN is not configured yet for this workspace."
+        );
+      }
       const job = await createFashnTryOnJob(clothingImage, modelImage, garmentNote);
       onProgress?.(
         describeTryOnProviderStatus(
@@ -1184,6 +1252,8 @@ export default function ImageStudioPage() {
     }
 
     onProgress?.("FASHN 未配置，当前继续使用 Gemini 换装。");
+    onProgress?.(`Submitting ${selectedTryOnEngineOption.label} try-on request...`);
+    const geminiTryOnSize = GEMINI_TRYON_SIZE_BY_MODEL[selectedTryOnEngine];
     const response = await fetchWithRetry("/api/gemini", {
       method: "POST",
       headers: {
@@ -1195,7 +1265,7 @@ export default function ImageStudioPage() {
         garmentNote,
         type: "virtual-tryon",
         size: geminiTryOnSize,
-        model: selectedGeminiModel,
+        model: selectedTryOnEngine,
       }),
     });
 
@@ -1273,7 +1343,7 @@ export default function ImageStudioPage() {
         status: "processing",
         retryCount: isRetry ? current.tryOn.retryCount + 1 : current.tryOn.retryCount,
         detail:
-          isTryOnConfigured === true
+          selectedTryOnEngine === "fashn"
             ? "正在提交 FASHN Try-On Max 任务..."
             : "正在提交 Gemini 换装请求...",
       }),
@@ -2372,32 +2442,20 @@ export default function ImageStudioPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                        换装后端
+                        换装引擎
                       </p>
                       <h2 className="mt-2 text-2xl font-semibold tracking-[-0.03em] text-slate-950">
                         {tryOnBackendLabel}
                       </h2>
                     </div>
                     <span
-                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${
-                        isTryOnConfigured === null
-                          ? "bg-slate-100 text-slate-500"
-                          : tryOnBackendReady
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-amber-100 text-amber-700"
-                      }`}
+                      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] ${tryOnBackendStatusClass}`}
                     >
-                      {isTryOnConfigured === null
-                        ? "检查中"
-                        : tryOnBackendReady
-                          ? "FASHN 已启用"
-                          : "Gemini 回退"}
+                      {tryOnBackendStatusLabel}
                     </span>
                   </div>
 
-                  <p className="text-sm leading-6 text-slate-600">
-                    {tryOnConfigMessage || "正在检查换装后端配置。"}
-                  </p>
+                  <p className="text-sm leading-6 text-slate-600">{tryOnEngineMessage}</p>
 
                   <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
                     当前配置：{tryOnBackendSummary}
@@ -2405,21 +2463,26 @@ export default function ImageStudioPage() {
 
                   <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
-                      Gemini 图像模型
+                      换装模型
                     </p>
                     <div className="mt-3 grid gap-2">
-                      {geminiImageModelOptions.map((option) => {
-                        const isActive = option.value === selectedGeminiModel;
+                      {tryOnEngineOptions.map((option) => {
+                        const isActive = option.value === selectedTryOnEngine;
+                        const isUnavailable =
+                          option.requiresFashn === true && isTryOnConfigured !== true;
 
                         return (
                           <button
                             key={option.value}
                             type="button"
-                            onClick={() => setSelectedGeminiModel(option.value)}
+                            onClick={() => handleTryOnEngineChange(option.value)}
+                            disabled={isUnavailable}
                             className={`rounded-2xl border px-4 py-3 text-left transition ${
                               isActive
                                 ? "border-slate-950 bg-slate-950 text-white"
-                                : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
+                                : isUnavailable
+                                  ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                                  : "border-slate-200 bg-white text-slate-700 hover:border-slate-300"
                             }`}
                           >
                             <div className="flex items-center justify-between gap-3">
@@ -2429,7 +2492,7 @@ export default function ImageStudioPage() {
                                   isActive ? "text-white/80" : "text-slate-400"
                                 }`}
                               >
-                                {isActive ? "当前使用" : "可切换"}
+                                {isActive ? "当前使用" : isUnavailable ? "需配置" : "可切换"}
                               </span>
                             </div>
                             <p
@@ -2444,16 +2507,16 @@ export default function ImageStudioPage() {
                       })}
                     </div>
                     <p className="mt-3 text-xs leading-5 text-slate-500">
-                      当前接口：{selectedGeminiModelOption.endpoint}
+                      当前接口：{tryOnBackendEndpoint}
                     </p>
                     <p className="mt-1 text-xs leading-5 text-slate-500">
-                      同时作用于 Gemini 换装兜底、换白底和自由生图。
+                      这里控制换装链路；自由生图仍然使用下方工作区自己的 Gemini 模型设置。
                     </p>
                   </div>
 
-                  {!tryOnBackendReady ? (
+                  {isFashnSelected && !tryOnBackendReady ? (
                     <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800">
-                      拿到 `FASHN_API_KEY` 后，只要填进 `.env.local` 或 Vercel 环境变量并重启，换装会自动切到 FASHN Try-On Max。当前 Gemini 回退更适合兜底，不适合追求高一致性的大批量换装。
+                      配置 `FASHN_API_KEY` 后，这里就可以直接切到 FASHN Try-On Max；如果暂时没配好，也可以继续切换到 Nano Banana Pro 或 Image2 跑 Gemini 换装。
                     </div>
                   ) : null}
                 </div>

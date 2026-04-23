@@ -6,6 +6,7 @@ import {
 import { readVideoOutputFile } from "@/lib/video-studio-service";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 interface OutputRouteContext {
   params: Promise<{

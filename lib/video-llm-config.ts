@@ -220,12 +220,7 @@ function getVideoLlmConfigPath(): string {
     return path.join(os.tmpdir(), "amazon-atlas-video-runtime", "llm-config.json");
   }
 
-  return path.join(
-    /*turbopackIgnore: true*/ process.cwd(),
-    ".video-output",
-    "runtime",
-    "llm-config.json"
-  );
+  return path.join(".video-output", "runtime", "llm-config.json");
 }
 
 async function loadStoredVideoLlmConfig(): Promise<LoadedVideoLlmConfig> {
