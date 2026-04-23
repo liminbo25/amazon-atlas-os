@@ -839,6 +839,69 @@ interface RunImageGenerationOptions {
   maxAttempts?: number;
 }
 
+function buildImageGenerationPayload(
+  imageModel: GeminiImageModel,
+  prompt: string,
+  size: string,
+  images: string[]
+) {
+  const payload: Record<string, unknown> = {
+    model: imageModel,
+    prompt,
+    n: 1,
+    size,
+  };
+
+  if (images.length > 0) {
+    payload.image = images;
+  }
+
+  // `nano_banana_pro` rejects DALL-E-style tuning fields like `quality` on this gateway.
+  if (imageModel !== "nano_banana_pro") {
+    payload.quality = "hd";
+    payload.style = "natural";
+  }
+
+  return payload;
+}
+
+function shouldRetryWithoutOptionalImageGenerationSettings(
+  responseText: string,
+  status: number
+) {
+  if (status !== 400 && status !== 422) {
+    return false;
+  }
+
+  const normalized = responseText.toLowerCase();
+
+  if (!normalized.includes("quality") && !normalized.includes("style")) {
+    return false;
+  }
+
+  return (
+    normalized.includes("invalid_request_error") ||
+    normalized.includes("invalid") ||
+    normalized.includes("unsupported") ||
+    normalized.includes("unknown parameter") ||
+    normalized.includes("unrecognized")
+  );
+}
+
+function stripOptionalImageGenerationSettings(payload: Record<string, unknown>) {
+  const nextPayload = { ...payload };
+  let changed = false;
+
+  for (const key of ["quality", "style"] as const) {
+    if (key in nextPayload) {
+      delete nextPayload[key];
+      changed = true;
+    }
+  }
+
+  return changed ? nextPayload : null;
+}
+
 async function runImageGeneration(options: RunImageGenerationOptions) {
   const {
     geminiApiKey,
@@ -947,18 +1010,12 @@ async function runImageGeneration(options: RunImageGenerationOptions) {
   const normalizedFallbackSize = fallbackSize
     ? normalizeSizeForModel(imageModel, fallbackSize, fallbackSize)
     : undefined;
-  const imageGenerationPayload: Record<string, unknown> = {
-    model: imageModel,
+  let imageGenerationPayload = buildImageGenerationPayload(
+    imageModel,
     prompt,
-    n: 1,
-    size: normalizedSize,
-    quality: "hd",
-    style: "natural",
-  };
-
-  if (normalizedImages.length > 0) {
-    imageGenerationPayload.image = normalizedImages;
-  }
+    normalizedSize,
+    normalizedImages
+  );
 
   let apiResult = await requestProviderJson(
     apiBaseUrl,
@@ -967,6 +1024,28 @@ async function runImageGeneration(options: RunImageGenerationOptions) {
     imageGenerationPayload,
     maxAttempts
   );
+
+  if (
+    !apiResult.ok &&
+    shouldRetryWithoutOptionalImageGenerationSettings(
+      apiResult.responseText,
+      apiResult.status
+    )
+  ) {
+    const compatibilityPayload =
+      stripOptionalImageGenerationSettings(imageGenerationPayload);
+
+    if (compatibilityPayload) {
+      imageGenerationPayload = compatibilityPayload;
+      apiResult = await requestProviderJson(
+        apiBaseUrl,
+        "/images/generations",
+        geminiApiKey,
+        imageGenerationPayload,
+        maxAttempts
+      );
+    }
+  }
 
   if (
     !apiResult.ok &&
