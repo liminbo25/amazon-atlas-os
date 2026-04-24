@@ -836,6 +836,7 @@ interface RunImageGenerationOptions {
   imageLabels?: string[];
   size: string;
   fallbackSize?: string;
+  outputFolder: string;
   maxAttempts?: number;
 }
 
@@ -911,6 +912,7 @@ async function runImageGeneration(options: RunImageGenerationOptions) {
     imageLabels,
     size,
     fallbackSize,
+    outputFolder,
     maxAttempts = GEMINI_UPSTREAM_MAX_ATTEMPTS,
   } = options;
   const apiBaseUrl = resolveImageApiBaseUrl(imageModel);
@@ -988,7 +990,7 @@ async function runImageGeneration(options: RunImageGenerationOptions) {
     const result = extractImageFromChatCompletion(data);
 
     if (result) {
-      return result;
+      return persistGeneratedImageResult(result, outputFolder);
     }
 
     if (data.error?.message) {
@@ -1093,7 +1095,7 @@ async function runImageGeneration(options: RunImageGenerationOptions) {
   const result = extractImageFromResponse(data);
 
   if (result) {
-    return result;
+    return persistGeneratedImageResult(result, outputFolder);
   }
 
   if (data.error?.message) {
@@ -1244,15 +1246,12 @@ export async function POST(request: NextRequest) {
         imageLabels: TRY_ON_CHAT_IMAGE_LABELS,
         size: size || getDefaultTryOnSize(imageModel),
         fallbackSize: "1024x1024",
+        outputFolder: "image-studio/generated/try-on",
       });
-      const persistedResult = await persistGeneratedImageResult(
-        generation.result,
-        "image-studio/generated/try-on"
-      );
 
       return NextResponse.json({
         success: true,
-        result: persistedResult,
+        result: generation.result,
         modelUsed: generation.modelUsed,
         fallbackModelUsed: generation.fallbackModelUsed || undefined,
       });
@@ -1273,15 +1272,12 @@ export async function POST(request: NextRequest) {
         images: [image],
         size: size || "1024x1024",
         fallbackSize: "1024x1024",
+        outputFolder: "image-studio/generated/white-background",
       });
-      const persistedResult = await persistGeneratedImageResult(
-        generation.result,
-        "image-studio/generated/white-background"
-      );
 
       return NextResponse.json({
         success: true,
-        result: persistedResult,
+        result: generation.result,
         modelUsed: generation.modelUsed,
         fallbackModelUsed: generation.fallbackModelUsed || undefined,
       });
@@ -1336,15 +1332,12 @@ export async function POST(request: NextRequest) {
         images: generationImages,
         size: size || "1024x1024",
         fallbackSize: "1024x1024",
+        outputFolder: "image-studio/generated/free-generation",
       });
-      const persistedResult = await persistGeneratedImageResult(
-        generation.result,
-        "image-studio/generated/free-generation"
-      );
 
       return NextResponse.json({
         success: true,
-        result: persistedResult,
+        result: generation.result,
         modelUsed: generation.modelUsed,
         fallbackModelUsed: generation.fallbackModelUsed || undefined,
       });
@@ -1364,15 +1357,12 @@ export async function POST(request: NextRequest) {
       images: [image],
       size: size || "1024x1536",
       fallbackSize: "1024x1024",
+      outputFolder: "image-studio/generated/model-swap",
     });
-    const persistedResult = await persistGeneratedImageResult(
-      generation.result,
-      "image-studio/generated/model-swap"
-    );
 
     return NextResponse.json({
       success: true,
-      result: persistedResult,
+      result: generation.result,
       modelUsed: generation.modelUsed,
       fallbackModelUsed: generation.fallbackModelUsed || undefined,
     });
