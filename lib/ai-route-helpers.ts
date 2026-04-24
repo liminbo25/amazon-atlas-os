@@ -330,13 +330,14 @@ export function toErrorResponse(
   fallbackMessage: string
 ): Response {
   const routeError = normalizeRouteError(error, fallbackMessage);
+  const includeDetails = process.env.NODE_ENV !== "production";
 
   return Response.json(
     {
       error: routeError.message,
       code: routeError.code,
       retryable: routeError.retryable,
-      details: routeError.logDetails ?? undefined,
+      details: includeDetails ? routeError.logDetails ?? undefined : undefined,
     },
     { status: routeError.status }
   );

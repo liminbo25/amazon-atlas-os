@@ -167,13 +167,13 @@ export function ProductImageUpload({
     setIsProcessing(false);
   };
 
-  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDrop = (event: React.DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
     setIsDragging(false);
     void handleFiles(event.dataTransfer.files);
   };
 
-  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+  const handleDragOver = (event: React.DragEvent<HTMLButtonElement>) => {
     event.preventDefault();
     if (!isProcessing && remainingSlots > 0) {
       setIsDragging(true);
@@ -231,12 +231,15 @@ export function ProductImageUpload({
       )}
 
       {remainingSlots > 0 ? (
-        <div
+        <button
+          type="button"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onClick={handleClick}
+          disabled={isProcessing || remainingSlots === 0}
           className={[
+            "block w-full",
             "rounded-lg border-2 border-dashed p-8 text-center transition-colors",
             isProcessing || remainingSlots === 0
               ? "cursor-not-allowed opacity-70"
@@ -272,7 +275,7 @@ export function ProductImageUpload({
               </p>
             </>
           )}
-        </div>
+        </button>
       ) : (
         <div className="rounded-lg border border-dashed border-orange-300 bg-orange-50 px-4 py-3 text-sm text-orange-700">
           图片数量已达到上限。删除部分图片后，可继续上传补充视角。

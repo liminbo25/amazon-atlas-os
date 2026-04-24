@@ -944,7 +944,8 @@ function findAttribute(
   return null;
 }
 
-function convertDisplayCurrency(value: number, _currency: string): number {
+function convertDisplayCurrency(value: number, currency: string): number {
+  void currency;
   return value;
 }
 

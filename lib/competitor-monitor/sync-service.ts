@@ -15,6 +15,10 @@ import type {
   CompetitorMonitorSyncTrigger,
 } from "./types";
 
+const DEFAULT_SYNC_MIN_INTERVAL_MS = 60_000;
+const activeSyncKeys = new Set<string>();
+const lastSyncStartedAtByKey = new Map<string, number>();
+
 export function assertCompetitorMonitorCronSecret(request: Request): void {
   const expected =
     process.env.COMPETITOR_MONITOR_CRON_SECRET?.trim() ||
@@ -45,6 +49,49 @@ export function assertCompetitorMonitorCronSecret(request: Request): void {
 }
 
 export async function runCompetitorMonitorDailySync(options: {
+  marketId?: string | null;
+  trigger?: CompetitorMonitorSyncTrigger;
+} = {}): Promise<CompetitorMonitorSyncSummary> {
+  const lockKey = options.marketId?.trim() || "all-markets";
+  const now = Date.now();
+  const minIntervalMs = readPositiveIntegerEnv(
+    "COMPETITOR_MONITOR_SYNC_MIN_INTERVAL_MS",
+    DEFAULT_SYNC_MIN_INTERVAL_MS
+  );
+  const previousStart = lastSyncStartedAtByKey.get(lockKey) ?? 0;
+
+  if (activeSyncKeys.has(lockKey)) {
+    throw new RouteError("competitor-monitor sync is already running.", {
+      status: 409,
+      code: "competitor_monitor_sync_in_progress",
+      retryable: true,
+      logDetails: { lockKey },
+    });
+  }
+
+  if (now - previousStart < minIntervalMs) {
+    throw new RouteError("competitor-monitor sync was triggered too recently.", {
+      status: 429,
+      code: "competitor_monitor_sync_rate_limited",
+      retryable: true,
+      logDetails: {
+        lockKey,
+        retryAfterMs: minIntervalMs - (now - previousStart),
+      },
+    });
+  }
+
+  activeSyncKeys.add(lockKey);
+  lastSyncStartedAtByKey.set(lockKey, now);
+
+  try {
+    return await runCompetitorMonitorDailySyncUnlocked(options);
+  } finally {
+    activeSyncKeys.delete(lockKey);
+  }
+}
+
+async function runCompetitorMonitorDailySyncUnlocked(options: {
   marketId?: string | null;
   trigger?: CompetitorMonitorSyncTrigger;
 } = {}): Promise<CompetitorMonitorSyncSummary> {
@@ -364,4 +411,14 @@ function toErrorMessage(error: unknown): string {
 
 function isoNow(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, "Z");
+}
+
+function readPositiveIntegerEnv(name: string, fallback: number): number {
+  const rawValue = process.env[name]?.trim();
+  if (!rawValue) {
+    return fallback;
+  }
+
+  const parsed = Number.parseInt(rawValue, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
 }
