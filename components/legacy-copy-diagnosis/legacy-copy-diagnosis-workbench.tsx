@@ -342,7 +342,7 @@ export function LegacyCopyDiagnosisWorkbench() {
   return (
     <section className="page-shell mt-8">
       <div className="glass-panel p-6 sm:p-7">
-        <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+        <div className="grid gap-6 xl:grid-cols-[minmax(320px,0.78fr)_minmax(0,1.32fr)]">
           <div className="space-y-6">
             <Card className="border-slate-200/80 bg-white/85 shadow-none">
               <CardHeader className="pb-3">
@@ -771,7 +771,7 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
       </TabsList>
 
       <TabsContent value="overview" className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-4">
           <MetricCard
             icon={Target}
             title="诊断总分"
@@ -817,7 +817,7 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
               <p className="text-sm font-semibold text-rose-950">问题</p>
               <p className="mt-2 text-sm leading-7 text-rose-900">{topRecommendation.problem}</p>
             </div>
-            <div className="grid gap-4 lg:grid-cols-3">
+            <div className="grid gap-4 2xl:grid-cols-3">
               <RecommendationBlock title="为什么优先" value={topRecommendation.why} />
               <RecommendationBlock title="现在怎么改" value={topRecommendation.changeNow} />
               <RecommendationBlock title="看什么结果" value={topRecommendation.expectedOutcome} />
@@ -831,12 +831,12 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="grid gap-4 2xl:grid-cols-[0.95fr_1.05fr]">
           <Card className="border-slate-200/80 bg-white/85 shadow-none">
             <CardHeader>
               <CardTitle className="text-lg text-slate-950">Quick Wins / Watchouts</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 md:grid-cols-2">
+            <CardContent className="grid gap-4 2xl:grid-cols-2">
               <SignalColumn
                 title="当天可改"
                 items={report.ai.output?.quickWins.length ? report.ai.output.quickWins : report.actionPlan.p0}
@@ -860,37 +860,16 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
       </TabsContent>
 
       <TabsContent value="pillars" className="space-y-4">
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="space-y-4">
           {rootCauseGroups.map((group) => (
             <Card key={group.title} className="border-slate-200/80 bg-white/85 shadow-none">
               <CardHeader className="pb-3">
                 <CardTitle className="text-lg text-slate-950">{group.title}</CardTitle>
                 <p className="text-sm leading-7 text-slate-500">{group.summary}</p>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
                 {group.pillars.map((pillar) => (
-                  <div
-                    key={pillar.id}
-                    className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm font-semibold text-slate-950">{pillar.title}</p>
-                      <div className="flex items-center gap-2">
-                        <Badge className={scoreBadgeClassName(pillar.status)}>
-                          {statusLabel(pillar.status)}
-                        </Badge>
-                        <Badge variant="outline">
-                          {pillar.score}/{pillar.maxScore}
-                        </Badge>
-                      </div>
-                    </div>
-                    <p className="mt-3 text-sm leading-7 text-slate-600">{pillar.summary}</p>
-                    <div className="mt-4 grid gap-3 md:grid-cols-3">
-                      <DetailBlock title="症状" items={pillar.findings.slice(0, 3)} />
-                      <DetailBlock title="修正面" items={pillar.recommendedActions.slice(0, 3)} />
-                      <DetailBlock title="证据" items={pillar.evidence.slice(0, 3)} />
-                    </div>
-                  </div>
+                  <RootCauseItem key={pillar.id} pillar={pillar} />
                 ))}
               </CardContent>
             </Card>
@@ -899,7 +878,7 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
       </TabsContent>
 
       <TabsContent value="keywords" className="space-y-4">
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-4 2xl:grid-cols-2">
           {fieldDiagnostics.map((item) => (
             <FieldDiagnosticCard key={item.field} item={item} />
           ))}
@@ -942,7 +921,7 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
       </TabsContent>
 
       <TabsContent value="rewrite" className="space-y-4">
-        <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 2xl:grid-cols-3">
           <ActionColumn title="P0 今天处理" items={report.ai.output?.p0Actions.length ? report.ai.output.p0Actions : report.actionPlan.p0} />
           <ActionColumn title="P1 7-14天推进" items={report.ai.output?.p1Actions.length ? report.ai.output.p1Actions : report.actionPlan.p1} />
           <ActionColumn title="P2 观察/补强" items={report.ai.output?.p2Actions.length ? report.ai.output.p2Actions : report.actionPlan.p2} />
@@ -962,7 +941,7 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
               </div>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-4 md:grid-cols-3">
+          <CardContent className="grid gap-4 2xl:grid-cols-3">
             {validationPlan.map((item) => (
               <ValidationStepCard key={item.window} item={item} />
             ))}
@@ -1019,16 +998,81 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
 
 function RecommendationBlock({ title, value }: { title: string; value: string }) {
   return (
-    <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
+    <div className="min-w-0 rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
       <p className="text-sm font-semibold text-slate-950">{title}</p>
-      <p className="mt-2 text-sm leading-7 text-slate-600">{value || "暂无明确结论"}</p>
+      <p className="mt-2 break-words text-sm leading-7 text-slate-600">
+        {value || "暂无明确结论"}
+      </p>
+    </div>
+  );
+}
+
+function RootCauseItem({
+  pillar,
+}: {
+  pillar: LegacyDiagnosisReport["pillars"][number];
+}) {
+  const symptom = pillar.findings[0] || pillar.summary;
+  const action = pillar.recommendedActions[0] || "暂无明确修正动作";
+  const evidence = pillar.evidence[0] || "暂无证据";
+
+  return (
+    <div className="min-w-0 rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <p className="break-words text-sm font-semibold text-slate-950">
+            {pillar.title}
+          </p>
+          <p className="mt-2 break-words text-sm leading-7 text-slate-600">
+            {pillar.summary}
+          </p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <Badge className={scoreBadgeClassName(pillar.status)}>
+            {statusLabel(pillar.status)}
+          </Badge>
+          <Badge variant="outline">
+            {pillar.score}/{pillar.maxScore}
+          </Badge>
+        </div>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        <RootCauseLine label="症状" value={symptom} />
+        <RootCauseLine label="修正" value={action} />
+        <RootCauseLine label="证据" value={evidence} muted />
+      </div>
+    </div>
+  );
+}
+
+function RootCauseLine({
+  label,
+  value,
+  muted,
+}: {
+  label: string;
+  value: string;
+  muted?: boolean;
+}) {
+  return (
+    <div className="grid gap-2 rounded-xl bg-white/70 px-3 py-3 text-sm sm:grid-cols-[4.5rem_minmax(0,1fr)]">
+      <span className="font-semibold text-slate-950">{label}</span>
+      <span
+        className={cn(
+          "min-w-0 break-words leading-7",
+          muted ? "text-slate-500" : "text-slate-600"
+        )}
+      >
+        {value}
+      </span>
     </div>
   );
 }
 
 function FieldDiagnosticCard({ item }: { item: OperatorFieldDiagnostic }) {
   return (
-    <Card className="border-slate-200/80 bg-white/85 shadow-none">
+    <Card className="min-w-0 border-slate-200/80 bg-white/85 shadow-none">
       <CardHeader className="pb-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <CardTitle className="text-lg text-slate-950">{item.field}</CardTitle>
@@ -1061,7 +1105,7 @@ function FieldDiagnosticCard({ item }: { item: OperatorFieldDiagnostic }) {
 
 function ActionColumn({ title, items }: { title: string; items: string[] }) {
   return (
-    <Card className="border-slate-200/80 bg-white/85 shadow-none">
+    <Card className="min-w-0 border-slate-200/80 bg-white/85 shadow-none">
       <CardHeader className="pb-2">
         <CardTitle className="text-lg text-slate-950">{title}</CardTitle>
       </CardHeader>
@@ -1074,15 +1118,15 @@ function ActionColumn({ title, items }: { title: string; items: string[] }) {
 
 function ValidationStepCard({ item }: { item: OperatorValidationStep }) {
   return (
-    <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
+    <div className="min-w-0 rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
       <div className="flex items-center gap-2">
         <Badge className="bg-slate-950 text-white hover:bg-slate-950">
           {item.window}
         </Badge>
         <p className="text-sm font-semibold text-slate-950">{item.metric}</p>
       </div>
-      <p className="mt-3 text-sm leading-7 text-slate-600">{item.target}</p>
-      <p className="mt-3 text-xs leading-6 text-slate-500">
+      <p className="mt-3 break-words text-sm leading-7 text-slate-600">{item.target}</p>
+      <p className="mt-3 break-words text-xs leading-6 text-slate-500">
         回滚信号：{item.rollbackSignal}
       </p>
     </div>
@@ -1125,15 +1169,6 @@ function SignalColumn({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function DetailBlock({ title, items }: { title: string; items: string[] }) {
-  return (
-    <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-      <p className="text-sm font-semibold text-slate-950">{title}</p>
-      <SimpleList items={items} />
-    </div>
-  );
-}
-
 function SimpleList({ items }: { items: string[] }) {
   if (items.length === 0) {
     return <p className="mt-3 text-sm text-slate-500">暂无</p>;
@@ -1142,9 +1177,9 @@ function SimpleList({ items }: { items: string[] }) {
   return (
     <ul className="mt-3 space-y-2 text-sm leading-7 text-slate-600">
       {items.map((item) => (
-        <li key={item} className="flex gap-3">
-          <span className="mt-2 h-1.5 w-1.5 rounded-full bg-slate-400" />
-          <span>{item}</span>
+        <li key={item} className="flex min-w-0 gap-3">
+          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
+          <span className="min-w-0 break-words">{item}</span>
         </li>
       ))}
     </ul>
