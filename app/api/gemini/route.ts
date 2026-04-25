@@ -7,6 +7,11 @@ import {
   type TryOnGarmentScope,
 } from "@/lib/tryon-scope";
 import {
+  getClosestTryOnSizeForAspect,
+  isValidImageDimensions,
+  type ImageDimensions,
+} from "@/lib/tryon-aspect";
+import {
   buildStrictTryOnPrompt,
   TRY_ON_CHAT_IMAGE_LABELS,
 } from "@/lib/tryon-prompts";
@@ -36,6 +41,7 @@ export interface GeminiRequest {
   prompt?: string;
   garmentNote?: string;
   garmentScope?: TryOnGarmentScope;
+  modelImageDimensions?: Partial<ImageDimensions>;
   type?: GeminiRequestType;
   freeGenerationMode?: GeminiFreeGenerationMode;
   size?: string;
@@ -843,6 +849,7 @@ interface RunImageGenerationOptions {
   fallbackSize?: string;
   outputFolder: string;
   maxAttempts?: number;
+  sourceDimensions?: Partial<ImageDimensions> | null;
 }
 
 function buildImageGenerationPayload(
@@ -1196,7 +1203,9 @@ async function runImageGenerationWithFallback(options: RunImageGenerationOptions
       error: error instanceof Error ? error.message : String(error),
     });
 
-    const alternateSize = options.fallbackSize || getDefaultTryOnSize(alternateModel);
+    const alternateSize = isValidImageDimensions(options.sourceDimensions)
+      ? getClosestTryOnSizeForAspect(alternateModel, options.sourceDimensions)
+      : options.fallbackSize || getDefaultTryOnSize(alternateModel);
     const result = await runImageGeneration({
       ...options,
       imageModel: alternateModel,
@@ -1224,6 +1233,7 @@ export async function POST(request: NextRequest) {
       referenceImages,
       garmentNote,
       garmentScope,
+      modelImageDimensions,
       type = "model-swap",
       freeGenerationMode,
       size,
@@ -1254,9 +1264,15 @@ export async function POST(request: NextRequest) {
         prompt: buildVirtualTryOnPrompt(imageModel, garmentNote, garmentScope),
         images: [clothingImage, modelImage],
         imageLabels: TRY_ON_CHAT_IMAGE_LABELS,
-        size: size || getDefaultTryOnSize(imageModel),
-        fallbackSize: "1024x1024",
+        size:
+          size ||
+          getClosestTryOnSizeForAspect(imageModel, modelImageDimensions),
+        fallbackSize: getClosestTryOnSizeForAspect(
+          imageModel,
+          modelImageDimensions
+        ),
         outputFolder: "image-studio/generated/try-on",
+        sourceDimensions: modelImageDimensions,
       });
 
       return NextResponse.json({

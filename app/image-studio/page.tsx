@@ -11,6 +11,12 @@ import {
   TRY_ON_GARMENT_SCOPE_OPTIONS,
   type TryOnGarmentScope,
 } from "@/lib/tryon-scope";
+import {
+  getAspectRatio,
+  getCanvasDimensionsForAspect,
+  getClosestTryOnSizeForAspect,
+  type ImageDimensions,
+} from "@/lib/tryon-aspect";
 
 type AsyncStatus = "idle" | "processing" | "success" | "error";
 type GeminiImageModel = "nano_banana_pro" | "image2";
@@ -189,10 +195,7 @@ const quickNotes = [
 ];
 
 const formatOptions: UpscaleOutputFormat[] = ["jpg", "png", "webp"];
-const GEMINI_TRYON_SIZE_BY_MODEL: Record<GeminiImageModel, string> = {
-  nano_banana_pro: "1024x1024",
-  image2: "1024x1792",
-};
+const TRY_ON_RESULT_ASPECT_TOLERANCE = 0.01;
 const geminiImageModelOptions: GeminiImageModelOption[] = [
   {
     value: "nano_banana_pro",
@@ -647,6 +650,62 @@ function buildStandaloneFilename(
   extension: string
 ) {
   return `image-studio-standalone-${index + 1}-${suffix}.${extension}`;
+}
+
+function loadImageElement(source: string) {
+  return new Promise<HTMLImageElement>((resolve, reject) => {
+    const image = new Image();
+
+    image.onload = () => {
+      if (!image.naturalWidth || !image.naturalHeight) {
+        reject(new Error("图片尺寸读取失败。"));
+        return;
+      }
+
+      resolve(image);
+    };
+    image.onerror = () => reject(new Error("图片加载失败，无法读取原比例。"));
+    image.src = source;
+  });
+}
+
+async function readImageDimensions(source: string): Promise<ImageDimensions> {
+  const image = await loadImageElement(source);
+
+  return {
+    width: image.naturalWidth,
+    height: image.naturalHeight,
+  };
+}
+
+function getCoverDrawRect(
+  imageDimensions: ImageDimensions,
+  canvasDimensions: ImageDimensions
+) {
+  const imageRatio = getAspectRatio(imageDimensions);
+  const canvasRatio = getAspectRatio(canvasDimensions);
+
+  if (imageRatio > canvasRatio) {
+    const height = canvasDimensions.height;
+    const width = height * imageRatio;
+
+    return {
+      x: (canvasDimensions.width - width) / 2,
+      y: 0,
+      width,
+      height,
+    };
+  }
+
+  const width = canvasDimensions.width;
+  const height = width / imageRatio;
+
+  return {
+    x: 0,
+    y: (canvasDimensions.height - height) / 2,
+    width,
+    height,
+  };
 }
 
 function PreviewTile({
@@ -1157,6 +1216,87 @@ export default function ImageStudioPage() {
     return data.result;
   }
 
+  async function getDrawableImageSource(imageData: string) {
+    if (!imageData.startsWith("http://") && !imageData.startsWith("https://")) {
+      return imageData;
+    }
+
+    const response = await fetchWithRetry("/api/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ imageUrl: imageData }),
+    });
+    const json = (await response.json()) as {
+      success?: boolean;
+      error?: string;
+      data?: string;
+    };
+
+    if (!response.ok || json.success !== true || !json.data) {
+      throw new Error(json.error || "图片比例校正前的下载代理失败。");
+    }
+
+    return json.data;
+  }
+
+  async function normalizeTryOnResultToModelAspect(
+    data: { result: string; format: string },
+    modelImage: string
+  ) {
+    try {
+      const [modelDimensions, resultDimensions] = await Promise.all([
+        readImageDimensions(modelImage),
+        readImageDimensions(data.result),
+      ]);
+      const modelRatio = getAspectRatio(modelDimensions);
+      const resultRatio = getAspectRatio(resultDimensions);
+      const ratioDelta = Math.abs(modelRatio - resultRatio) / modelRatio;
+
+      if (ratioDelta <= TRY_ON_RESULT_ASPECT_TOLERANCE) {
+        return data;
+      }
+
+      const drawableSource = await getDrawableImageSource(data.result);
+      const drawableImage = await loadImageElement(drawableSource);
+      const drawableDimensions = {
+        width: drawableImage.naturalWidth,
+        height: drawableImage.naturalHeight,
+      };
+      const canvasDimensions = getCanvasDimensionsForAspect(
+        drawableDimensions,
+        modelDimensions
+      );
+      const canvas = document.createElement("canvas");
+      const context = canvas.getContext("2d");
+
+      if (!context) {
+        throw new Error("浏览器无法创建比例校正画布。");
+      }
+
+      canvas.width = canvasDimensions.width;
+      canvas.height = canvasDimensions.height;
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+
+      const rect = getCoverDrawRect(drawableDimensions, canvasDimensions);
+      context.drawImage(
+        drawableImage,
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height
+      );
+
+      return {
+        result: canvas.toDataURL("image/png"),
+        format: "png",
+      };
+    } catch (aspectError) {
+      console.warn("Failed to normalize try-on result aspect ratio:", aspectError);
+      return data;
+    }
+  }
+
   async function createFashnTryOnJob(
     clothingImage: string,
     modelImage: string,
@@ -1283,7 +1423,13 @@ export default function ImageStudioPage() {
 
     onProgress?.("FASHN 未配置，当前继续使用 Gemini 换装。");
     onProgress?.(`Submitting ${selectedTryOnEngineOption.label} try-on request...`);
-    const geminiTryOnSize = GEMINI_TRYON_SIZE_BY_MODEL[selectedTryOnEngine];
+    const geminiModel = selectedTryOnEngine as GeminiImageModel;
+    const modelDimensions = await readImageDimensions(modelImage).catch(() => null);
+    const geminiTryOnSize = getClosestTryOnSizeForAspect(
+      geminiModel,
+      modelDimensions
+    );
+    onProgress?.(`按模特原图比例请求输出尺寸：${geminiTryOnSize}`);
     const response = await fetchWithRetry("/api/gemini", {
       method: "POST",
       headers: {
@@ -1294,9 +1440,10 @@ export default function ImageStudioPage() {
         modelImage,
         garmentNote,
         garmentScope: scope,
+        modelImageDimensions: modelDimensions || undefined,
         type: "virtual-tryon",
         size: geminiTryOnSize,
-        model: selectedTryOnEngine,
+        model: geminiModel,
       }),
     });
 
@@ -1318,14 +1465,15 @@ export default function ImageStudioPage() {
       onProgress
     );
 
-    if (typeof result === "string") {
-      return {
+    const data =
+      typeof result === "string"
+        ? {
         result,
         format: inferImageFormatFromSource(result) || "png",
-      };
-    }
+          }
+        : result;
 
-    return result;
+    return normalizeTryOnResultToModelAspect(data, modelImage);
   }
 
   async function requestWhiteBackgroundImage(image: string) {
