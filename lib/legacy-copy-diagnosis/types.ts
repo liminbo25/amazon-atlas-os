@@ -85,13 +85,34 @@ export interface LegacyPillarScore {
 
 export interface LegacyAiOutput {
   executiveSummary: string;
+  topRecommendation: {
+    problem: string;
+    why: string;
+    changeNow: string;
+    expectedOutcome: string;
+    confidence: string;
+  };
   quickWins: string[];
+  fieldDiagnostics: Array<{
+    field: string;
+    priority: "P0" | "P1" | "P2";
+    problem: string;
+    fix: string;
+    keywords: string[];
+  }>;
+  competitorDeltas: string[];
   titleSuggestion: string;
   bulletSuggestions: string[];
   searchTermsSuggestion: string;
   p0Actions: string[];
   p1Actions: string[];
   p2Actions: string[];
+  validationPlan: Array<{
+    window: string;
+    metric: string;
+    target: string;
+    rollbackSignal: string;
+  }>;
   watchouts: string[];
 }
 

@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from "react";
 import {
+  AlertTriangle,
   BrainCircuit,
+  CalendarCheck,
   ChevronDown,
   ChevronUp,
   ClipboardList,
+  FileText,
   Loader2,
   Radar,
   RefreshCw,
@@ -68,6 +71,31 @@ const DEFAULT_SELLER_SPRITE_CONFIG = {
   requestTimeoutMs: "15000",
 };
 
+type OperatorPriority = "P0" | "P1" | "P2";
+
+type OperatorTopRecommendation = {
+  problem: string;
+  why: string;
+  changeNow: string;
+  expectedOutcome: string;
+  confidence: string;
+};
+
+type OperatorFieldDiagnostic = {
+  field: string;
+  priority: OperatorPriority;
+  problem: string;
+  fix: string;
+  keywords: string[];
+};
+
+type OperatorValidationStep = {
+  window: string;
+  metric: string;
+  target: string;
+  rollbackSignal: string;
+};
+
 const MARKET_OPTIONS = ["US", "CA", "UK", "DE", "FR", "IT", "ES", "JP"];
 
 const PROVIDER_OPTIONS: Array<{ value: AiProvider | "auto"; label: string }> = [
@@ -82,7 +110,7 @@ export function LegacyCopyDiagnosisWorkbench() {
   const [sellerSpriteConfig, setSellerSpriteConfig] = useState(
     DEFAULT_SELLER_SPRITE_CONFIG
   );
-  const [runtimeOpen, setRuntimeOpen] = useState(true);
+  const [runtimeOpen, setRuntimeOpen] = useState(false);
   const [report, setReport] = useState<LegacyDiagnosisReport | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiRequestError | null>(null);
@@ -410,9 +438,9 @@ export function LegacyCopyDiagnosisWorkbench() {
                 <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-950">API 接入设置</p>
+                      <p className="text-sm font-semibold text-slate-950">高级接入设置</p>
                       <p className="mt-1 text-sm leading-7 text-slate-500">
-                        这里可以直接配置 SellerSprite MCP 和分析模型 API。这里的模型用于分析卖家精灵抓回的数据并生成诊断与优化建议，比如 gpt-5.4；密钥留空时会优先使用服务端环境变量。
+                        只在需要切换 SellerSprite MCP 或分析模型时展开；日常诊断直接填写 ASIN 后运行。
                       </p>
                     </div>
                     <Button
@@ -694,17 +722,25 @@ export function LegacyCopyDiagnosisWorkbench() {
 }
 
 function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
+  const topRecommendation = getTopRecommendation(report);
+  const fieldDiagnostics = buildFieldDiagnostics(report);
+  const validationPlan = buildValidationPlan(report);
+  const competitorDeltas = buildCompetitorDeltas(report);
+  const rootCauseGroups = buildRootCauseGroups(report);
+  const primaryBlocker = getPrimaryBlocker(report);
+  const firstSurface = getFirstSurface(primaryBlocker.id);
+
   return (
     <Tabs defaultValue="overview" className="space-y-4">
-      <TabsList>
-        <TabsTrigger value="overview">总览</TabsTrigger>
-        <TabsTrigger value="pillars">支柱分</TabsTrigger>
-        <TabsTrigger value="keywords">关键词缺口</TabsTrigger>
-        <TabsTrigger value="rewrite">改写建议</TabsTrigger>
+      <TabsList className="h-auto flex-wrap">
+        <TabsTrigger value="overview">诊断结论</TabsTrigger>
+        <TabsTrigger value="pillars">根因地图</TabsTrigger>
+        <TabsTrigger value="keywords">字段缺口</TabsTrigger>
+        <TabsTrigger value="rewrite">执行复盘</TabsTrigger>
       </TabsList>
 
       <TabsContent value="overview" className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           <MetricCard
             icon={Target}
             title="诊断总分"
@@ -712,16 +748,22 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
             note={report.score.label}
           />
           <MetricCard
-            icon={Search}
-            title="目标关键词数"
-            value={String(report.targetKeywords.length)}
-            note={`${report.keywordGaps.length} 个重点缺口`}
+            icon={AlertTriangle}
+            title="第一卡点"
+            value={primaryBlocker.shortTitle}
+            note={`${primaryBlocker.score}/${primaryBlocker.maxScore}`}
           />
           <MetricCard
-            icon={Radar}
-            title="竞品样本"
-            value={String(report.competitorSnapshots.length)}
-            note="基于卖家精灵 MCP"
+            icon={FileText}
+            title="先改字段"
+            value={firstSurface}
+            note="先打透一个面，再联动其他字段"
+          />
+          <MetricCard
+            icon={CalendarCheck}
+            title="复盘节奏"
+            value="7/14/28天"
+            note="索引、排名、转化分窗口验证"
           />
         </div>
 
@@ -732,21 +774,28 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
                 <Sparkles className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-xl text-slate-950">{report.score.headline}</CardTitle>
+                <CardTitle className="text-xl text-slate-950">Top Recommendation</CardTitle>
                 <p className="mt-1 text-sm leading-7 text-slate-500">
-                  目标 ASIN：{report.targetAsin}，当前标题与五点会优先用你手动输入的内容；没填的部分回退到卖家精灵抓取结果。
+                  目标 ASIN：{report.targetAsin}。这里直接给第一优先级，不再展示方法论解释。
                 </p>
               </div>
             </div>
           </CardHeader>
-          <CardContent className="grid gap-4 lg:grid-cols-2">
-            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-sm font-semibold text-slate-950">P0 动作</p>
-              <SimpleList items={report.ai.output?.p0Actions ?? report.actionPlan.p0} />
+          <CardContent className="space-y-4">
+            <div className="rounded-[1.2rem] border border-rose-200 bg-rose-50/80 p-4">
+              <p className="text-sm font-semibold text-rose-950">问题</p>
+              <p className="mt-2 text-sm leading-7 text-rose-900">{topRecommendation.problem}</p>
             </div>
-            <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-              <p className="text-sm font-semibold text-slate-950">P1 / P2 动作</p>
-              <SimpleList items={[...report.actionPlan.p1.slice(0, 3), ...report.actionPlan.p2.slice(0, 2)]} />
+            <div className="grid gap-4 lg:grid-cols-3">
+              <RecommendationBlock title="为什么优先" value={topRecommendation.why} />
+              <RecommendationBlock title="现在怎么改" value={topRecommendation.changeNow} />
+              <RecommendationBlock title="看什么结果" value={topRecommendation.expectedOutcome} />
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="outline">置信度：{topRecommendation.confidence}</Badge>
+              <Badge variant="secondary">{report.ai.used ? "模型 + 规则" : "规则诊断兜底"}</Badge>
+              <Badge variant="secondary">竞品 {report.competitorSnapshots.length} 个</Badge>
+              <Badge variant="secondary">缺口词 {report.keywordGaps.length} 个</Badge>
             </div>
           </CardContent>
         </Card>
@@ -754,49 +803,26 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
         <div className="grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
           <Card className="border-slate-200/80 bg-white/85 shadow-none">
             <CardHeader>
-              <CardTitle className="text-lg text-slate-950">评论信号</CardTitle>
+              <CardTitle className="text-lg text-slate-950">Quick Wins / Watchouts</CardTitle>
             </CardHeader>
             <CardContent className="grid gap-4 md:grid-cols-2">
               <SignalColumn
-                title="负向主题"
-                items={report.negativeThemes.map(
-                  (item) =>
-                    `${item.phrase} (${item.count})${item.addressedInCopy ? " · 文案已承接" : " · 文案未承接"}`
-                )}
+                title="当天可改"
+                items={report.ai.output?.quickWins.length ? report.ai.output.quickWins : report.actionPlan.p0}
               />
               <SignalColumn
-                title="正向主题"
-                items={report.positiveThemes.map(
-                  (item) =>
-                    `${item.phrase} (${item.count})${item.addressedInCopy ? " · 文案已承接" : " · 仍可放大"}`
-                )}
+                title="别踩坑"
+                items={report.ai.output?.watchouts.length ? report.ai.output.watchouts : report.actionPlan.watchouts}
               />
             </CardContent>
           </Card>
 
           <Card className="border-slate-200/80 bg-white/85 shadow-none">
             <CardHeader>
-              <CardTitle className="text-lg text-slate-950">竞品快照</CardTitle>
+              <CardTitle className="text-lg text-slate-950">竞品差距</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              {report.competitorSnapshots.map((item) => (
-                <div
-                  key={item.asin}
-                  className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline">{item.asin}</Badge>
-                    <Badge variant="secondary">{item.keywordCount} 词</Badge>
-                    {item.hasAPlus ? <Badge variant="secondary">A+</Badge> : null}
-                    {item.hasVideo ? <Badge variant="secondary">Video</Badge> : null}
-                  </div>
-                  <p className="mt-3 text-sm leading-7 text-slate-600">{item.title}</p>
-                  <p className="mt-2 text-sm text-slate-500">
-                    ${item.price.toFixed(2)} / {item.rating.toFixed(1)}★ / {item.reviews} 评 /
-                    变体 {item.variationCount || 0}
-                  </p>
-                </div>
-              ))}
+              <SimpleList items={competitorDeltas} />
             </CardContent>
           </Card>
         </div>
@@ -804,24 +830,37 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
 
       <TabsContent value="pillars" className="space-y-4">
         <div className="grid gap-4 xl:grid-cols-2">
-          {report.pillars.map((pillar) => (
-            <Card key={pillar.id} className="border-slate-200/80 bg-white/85 shadow-none">
+          {rootCauseGroups.map((group) => (
+            <Card key={group.title} className="border-slate-200/80 bg-white/85 shadow-none">
               <CardHeader className="pb-3">
-                <div className="flex items-center justify-between gap-3">
-                  <CardTitle className="text-lg text-slate-950">{pillar.title}</CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Badge className={scoreBadgeClassName(pillar.status)}>{statusLabel(pillar.status)}</Badge>
-                    <Badge variant="outline">
-                      {pillar.score}/{pillar.maxScore}
-                    </Badge>
-                  </div>
-                </div>
-                <p className="text-sm leading-7 text-slate-500">{pillar.summary}</p>
+                <CardTitle className="text-lg text-slate-950">{group.title}</CardTitle>
+                <p className="text-sm leading-7 text-slate-500">{group.summary}</p>
               </CardHeader>
-              <CardContent className="grid gap-4 md:grid-cols-3">
-                <DetailBlock title="发现" items={pillar.findings} />
-                <DetailBlock title="建议" items={pillar.recommendedActions} />
-                <DetailBlock title="证据" items={pillar.evidence} />
+              <CardContent className="space-y-4">
+                {group.pillars.map((pillar) => (
+                  <div
+                    key={pillar.id}
+                    className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-950">{pillar.title}</p>
+                      <div className="flex items-center gap-2">
+                        <Badge className={scoreBadgeClassName(pillar.status)}>
+                          {statusLabel(pillar.status)}
+                        </Badge>
+                        <Badge variant="outline">
+                          {pillar.score}/{pillar.maxScore}
+                        </Badge>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-sm leading-7 text-slate-600">{pillar.summary}</p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <DetailBlock title="症状" items={pillar.findings.slice(0, 3)} />
+                      <DetailBlock title="修正面" items={pillar.recommendedActions.slice(0, 3)} />
+                      <DetailBlock title="证据" items={pillar.evidence.slice(0, 3)} />
+                    </div>
+                  </div>
+                ))}
               </CardContent>
             </Card>
           ))}
@@ -829,9 +868,15 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
       </TabsContent>
 
       <TabsContent value="keywords" className="space-y-4">
+        <div className="grid gap-4 xl:grid-cols-2">
+          {fieldDiagnostics.map((item) => (
+            <FieldDiagnosticCard key={item.field} item={item} />
+          ))}
+        </div>
+
         <Card className="border-slate-200/80 bg-white/85 shadow-none">
           <CardHeader>
-            <CardTitle className="text-lg text-slate-950">重点关键词缺口</CardTitle>
+            <CardTitle className="text-lg text-slate-950">关键词证据</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             {report.keywordGaps.map((gap) => (
@@ -866,6 +911,33 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
       </TabsContent>
 
       <TabsContent value="rewrite" className="space-y-4">
+        <div className="grid gap-4 lg:grid-cols-3">
+          <ActionColumn title="P0 今天处理" items={report.ai.output?.p0Actions.length ? report.ai.output.p0Actions : report.actionPlan.p0} />
+          <ActionColumn title="P1 7-14天推进" items={report.ai.output?.p1Actions.length ? report.ai.output.p1Actions : report.actionPlan.p1} />
+          <ActionColumn title="P2 观察/补强" items={report.ai.output?.p2Actions.length ? report.ai.output.p2Actions : report.actionPlan.p2} />
+        </div>
+
+        <Card className="border-slate-200/80 bg-white/85 shadow-none">
+          <CardHeader>
+            <div className="flex items-center gap-3">
+              <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                <CalendarCheck className="h-4 w-4" />
+              </div>
+              <div>
+                <CardTitle className="text-lg text-slate-950">7 / 14 / 28 天验证计划</CardTitle>
+                <p className="mt-1 text-sm leading-7 text-slate-500">
+                  改完不是等感觉，按窗口看指标；不达标就回滚或换方案。
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="grid gap-4 md:grid-cols-3">
+            {validationPlan.map((item) => (
+              <ValidationStepCard key={item.window} item={item} />
+            ))}
+          </CardContent>
+        </Card>
+
         <Card className="border-slate-200/80 bg-white/85 shadow-none">
           <CardHeader>
             <div className="flex items-center gap-3">
@@ -873,7 +945,7 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
                 <BrainCircuit className="h-4 w-4" />
               </div>
               <div>
-                <CardTitle className="text-lg text-slate-950">模型分析与优化建议</CardTitle>
+                <CardTitle className="text-lg text-slate-950">可直接改写的字段草案</CardTitle>
                 <p className="mt-1 text-sm leading-7 text-slate-500">
                   {report.ai.used
                     ? `已使用 ${report.ai.provider} / ${report.ai.model}`
@@ -886,27 +958,17 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
             {report.ai.output ? (
               <>
                 <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">总评</p>
-                  <p className="mt-2 text-sm leading-7 text-slate-600">
-                    {report.ai.output.executiveSummary}
-                  </p>
-                </div>
-                <div className="grid gap-4 lg:grid-cols-2">
-                  <DetailBlock title="Quick Wins" items={report.ai.output.quickWins} />
-                  <DetailBlock title="Watchouts" items={report.ai.output.watchouts} />
-                </div>
-                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">Title Suggestion</p>
+                  <p className="text-sm font-semibold text-slate-950">Title 草案</p>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
                     {report.ai.output.titleSuggestion}
                   </p>
                 </div>
                 <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">Bullet Suggestions</p>
+                  <p className="text-sm font-semibold text-slate-950">五点草案</p>
                   <SimpleList items={report.ai.output.bulletSuggestions} />
                 </div>
                 <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
-                  <p className="text-sm font-semibold text-slate-950">Search Terms Suggestion</p>
+                  <p className="text-sm font-semibold text-slate-950">Search Terms 草案</p>
                   <p className="mt-2 text-sm leading-7 text-slate-600">
                     {report.ai.output.searchTermsSuggestion}
                   </p>
@@ -921,6 +983,78 @@ function ResultsPanel({ report }: { report: LegacyDiagnosisReport }) {
         </Card>
       </TabsContent>
     </Tabs>
+  );
+}
+
+function RecommendationBlock({ title, value }: { title: string; value: string }) {
+  return (
+    <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
+      <p className="text-sm font-semibold text-slate-950">{title}</p>
+      <p className="mt-2 text-sm leading-7 text-slate-600">{value || "暂无明确结论"}</p>
+    </div>
+  );
+}
+
+function FieldDiagnosticCard({ item }: { item: OperatorFieldDiagnostic }) {
+  return (
+    <Card className="border-slate-200/80 bg-white/85 shadow-none">
+      <CardHeader className="pb-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle className="text-lg text-slate-950">{item.field}</CardTitle>
+          <Badge className={operatorPriorityBadgeClassName(item.priority)}>
+            {item.priority}
+          </Badge>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <RecommendationBlock title="字段问题" value={item.problem} />
+        <RecommendationBlock title="怎么改" value={item.fix} />
+        <div>
+          <p className="text-sm font-semibold text-slate-950">优先承接</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {item.keywords.length ? (
+              item.keywords.map((keyword) => (
+                <Badge key={`${item.field}-${keyword}`} variant="secondary">
+                  {keyword}
+                </Badge>
+              ))
+            ) : (
+              <span className="text-sm text-slate-500">暂无明确词包</span>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActionColumn({ title, items }: { title: string; items: string[] }) {
+  return (
+    <Card className="border-slate-200/80 bg-white/85 shadow-none">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-lg text-slate-950">{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <SimpleList items={items} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function ValidationStepCard({ item }: { item: OperatorValidationStep }) {
+  return (
+    <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50/70 p-4">
+      <div className="flex items-center gap-2">
+        <Badge className="bg-slate-950 text-white hover:bg-slate-950">
+          {item.window}
+        </Badge>
+        <p className="text-sm font-semibold text-slate-950">{item.metric}</p>
+      </div>
+      <p className="mt-3 text-sm leading-7 text-slate-600">{item.target}</p>
+      <p className="mt-3 text-xs leading-6 text-slate-500">
+        回滚信号：{item.rollbackSignal}
+      </p>
+    </div>
   );
 }
 
@@ -984,6 +1118,335 @@ function SimpleList({ items }: { items: string[] }) {
       ))}
     </ul>
   );
+}
+
+function getTopRecommendation(report: LegacyDiagnosisReport): OperatorTopRecommendation {
+  const aiRecommendation = report.ai.output?.topRecommendation;
+  if (
+    aiRecommendation &&
+    (aiRecommendation.problem ||
+      aiRecommendation.why ||
+      aiRecommendation.changeNow ||
+      aiRecommendation.expectedOutcome)
+  ) {
+    return {
+      problem: aiRecommendation.problem || report.score.headline,
+      why: aiRecommendation.why || getPrimaryBlocker(report).summary,
+      changeNow:
+        aiRecommendation.changeNow ||
+        report.actionPlan.p0[0] ||
+        getPrimaryBlocker(report).recommendedActions[0] ||
+        "先修正第一弱项，再联动广告与资产。",
+      expectedOutcome:
+        aiRecommendation.expectedOutcome || "观察 CTR、自然排名、索引词数和 CVR 是否同步改善。",
+      confidence: aiRecommendation.confidence || getConfidenceLabel(report),
+    };
+  }
+
+  const blocker = getPrimaryBlocker(report);
+  return {
+    problem: blocker.summary || report.score.headline,
+    why:
+      blocker.evidence[0] ||
+      blocker.findings[0] ||
+      "规则诊断显示该项是当前得分最低的瓶颈。",
+    changeNow:
+      report.actionPlan.p0[0] ||
+      blocker.recommendedActions[0] ||
+      "先处理最高优先级字段，不要同时大改所有位置。",
+    expectedOutcome: getExpectedOutcome(blocker.id),
+    confidence: getConfidenceLabel(report),
+  };
+}
+
+function buildFieldDiagnostics(report: LegacyDiagnosisReport): OperatorFieldDiagnostic[] {
+  const aiDiagnostics = report.ai.output?.fieldDiagnostics ?? [];
+  if (aiDiagnostics.length > 0) {
+    return aiDiagnostics.map((item) => ({
+      field: item.field,
+      priority: item.priority,
+      problem: item.problem,
+      fix: item.fix,
+      keywords: item.keywords,
+    }));
+  }
+
+  const titleGaps = report.keywordGaps
+    .filter((gap) => !gap.coverage.title)
+    .slice(0, 5);
+  const uncoveredGaps = report.keywordGaps
+    .filter((gap) => !gap.coverage.anywhere)
+    .slice(0, 5);
+  const unhandledNegatives = report.negativeThemes
+    .filter((theme) => !theme.addressedInCopy)
+    .slice(0, 4);
+  const assetPillar = findPillar(report, "assets");
+  const scenePillar = findPillar(report, "scene");
+  const variationPillar = findPillar(report, "variation");
+
+  return [
+    {
+      field: "Title 前80字符",
+      priority: hasCriticalGap(titleGaps) ? "P0" : "P1",
+      problem: titleGaps.length
+        ? `核心词没有进入标题高权重区：${titleGaps.map((gap) => gap.keyword).join(" / ")}。`
+        : "标题已覆盖部分核心词，但仍需要控制重复和前置顺序。",
+      fix: "按“类目词 + 主需求 + 高意图场景 + 关键材质/款式”重排标题前半段，低价值修饰词后置或删除。",
+      keywords: titleGaps.map((gap) => gap.keyword),
+    },
+    {
+      field: "Bullet 1-5",
+      priority: unhandledNegatives.length ? "P0" : "P1",
+      problem: unhandledNegatives.length
+        ? `评论顾虑没有被五点提前回答：${unhandledNegatives.map((theme) => theme.phrase).join(" / ")}。`
+        : "五点可以继续强化结果型卖点和证据链，而不是只承接关键词。",
+      fix: "Bullet 1 先讲购买结果；Bullet 2-3 用材质/结构/评论证据打消顾虑；Bullet 4-5 承接场景、尺码和售后。",
+      keywords: unhandledNegatives.map((theme) => theme.phrase),
+    },
+    {
+      field: "后台 Search Terms",
+      priority: uncoveredGaps.length ? "P0" : "P2",
+      problem: uncoveredGaps.length
+        ? `仍有词没有被任何可见字段承接：${uncoveredGaps.map((gap) => gap.keyword).join(" / ")}。`
+        : "Search Terms 主要用于去重补漏，不应机械重复标题词。",
+      fix: "把标题和五点放不自然的长尾词、同义词、场景词放到 ST，并清理已在标题高频出现的重复词。",
+      keywords: uncoveredGaps.map((gap) => gap.keyword),
+    },
+    {
+      field: "A+ / 图片 / 视频",
+      priority: assetPillar?.status === "weak" ? "P1" : "P2",
+      problem: assetPillar?.summary || "资产层需要和标题、五点讲同一个购买理由。",
+      fix:
+        assetPillar?.recommendedActions[0] ||
+        "用 A+、辅图和视频补足标题/五点讲不透的材质、场景、尺码和对比证据。",
+      keywords: report.keywordGaps.slice(0, 3).map((gap) => gap.keyword),
+    },
+    {
+      field: "类目 / 属性 / 变体",
+      priority:
+        scenePillar?.status === "weak" || variationPillar?.status === "weak"
+          ? "P1"
+          : "P2",
+      problem:
+        scenePillar?.summary ||
+        variationPillar?.summary ||
+        "类目、场景、变体命名要和文案词包一致，否则权重会被稀释。",
+      fix:
+        scenePillar?.recommendedActions[0] ||
+        variationPillar?.recommendedActions[0] ||
+        "核对 browse node、occasion、颜色尺码命名和父子体结构，避免内容与运营结构互相打架。",
+      keywords: report.keywordGaps
+        .filter((gap) => !gap.coverage.anywhere)
+        .slice(0, 3)
+        .map((gap) => gap.keyword),
+    },
+  ];
+}
+
+function buildValidationPlan(report: LegacyDiagnosisReport): OperatorValidationStep[] {
+  const aiPlan = report.ai.output?.validationPlan ?? [];
+  if (aiPlan.length > 0) {
+    return aiPlan.map((item) => ({
+      window: item.window,
+      metric: item.metric,
+      target: item.target,
+      rollbackSignal: item.rollbackSignal,
+    }));
+  }
+
+  return [
+    {
+      window: "7天",
+      metric: "索引词数 / CTR",
+      target: "P0 词开始被收录，CTR 不低于改版前；若标题已改，重点看主图曝光后的点击变化。",
+      rollbackSignal: "CTR 连续下滑且主词曝光没有恢复，说明标题前置或主图承接不匹配。",
+    },
+    {
+      window: "14天",
+      metric: "自然排名 / 广告依赖",
+      target: "至少一批 P0/P1 关键词自然位改善，广告点击能被页面内容接住。",
+      rollbackSignal: "广告点击增加但 CVR 不动，说明五点/A+证据链还没解决信任问题。",
+    },
+    {
+      window: "28天",
+      metric: "CVR / ACOS / 评论主题",
+      target: "CVR、广告自然流量占比或转化成本出现明确改善，新增差评顾虑不再集中重复。",
+      rollbackSignal: "CVR 低于改版前且负向评论主题扩大，需要回滚卖点表达或补资产。",
+    },
+  ];
+}
+
+function buildCompetitorDeltas(report: LegacyDiagnosisReport): string[] {
+  const aiDeltas = report.ai.output?.competitorDeltas ?? [];
+  if (aiDeltas.length > 0) {
+    return aiDeltas;
+  }
+
+  const target = report.targetListing;
+  const competitors = report.competitorSnapshots;
+  const averagePrice = average(competitors.map((item) => item.price));
+  const averageRating = average(competitors.map((item) => item.rating));
+  const averageReviews = average(competitors.map((item) => item.reviews));
+  const bestKeywordCompetitor = [...competitors].sort(
+    (left, right) => right.keywordCount - left.keywordCount
+  )[0];
+  const deltas: string[] = [];
+
+  if (bestKeywordCompetitor) {
+    deltas.push(
+      `${bestKeywordCompetitor.asin} 关键词覆盖约 ${bestKeywordCompetitor.keywordCount} 个，目标 ASIN 当前重点缺口 ${report.keywordGaps.length} 个，先补被竞品拿位的词。`
+    );
+  }
+
+  if (averagePrice > 0 && target.price > 0) {
+    deltas.push(
+      `目标价格 ${formatMoney(target.price)}，竞品均价约 ${formatMoney(averagePrice)}；价格带是否能被材质、评分和资产证据托住，需要在五点/A+里说明。`
+    );
+  }
+
+  if (averageRating > 0 && target.rating > 0) {
+    deltas.push(
+      `目标评分 ${target.rating.toFixed(1)}，竞品均分约 ${averageRating.toFixed(1)}；若评分不占优，文案要提前处理差评高频顾虑。`
+    );
+  }
+
+  if (averageReviews > 0 && target.reviews > 0) {
+    deltas.push(
+      `目标评论 ${target.reviews}，竞品均值约 ${Math.round(averageReviews)}；口碑不够强时，不能只靠标题堆词，要补证据链。`
+    );
+  }
+
+  return deltas.length ? deltas : ["竞品样本不足，当前以关键词缺口、评论信号和字段覆盖作为主要证据。"];
+}
+
+function buildRootCauseGroups(report: LegacyDiagnosisReport) {
+  const groups = [
+    {
+      title: "找不到：搜索与自然流量",
+      summary: "看核心词有没有被标题、ST、类目和广告词包真正接住。",
+      ids: ["search", "scene", "traffic"],
+    },
+    {
+      title: "点了不买：卖点与信任证据",
+      summary: "看五点、评论顾虑、价格锚点和价值表达是否能完成说服。",
+      ids: ["conversion", "value", "mobile"],
+    },
+    {
+      title: "页面撑不住：资产与运营结构",
+      summary: "看 A+、图片视频、变体、合规和实验节奏是否拖累改写效果。",
+      ids: ["assets", "variation", "compliance"],
+    },
+  ];
+
+  return groups.map((group) => ({
+    ...group,
+    pillars: group.ids
+      .map((id) => findPillar(report, id))
+      .filter((pillar): pillar is LegacyDiagnosisReport["pillars"][number] =>
+        Boolean(pillar)
+      ),
+  }));
+}
+
+function getPrimaryBlocker(report: LegacyDiagnosisReport) {
+  const pillar = [...report.pillars].sort(
+    (left, right) => left.score / left.maxScore - right.score / right.maxScore
+  )[0];
+
+  return {
+    ...pillar,
+    shortTitle: shortPillarTitle(pillar.title),
+  };
+}
+
+function getFirstSurface(pillarId: string): string {
+  switch (pillarId) {
+    case "search":
+    case "traffic":
+      return "标题 / ST";
+    case "scene":
+      return "标题 / 类目";
+    case "conversion":
+    case "mobile":
+      return "五点";
+    case "assets":
+      return "A+ / 图片";
+    case "value":
+      return "五点 / 价格";
+    case "variation":
+      return "变体";
+    case "compliance":
+      return "合规";
+    default:
+      return "P0 字段";
+  }
+}
+
+function getExpectedOutcome(pillarId: string): string {
+  switch (pillarId) {
+    case "search":
+    case "traffic":
+      return "优先看索引词数、P0 关键词自然位和广告依赖度是否改善。";
+    case "conversion":
+    case "value":
+      return "优先看 CVR、加购率和评论顾虑是否改善。";
+    case "mobile":
+      return "优先看移动端 CTR 与首屏停留相关指标。";
+    case "assets":
+      return "优先看 CVR、页面停留和 A+ / 视频互动是否改善。";
+    default:
+      return "优先按 7/14/28 天窗口观察 CTR、CVR、自然位和广告成本。";
+  }
+}
+
+function getConfidenceLabel(report: LegacyDiagnosisReport): string {
+  if (report.ai.used && report.competitorSnapshots.length >= 2 && report.targetKeywords.length >= 10) {
+    return "高：模型、竞品和关键词数据均可用";
+  }
+
+  if (report.competitorSnapshots.length > 0 || report.targetKeywords.length > 0) {
+    return "中：已有规则证据，部分结论需复盘验证";
+  }
+
+  return "低：数据源不足，建议补竞品和关键词后复跑";
+}
+
+function findPillar(report: LegacyDiagnosisReport, id: string) {
+  return report.pillars.find((pillar) => pillar.id === id);
+}
+
+function hasCriticalGap(gaps: LegacyDiagnosisReport["keywordGaps"]) {
+  return gaps.some((gap) => gap.opportunity === "critical");
+}
+
+function shortPillarTitle(title: string): string {
+  return title
+    .replace("搜索相关性与索引路径", "搜索索引")
+    .replace("类目、场景与受众映射", "场景类目")
+    .replace("转化卖点与证据链", "卖点证据")
+    .replace("移动端结构与可读性", "移动端")
+    .replace("A+、图片与视频资产协同", "资产协同")
+    .replace("口碑、价格与价值锚点", "价值锚点")
+    .replace("流量结构与广告依赖", "广告依赖")
+    .replace("变体治理与运营健康", "变体治理")
+    .replace("合规、时效与实验计划", "合规实验");
+}
+
+function average(values: number[]): number {
+  const valid = values.filter((value) => Number.isFinite(value) && value > 0);
+  if (valid.length === 0) {
+    return 0;
+  }
+
+  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+}
+
+function formatMoney(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) {
+    return "-";
+  }
+
+  return `$${value.toFixed(2)}`;
 }
 
 function splitCompetitorAsins(value: string): string[] {
@@ -1063,6 +1526,15 @@ function priorityBadgeClassName(priority: "critical" | "high" | "medium") {
     priority === "critical" && "bg-rose-600 hover:bg-rose-600",
     priority === "high" && "bg-amber-500 hover:bg-amber-500",
     priority === "medium" && "bg-slate-700 hover:bg-slate-700"
+  );
+}
+
+function operatorPriorityBadgeClassName(priority: OperatorPriority) {
+  return cn(
+    "text-white",
+    priority === "P0" && "bg-rose-600 hover:bg-rose-600",
+    priority === "P1" && "bg-amber-500 hover:bg-amber-500",
+    priority === "P2" && "bg-slate-700 hover:bg-slate-700"
   );
 }
 

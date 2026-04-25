@@ -319,7 +319,7 @@ async function maybeGenerateAiRecommendations(
           operationName: "legacy copy diagnosis ai recommendations",
           systemPrompt: LEGACY_DIAGNOSIS_SYSTEM_PROMPT,
           userPrompt: buildAiPrompt(report, attempt),
-          maxTokens: 3200,
+          maxTokens: 4200,
           temperature: 0,
         }),
       parseResult: parseAiOutput,
@@ -382,7 +382,9 @@ function buildAiPrompt(report: LegacyDiagnosisReport, attempt: number): string {
   ].join("\n");
 
   return `
-你要根据已有规则诊断结果，输出一份更像资深运营顾问写的“老品文案诊断优化建议”。
+你要根据已有规则诊断结果，输出一份直接可执行的“老品 ASIN 诊断作战台”。
+不要解释诊断框架，不要介绍模块能力，不要复述 Excel 来历，不要写“我们升级了什么”。
+只回答这个目标 ASIN 当前卡在哪里、哪个字段先改、为什么先改、改完看什么指标。
 
 背景:
 - Marketplace: ${report.marketplace}
@@ -411,7 +413,26 @@ ${competitorSummary || "None"}
 请只返回一个 JSON 对象，格式如下:
 {
   "executiveSummary": "中文总评，1段",
+  "topRecommendation": {
+    "problem": "当前最致命的问题，必须指向具体字段/流量/转化卡点",
+    "why": "为什么它优先，必须引用关键词/评论/竞品/分数证据",
+    "changeNow": "现在要怎么改，必须是可交给运营执行的一条动作",
+    "expectedOutcome": "预期拉动的指标，例如 CTR、CVR、自然位、索引词数",
+    "confidence": "高/中/低 + 简短原因"
+  },
   "quickWins": ["中文快改动作1", "中文快改动作2", "中文快改动作3"],
+  "fieldDiagnostics": [
+    {
+      "field": "Title 前80字符 / Bullet 1 / Bullet 2 / Search Terms / A+ Alt Text / 图片视频 / 类目属性",
+      "priority": "P0",
+      "problem": "这个字段现在浪费了什么机会",
+      "fix": "这个字段应该补什么、删什么、前置什么",
+      "keywords": ["keyword 1", "keyword 2"]
+    }
+  ],
+  "competitorDeltas": [
+    "目标 ASIN 与竞品的一个具体差距，不要泛泛说竞品更强"
+  ],
   "titleSuggestion": "English Amazon title",
   "bulletSuggestions": [
     "English bullet 1",
@@ -424,14 +445,37 @@ ${competitorSummary || "None"}
   "p0Actions": ["中文P0动作1", "中文P0动作2"],
   "p1Actions": ["中文P1动作1", "中文P1动作2"],
   "p2Actions": ["中文P2动作1", "中文P2动作2"],
+  "validationPlan": [
+    {
+      "window": "7天",
+      "metric": "要观察的指标",
+      "target": "什么变化算有效",
+      "rollbackSignal": "什么信号说明要回滚或换方案"
+    },
+    {
+      "window": "14天",
+      "metric": "要观察的指标",
+      "target": "什么变化算有效",
+      "rollbackSignal": "什么信号说明要回滚或换方案"
+    },
+    {
+      "window": "28天",
+      "metric": "要观察的指标",
+      "target": "什么变化算有效",
+      "rollbackSignal": "什么信号说明要回滚或换方案"
+    }
+  ],
   "watchouts": ["中文风险提示1", "中文风险提示2"]
 }
 
 规则:
-- executiveSummary、quickWins、p0Actions、p1Actions、p2Actions、watchouts 用简体中文。
+- executiveSummary、topRecommendation、quickWins、fieldDiagnostics、competitorDeltas、p0Actions、p1Actions、p2Actions、validationPlan、watchouts 用简体中文；关键词本身保留英文。
 - titleSuggestion、bulletSuggestions、searchTermsSuggestion 必须用英文。
 - 重写建议必须严格基于现有诊断数据，不要凭空虚构产品功能。
 - 优先处理关键词缺口、评论高频顾虑、移动端可读性、广告依赖和场景映射问题。
+- fieldDiagnostics 必须至少 4 条，且覆盖 Title、Bullet、Search Terms；如果资产或类目有问题，也要覆盖 A+/图片视频/类目属性。
+- competitorDeltas 必须给 3-5 条具体差距，例如价格/评分/关键词/场景表达/资产状态，不要写口号。
+- validationPlan 必须包含 7天、14天、28天三个窗口。
 - titleSuggestion 控制在 200 字符内。
 - bulletSuggestions 必须正好 5 条。
 - searchTermsSuggestion 控制在 250 字符内，尽量避免与标题机械重复。
@@ -465,7 +509,13 @@ function parseAiOutput(value: unknown): LegacyAiOutput {
     executiveSummary: normalizeStringValue(value.executiveSummary, {
       allowEmpty: true,
     }),
+    topRecommendation: parseTopRecommendation(value.topRecommendation),
     quickWins: normalizeTextList(value.quickWins, {
+      maxItems: 5,
+      unique: true,
+    }),
+    fieldDiagnostics: parseFieldDiagnostics(value.fieldDiagnostics),
+    competitorDeltas: normalizeTextList(value.competitorDeltas, {
       maxItems: 5,
       unique: true,
     }),
@@ -488,9 +538,83 @@ function parseAiOutput(value: unknown): LegacyAiOutput {
       maxItems: 6,
       unique: true,
     }),
+    validationPlan: parseValidationPlan(value.validationPlan),
     watchouts: normalizeTextList(value.watchouts, {
       maxItems: 6,
       unique: true,
     }),
   };
+}
+
+function parseTopRecommendation(value: unknown): LegacyAiOutput["topRecommendation"] {
+  if (!isRecord(value)) {
+    return {
+      problem: "",
+      why: "",
+      changeNow: "",
+      expectedOutcome: "",
+      confidence: "",
+    };
+  }
+
+  return {
+    problem: normalizeStringValue(value.problem, { allowEmpty: true }),
+    why: normalizeStringValue(value.why, { allowEmpty: true }),
+    changeNow: normalizeStringValue(value.changeNow, { allowEmpty: true }),
+    expectedOutcome: normalizeStringValue(value.expectedOutcome, { allowEmpty: true }),
+    confidence: normalizeStringValue(value.confidence, { allowEmpty: true }),
+  };
+}
+
+function parseFieldDiagnostics(value: unknown): LegacyAiOutput["fieldDiagnostics"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(isRecord)
+    .map((item) => ({
+      field: normalizeStringValue(item.field, { allowEmpty: true }),
+      priority: normalizeActionPriority(item.priority),
+      problem: normalizeStringValue(item.problem, { allowEmpty: true }),
+      fix: normalizeStringValue(item.fix, { allowEmpty: true }),
+      keywords: normalizeTextList(item.keywords, {
+        maxItems: 6,
+        unique: true,
+      }),
+    }))
+    .filter((item) => item.field && (item.problem || item.fix))
+    .slice(0, 8);
+}
+
+function parseValidationPlan(value: unknown): LegacyAiOutput["validationPlan"] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .filter(isRecord)
+    .map((item) => ({
+      window: normalizeStringValue(item.window, { allowEmpty: true }),
+      metric: normalizeStringValue(item.metric, { allowEmpty: true }),
+      target: normalizeStringValue(item.target, { allowEmpty: true }),
+      rollbackSignal: normalizeStringValue(item.rollbackSignal, {
+        allowEmpty: true,
+      }),
+    }))
+    .filter((item) => item.window && item.metric)
+    .slice(0, 3);
+}
+
+function normalizeActionPriority(value: unknown): "P0" | "P1" | "P2" {
+  if (typeof value !== "string") {
+    return "P1";
+  }
+
+  const normalized = value.trim().toUpperCase();
+  if (normalized === "P0" || normalized === "P1" || normalized === "P2") {
+    return normalized;
+  }
+
+  return "P1";
 }
