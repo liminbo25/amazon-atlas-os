@@ -7,6 +7,10 @@ import { useEffect, useRef, useState } from "react";
 import FreeGenerationPanel from "@/components/image-studio/FreeGenerationPanel";
 import MultiImageUploader from "@/components/image-studio/MultiImageUploader";
 import { StudioHeader } from "@/components/portal/studio-header";
+import {
+  TRY_ON_GARMENT_SCOPE_OPTIONS,
+  type TryOnGarmentScope,
+} from "@/lib/tryon-scope";
 
 type AsyncStatus = "idle" | "processing" | "success" | "error";
 type GeminiImageModel = "nano_banana_pro" | "image2";
@@ -73,6 +77,7 @@ interface ImageGenerationTask {
   clothingImage: string;
   modelImage: string;
   garmentNote: string;
+  garmentScope: TryOnGarmentScope;
   tryOn: ImageTaskState;
   whiteBackground: ImageTaskState;
   enhanced: ImageTaskState;
@@ -246,6 +251,7 @@ function createProcessedTask(input: {
   clothingImage: string;
   modelImage: string;
   garmentNote: string;
+  garmentScope: TryOnGarmentScope;
 }): ImageGenerationTask {
   return {
     id: createTaskId(input.mode, input.clothingIndex, input.modelIndex),
@@ -257,6 +263,7 @@ function createProcessedTask(input: {
     clothingImage: input.clothingImage,
     modelImage: input.modelImage,
     garmentNote: input.garmentNote,
+    garmentScope: input.garmentScope,
     tryOn: createTaskState(),
     whiteBackground: createTaskState(),
     enhanced: createTaskState(),
@@ -482,6 +489,13 @@ function getGenerationModeShortLabel(mode: GenerationMode) {
   return generationModeOptions[mode].shortTitle;
 }
 
+function getTryOnGarmentScopeLabel(scope: TryOnGarmentScope) {
+  return (
+    TRY_ON_GARMENT_SCOPE_OPTIONS.find((option) => option.value === scope)
+      ?.label || TRY_ON_GARMENT_SCOPE_OPTIONS[0].label
+  );
+}
+
 function getPlannedTaskCount(
   mode: GenerationMode,
   clothingCount: number,
@@ -550,7 +564,8 @@ function buildGenerationTasks(
   mode: GenerationMode,
   clothingImages: string[],
   modelImages: string[],
-  garmentNotes: string[]
+  garmentNotes: string[],
+  garmentScope: TryOnGarmentScope
 ) {
   const clothingTotal = clothingImages.length;
   const modelTotal = modelImages.length;
@@ -572,6 +587,7 @@ function buildGenerationTasks(
         clothingImage,
         modelImage: fixedModel,
         garmentNote: garmentNotes[clothingIndex] ?? "",
+        garmentScope,
       })
     );
   }
@@ -593,6 +609,7 @@ function buildGenerationTasks(
         clothingImage: fixedClothing,
         modelImage,
         garmentNote: garmentNotes[0] ?? "",
+        garmentScope,
       })
     );
   }
@@ -608,6 +625,7 @@ function buildGenerationTasks(
         clothingImage,
         modelImage,
         garmentNote: garmentNotes[clothingIndex] ?? "",
+        garmentScope,
       })
     )
   );
@@ -618,7 +636,7 @@ function buildTaskFilename(
   suffix: "try-on" | "white-background" | "enhanced",
   extension: string
 ) {
-  return `image-studio-${task.mode}-c${task.clothingIndex + 1}-m${
+  return `image-studio-${task.mode}-${task.garmentScope}-c${task.clothingIndex + 1}-m${
     task.modelIndex + 1
   }-${suffix}.${extension}`;
 }
@@ -705,6 +723,7 @@ export default function ImageStudioPage() {
   );
   const [clothingImages, setClothingImages] = useState<string[]>([]);
   const [garmentNotes, setGarmentNotes] = useState<string[]>([]);
+  const [garmentScope, setGarmentScope] = useState<TryOnGarmentScope>("upper");
   const [modelImages, setModelImages] = useState<string[]>([]);
   const [standaloneImages, setStandaloneImages] = useState<string[]>([]);
   const [standaloneItems, setStandaloneItems] = useState<StandaloneImageItem[]>(
@@ -757,6 +776,9 @@ export default function ImageStudioPage() {
     clothingImages.length,
     modelImages.length
   );
+  const selectedGarmentScopeOption =
+    TRY_ON_GARMENT_SCOPE_OPTIONS.find((option) => option.value === garmentScope) ||
+    TRY_ON_GARMENT_SCOPE_OPTIONS[0];
 
   useEffect(() => {
     processedTasksRef.current = processedTasks;
@@ -1138,7 +1160,8 @@ export default function ImageStudioPage() {
   async function createFashnTryOnJob(
     clothingImage: string,
     modelImage: string,
-    garmentNote: string
+    garmentNote: string,
+    scope: TryOnGarmentScope
   ) {
     const response = await fetchWithRetry("/api/fashn/tryon", {
       method: "POST",
@@ -1149,6 +1172,7 @@ export default function ImageStudioPage() {
         clothingImage,
         modelImage,
         garmentNote,
+        garmentScope: scope,
       }),
     });
 
@@ -1233,6 +1257,7 @@ export default function ImageStudioPage() {
     clothingImage: string,
     modelImage: string,
     garmentNote: string,
+    scope: TryOnGarmentScope,
     onProgress?: (detail: string) => void
   ) {
     if (selectedTryOnEngine === "fashn") {
@@ -1242,7 +1267,12 @@ export default function ImageStudioPage() {
           tryOnConfigMessage || "FASHN is not configured yet for this workspace."
         );
       }
-      const job = await createFashnTryOnJob(clothingImage, modelImage, garmentNote);
+      const job = await createFashnTryOnJob(
+        clothingImage,
+        modelImage,
+        garmentNote,
+        scope
+      );
       onProgress?.(
         describeTryOnProviderStatus(
           (job.status as TryOnProviderStatus | undefined) || "starting"
@@ -1263,6 +1293,7 @@ export default function ImageStudioPage() {
         clothingImage,
         modelImage,
         garmentNote,
+        garmentScope: scope,
         type: "virtual-tryon",
         size: geminiTryOnSize,
         model: selectedTryOnEngine,
@@ -1276,12 +1307,14 @@ export default function ImageStudioPage() {
     clothingImage: string,
     modelImage: string,
     garmentNote: string,
+    scope: TryOnGarmentScope,
     onProgress?: (detail: string) => void
   ) {
     const result = await requestTryOnImage(
       clothingImage,
       modelImage,
       garmentNote,
+      scope,
       onProgress
     );
 
@@ -1356,6 +1389,7 @@ export default function ImageStudioPage() {
         task.clothingImage,
         task.modelImage,
         task.garmentNote,
+        task.garmentScope,
         (detail) => {
           updateProcessedTask(index, (current) => ({
             ...current,
@@ -1437,7 +1471,8 @@ export default function ImageStudioPage() {
       generationMode,
       clothingImages,
       modelImages,
-      garmentNotes
+      garmentNotes,
+      garmentScope
     );
 
     if (tasks.length === 0) {
@@ -2022,8 +2057,48 @@ export default function ImageStudioPage() {
                   })}
                 </div>
 
+                <div className="mt-6">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-400">
+                        换装范围
+                      </p>
+                      <h3 className="mt-2 text-lg font-semibold tracking-[-0.02em] text-slate-950">
+                        选择这次允许模型替换的服装区域
+                      </h3>
+                    </div>
+                    <span className="rounded-full bg-amber-100 px-4 py-2 text-sm font-semibold text-amber-800">
+                      当前：{selectedGarmentScopeOption.label}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 xl:grid-cols-3">
+                    {TRY_ON_GARMENT_SCOPE_OPTIONS.map((option) => {
+                      const isActive = garmentScope === option.value;
+
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => setGarmentScope(option.value)}
+                          className={`rounded-[1.5rem] border px-5 py-4 text-left transition ${
+                            isActive
+                              ? "border-amber-400 bg-amber-50 text-slate-950 shadow-[0_14px_34px_rgba(245,158,11,0.16)]"
+                              : "border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-400 hover:bg-white"
+                          }`}
+                        >
+                          <p className="text-base font-semibold">{option.label}</p>
+                          <p className="mt-2 text-sm leading-6 opacity-80">
+                            {option.description}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
                 <div className="mt-5 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-7 text-slate-600">
-                  {estimateMessage}
+                  {estimateMessage} 换装范围：{selectedGarmentScopeOption.description}
                 </div>
 
                 {plannedTaskCount >= 20 ? (
@@ -2911,6 +2986,9 @@ export default function ImageStudioPage() {
                             <span className="inline-flex items-center rounded-full bg-slate-950 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white">
                               {getGenerationModeShortLabel(item.mode)}
                             </span>
+                            <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800">
+                              {getTryOnGarmentScopeLabel(item.garmentScope)}
+                            </span>
                             <span
                               className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${getStatusPillClass(
                                 item.tryOn.status
@@ -2940,6 +3018,13 @@ export default function ImageStudioPage() {
                           <p className="text-sm leading-6 text-slate-600">
                             对应组合：服装 {item.clothingIndex + 1} / {item.clothingTotal}
                             ，模特 {item.modelIndex + 1} / {item.modelTotal}
+                          </p>
+                          <p className="text-sm leading-6 text-slate-600">
+                            换装范围：
+                            <span className="font-medium text-slate-900">
+                              {" "}
+                              {getTryOnGarmentScopeLabel(item.garmentScope)}
+                            </span>
                           </p>
                           <p className="text-sm leading-6 text-slate-600">
                             服装备注：

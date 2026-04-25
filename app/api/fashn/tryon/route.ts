@@ -6,6 +6,11 @@ import {
   type FashnRunResponse,
 } from "@/lib/fashn";
 import { isSupportedImageUrl } from "@/lib/image-blob";
+import {
+  getTryOnGarmentScopeOption,
+  normalizeTryOnGarmentScope,
+  type TryOnGarmentScope,
+} from "@/lib/tryon-scope";
 import { buildStrictTryOnPrompt } from "@/lib/tryon-prompts";
 
 export const runtime = "nodejs";
@@ -15,6 +20,7 @@ interface FashnTryOnRequest {
   clothingImage?: string;
   modelImage?: string;
   garmentNote?: string;
+  garmentScope?: TryOnGarmentScope;
 }
 
 async function readFashnRunError(response: Response) {
@@ -89,13 +95,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const prompt = buildStrictTryOnPrompt(body.garmentNote);
-    const response = await fetch(`${config.baseUrl}/run`, {
-      method: "POST",
-      headers: buildFashnAuthHeaders(config.apiKey),
-      body: JSON.stringify({
-        model_name: config.model,
-        inputs: {
+    const garmentScope = normalizeTryOnGarmentScope(body.garmentScope);
+    const scopeOption = getTryOnGarmentScopeOption(garmentScope);
+    const prompt = buildStrictTryOnPrompt(body.garmentNote, garmentScope);
+    const supportsCategoryInput = config.model === "tryon-v1.6";
+    const scopedInputs: Record<string, unknown> = supportsCategoryInput
+      ? {
+          model_image: body.modelImage,
+          garment_image: body.clothingImage,
+          category: scopeOption.fashnCategory,
+          mode: config.generationMode,
+          num_samples: 1,
+          output_format: config.outputFormat,
+          prompt,
+        }
+      : {
           model_image: body.modelImage,
           product_image: body.clothingImage,
           generation_mode: config.generationMode,
@@ -103,7 +117,14 @@ export async function POST(request: NextRequest) {
           output_format: config.outputFormat,
           num_images: 1,
           prompt,
-        },
+        };
+
+    const response = await fetch(`${config.baseUrl}/run`, {
+      method: "POST",
+      headers: buildFashnAuthHeaders(config.apiKey),
+      body: JSON.stringify({
+        model_name: config.model,
+        inputs: scopedInputs,
       }),
     });
 
@@ -138,6 +159,8 @@ export async function POST(request: NextRequest) {
       generationMode: config.generationMode,
       resolution: config.resolution,
       outputFormat: config.outputFormat,
+      garmentScope,
+      category: supportsCategoryInput ? scopeOption.fashnCategory : undefined,
     });
   } catch (error) {
     console.error("FASHN try-on route error:", error);

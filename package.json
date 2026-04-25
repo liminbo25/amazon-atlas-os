@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test:tryon-scope": "node scripts/verify-tryon-scope.mjs",
     "dev:video-backend": "python -m uvicorn app.main:app --reload --app-dir video-backend",
     "dev:video-backend:lan": "python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --app-dir video-backend"
   },

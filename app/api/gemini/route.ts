@@ -3,6 +3,10 @@ import { request as httpsRequest } from "node:https";
 import { NextRequest, NextResponse } from "next/server";
 import { uploadImageSourceToBlob } from "@/lib/image-blob";
 import {
+  normalizeTryOnGarmentScope,
+  type TryOnGarmentScope,
+} from "@/lib/tryon-scope";
+import {
   buildStrictTryOnPrompt,
   TRY_ON_CHAT_IMAGE_LABELS,
 } from "@/lib/tryon-prompts";
@@ -31,6 +35,7 @@ export interface GeminiRequest {
   referenceImages?: string[];
   prompt?: string;
   garmentNote?: string;
+  garmentScope?: TryOnGarmentScope;
   type?: GeminiRequestType;
   freeGenerationMode?: GeminiFreeGenerationMode;
   size?: string;
@@ -1136,9 +1141,13 @@ function shouldRetryWithFallbackSize(
 
 function buildVirtualTryOnPrompt(
   _imageModel: GeminiImageModel,
-  garmentNote?: string
+  garmentNote?: string,
+  garmentScope?: TryOnGarmentScope
 ) {
-  return buildStrictTryOnPrompt(garmentNote);
+  return buildStrictTryOnPrompt(
+    garmentNote,
+    normalizeTryOnGarmentScope(garmentScope)
+  );
 }
 
 function buildWhiteBackgroundPrompt() {
@@ -1214,6 +1223,7 @@ export async function POST(request: NextRequest) {
       modelImage,
       referenceImages,
       garmentNote,
+      garmentScope,
       type = "model-swap",
       freeGenerationMode,
       size,
@@ -1241,7 +1251,7 @@ export async function POST(request: NextRequest) {
       const generation = await runImageGenerationWithFallback({
         geminiApiKey,
         imageModel,
-        prompt: buildVirtualTryOnPrompt(imageModel, garmentNote),
+        prompt: buildVirtualTryOnPrompt(imageModel, garmentNote, garmentScope),
         images: [clothingImage, modelImage],
         imageLabels: TRY_ON_CHAT_IMAGE_LABELS,
         size: size || getDefaultTryOnSize(imageModel),
