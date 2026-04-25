@@ -96,6 +96,8 @@ type OperatorValidationStep = {
   rollbackSignal: string;
 };
 
+const JOB_POLL_INTERVAL_MS = 2_000;
+const JOB_POLL_TIMEOUT_MS = 10 * 60_000;
 const MARKET_OPTIONS = ["US", "CA", "UK", "DE", "FR", "IT", "ES", "JP"];
 
 const PROVIDER_OPTIONS: Array<{ value: AiProvider | "auto"; label: string }> = [
@@ -112,6 +114,7 @@ export function LegacyCopyDiagnosisWorkbench() {
   );
   const [runtimeOpen, setRuntimeOpen] = useState(false);
   const [report, setReport] = useState<LegacyDiagnosisReport | null>(null);
+  const [job, setJob] = useState<LegacyDiagnosisJobSnapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<ApiRequestError | null>(null);
   const [runtimeTesting, setRuntimeTesting] = useState(false);
@@ -253,9 +256,11 @@ export function LegacyCopyDiagnosisWorkbench() {
   const handleAnalyze = async () => {
     setLoading(true);
     setError(null);
+    setReport(null);
+    setJob(null);
 
     try {
-      const response = await fetch("/api/legacy-copy-diagnosis", {
+      const response = await fetch("/api/legacy-copy-diagnosis/jobs", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -282,7 +287,30 @@ export function LegacyCopyDiagnosisWorkbench() {
         throw await parseApiRequestError(response, "老品文案诊断失败");
       }
 
-      setReport((await response.json()) as LegacyDiagnosisReport);
+      const payload = (await response.json()) as {
+        job?: LegacyDiagnosisJobSnapshot;
+        jobId?: string;
+      };
+      const createdJob = payload.job;
+
+      if (!createdJob?.id) {
+        throw new ApiRequestError("诊断任务创建失败。", {
+          code: "legacy_copy_diagnosis_job_missing",
+        });
+      }
+
+      setJob(createdJob);
+
+      const finishedJob = await pollLegacyDiagnosisJob(createdJob.id, setJob);
+
+      if (finishedJob.status === "succeeded" && finishedJob.result) {
+        setReport(finishedJob.result);
+        return;
+      }
+
+      throw new ApiRequestError(finishedJob.error || "诊断任务失败。", {
+        code: finishedJob.code || "legacy_copy_diagnosis_job_failed",
+      });
     } catch (requestError) {
       setError(normalizeApiRequestError(requestError, "老品文案诊断失败"));
     } finally {
@@ -295,6 +323,7 @@ export function LegacyCopyDiagnosisWorkbench() {
     setRuntime(DEFAULT_RUNTIME);
     setSellerSpriteConfig(DEFAULT_SELLER_SPRITE_CONFIG);
     setReport(null);
+    setJob(null);
     setError(null);
     setRuntimeTestResult(null);
   };
@@ -680,6 +709,8 @@ export function LegacyCopyDiagnosisWorkbench() {
                 </div>
               </CardContent>
             </Card>
+
+            {job && loading ? <DiagnosisJobProgressCard job={job} /> : null}
 
             {error ? (
               <AiRequestErrorAlert
@@ -1449,6 +1480,52 @@ function formatMoney(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+function DiagnosisJobProgressCard({ job }: { job: LegacyDiagnosisJobSnapshot }) {
+  const statusText =
+    job.status === "queued"
+      ? "排队中"
+      : job.status === "running"
+        ? "诊断中"
+        : job.status === "succeeded"
+          ? "已完成"
+          : "失败";
+
+  return (
+    <Card className="border-slate-200/80 bg-white/85 shadow-none">
+      <CardContent className="space-y-4 pt-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-950 text-white">
+              <Loader2 className="h-4 w-4 animate-spin" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-950">{statusText}</p>
+              <p className="mt-1 text-sm leading-6 text-slate-500">
+                {job.phaseLabel || "正在准备诊断任务"}
+              </p>
+            </div>
+          </div>
+          <Badge variant="secondary">{job.progress}%</Badge>
+        </div>
+
+        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+          <div
+            className="h-full rounded-full bg-slate-950 transition-all duration-500"
+            style={{ width: `${Math.max(0, Math.min(100, job.progress))}%` }}
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-xs text-slate-500">
+          <Badge variant="outline">{job.marketplace}</Badge>
+          <Badge variant="outline">{job.targetAsin}</Badge>
+          <Badge variant="outline">竞品 {job.competitorCount}</Badge>
+          <Badge variant="outline">{job.store === "postgres" ? "持久任务" : "本机任务"}</Badge>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function splitCompetitorAsins(value: string): string[] {
   return value
     .split(/[\s,，;；]+/)
@@ -1498,6 +1575,69 @@ type RuntimeConnectivityResult = {
   message: string;
   detail?: string;
 };
+
+type LegacyDiagnosisJobSnapshot = {
+  id: string;
+  status: "queued" | "running" | "succeeded" | "failed";
+  phase: string;
+  phaseLabel: string;
+  progress: number;
+  marketplace: string;
+  targetAsin: string;
+  competitorCount: number;
+  updatedAt: string;
+  result: LegacyDiagnosisReport | null;
+  error: string | null;
+  code: string | null;
+  store?: "postgres" | "memory";
+};
+
+async function pollLegacyDiagnosisJob(
+  jobId: string,
+  onUpdate: (job: LegacyDiagnosisJobSnapshot) => void
+): Promise<LegacyDiagnosisJobSnapshot> {
+  const startedAt = Date.now();
+
+  while (Date.now() - startedAt < JOB_POLL_TIMEOUT_MS) {
+    await sleep(JOB_POLL_INTERVAL_MS);
+
+    const response = await fetch(
+      `/api/legacy-copy-diagnosis/jobs/${encodeURIComponent(jobId)}`,
+      {
+        cache: "no-store",
+      }
+    );
+
+    if (!response.ok) {
+      throw await parseApiRequestError(response, "读取诊断任务失败");
+    }
+
+    const payload = (await response.json()) as {
+      job?: LegacyDiagnosisJobSnapshot;
+    };
+    const job = payload.job;
+
+    if (!job?.id) {
+      throw new ApiRequestError("诊断任务返回结构无效。", {
+        code: "legacy_copy_diagnosis_job_invalid",
+      });
+    }
+
+    onUpdate(job);
+
+    if (job.status === "succeeded" || job.status === "failed") {
+      return job;
+    }
+  }
+
+  throw new ApiRequestError("诊断任务仍在运行，前端等待超时。", {
+    code: "legacy_copy_diagnosis_job_poll_timeout",
+  });
+}
+
+function sleep(delayMs: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, delayMs));
+}
 
 function formatPreviewBaseUrl(baseUrl: string): string {
   if (!baseUrl.trim()) {
