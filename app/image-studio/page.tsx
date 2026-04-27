@@ -1425,10 +1425,10 @@ export default function ImageStudioPage() {
     onProgress?.(`Submitting ${selectedTryOnEngineOption.label} try-on request...`);
     const geminiModel = selectedTryOnEngine as GeminiImageModel;
     const modelDimensions = await readImageDimensions(modelImage).catch(() => null);
-    const geminiTryOnSize = getClosestTryOnSizeForAspect(
-      geminiModel,
-      modelDimensions
-    );
+    const geminiTryOnSize =
+      geminiModel === "image2"
+        ? "1024x1024"
+        : getClosestTryOnSizeForAspect(geminiModel, modelDimensions);
     onProgress?.(`按模特原图比例请求输出尺寸：${geminiTryOnSize}`);
     const response = await fetchWithRetry("/api/gemini", {
       method: "POST",

@@ -58,10 +58,12 @@ const DEFAULT_IMAGE_GENERATIONS_API_BASE_URL = "https://ai.yijiarj.cn/v1";
 const DEFAULT_CHAT_COMPLETIONS_API_BASE_URL = "https://api.yijiarj.cn/v1";
 const DEFAULT_MODEL: GeminiImageModel = "nano_banana_pro";
 const DEFAULT_GEMINI_TRYON_SIZE = "1024x1024";
-const IMAGE2_GEMINI_TRYON_SIZE = "1024x1792";
+const IMAGE2_GEMINI_TRYON_SIZE = "1024x1024";
 const GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS = 30_000;
 const GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS = 90_000;
+const GEMINI_CHAT_COMPLETIONS_RESPONSE_TIMEOUT_MS = 180_000;
 const GEMINI_UPSTREAM_MAX_ATTEMPTS = 2;
+const GEMINI_CHAT_COMPLETIONS_MAX_ATTEMPTS = 1;
 const GEMINI_UPSTREAM_RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const IMAGE2_SUPPORTED_SIZES = new Set([
   "1024x1024",
@@ -84,6 +86,11 @@ const GEMINI_UPSTREAM_RETRYABLE_ERROR_CODES = new Set([
   "UPSTREAM_RESPONSE_TIMEOUT",
 ]);
 const MAX_INLINE_RESULT_BYTES = 2 * 1024 * 1024;
+
+interface ProviderRequestOptions {
+  connectTimeoutMs?: number;
+  responseTimeoutMs?: number;
+}
 
 function resolveApiBaseUrl(
   rawBaseUrl: string | undefined,
@@ -310,12 +317,17 @@ async function sendProviderRequest(
   apiBaseUrl: string,
   endpointPath: string,
   geminiApiKey: string,
-  payload: Record<string, unknown>
+  payload: Record<string, unknown>,
+  options: ProviderRequestOptions = {}
 ) {
   const requestUrl = new URL(`${apiBaseUrl}${endpointPath}`);
   const requestBody = JSON.stringify(payload);
   const requestImpl =
     requestUrl.protocol === "http:" ? httpRequest : httpsRequest;
+  const connectTimeoutMs =
+    options.connectTimeoutMs ?? GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS;
+  const responseTimeoutMs =
+    options.responseTimeoutMs ?? GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS;
 
   return new Promise<{
     ok: boolean;
@@ -359,16 +371,16 @@ async function sendProviderRequest(
     const connectTimer = setTimeout(() => {
       request.destroy(
         createErrorWithCode(
-          `Gemini upstream connect timeout after ${GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS}ms`,
+          `Gemini upstream connect timeout after ${connectTimeoutMs}ms`,
           "UPSTREAM_CONNECT_TIMEOUT"
         )
       );
-    }, GEMINI_UPSTREAM_CONNECT_TIMEOUT_MS);
+    }, connectTimeoutMs);
 
-    request.setTimeout(GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS, () => {
+    request.setTimeout(responseTimeoutMs, () => {
       request.destroy(
         createErrorWithCode(
-          `Gemini upstream response timeout after ${GEMINI_UPSTREAM_RESPONSE_TIMEOUT_MS}ms`,
+          `Gemini upstream response timeout after ${responseTimeoutMs}ms`,
           "UPSTREAM_RESPONSE_TIMEOUT"
         )
       );
@@ -401,7 +413,8 @@ async function requestProviderJson(
   endpointPath: string,
   geminiApiKey: string,
   payload: Record<string, unknown>,
-  maxAttempts = GEMINI_UPSTREAM_MAX_ATTEMPTS
+  maxAttempts = GEMINI_UPSTREAM_MAX_ATTEMPTS,
+  options: ProviderRequestOptions = {}
 ) {
   let lastNetworkError: unknown;
 
@@ -411,7 +424,8 @@ async function requestProviderJson(
         apiBaseUrl,
         endpointPath,
         geminiApiKey,
-        payload
+        payload,
+        options
       );
 
       if (
@@ -935,6 +949,13 @@ async function runImageGeneration(options: RunImageGenerationOptions) {
     const normalizedFallbackSize = fallbackSize
       ? normalizeSizeForModel(imageModel, fallbackSize, fallbackSize)
       : undefined;
+    const chatCompletionRequestOptions = {
+      responseTimeoutMs: GEMINI_CHAT_COMPLETIONS_RESPONSE_TIMEOUT_MS,
+    };
+    const chatCompletionMaxAttempts = Math.min(
+      maxAttempts,
+      GEMINI_CHAT_COMPLETIONS_MAX_ATTEMPTS
+    );
     let apiResult = await requestProviderJson(
       apiBaseUrl,
       "/chat/completions",
@@ -948,7 +969,8 @@ async function runImageGeneration(options: RunImageGenerationOptions) {
         ),
         size: normalizedSize,
       },
-      maxAttempts
+      chatCompletionMaxAttempts,
+      chatCompletionRequestOptions
     );
 
     if (
@@ -970,7 +992,8 @@ async function runImageGeneration(options: RunImageGenerationOptions) {
           ),
           size: normalizedFallbackSize,
         },
-        maxAttempts
+        chatCompletionMaxAttempts,
+        chatCompletionRequestOptions
       );
     }
 
